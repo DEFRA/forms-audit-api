@@ -212,7 +212,7 @@ docker build --target development --no-cache --tag forms-audit-api:development .
 Run:
 
 ```bash
-docker run -e PORT=3001 -p 3001:3001 forms-audit-api:development
+docker run -e PORT=3003 -p 3003:3003 forms-audit-api:development
 ```
 
 ### Production image
@@ -226,7 +226,7 @@ docker build --no-cache --tag forms-audit-api .
 Run:
 
 ```bash
-docker run -e PORT=3001 -p 3001:3001 forms-audit-api
+docker run -e PORT=3003 -p 3003:3003 forms-audit-api
 ```
 
 ### Docker Compose

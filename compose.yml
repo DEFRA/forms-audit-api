@@ -70,7 +70,7 @@ services:
       context: .
       target: development
     ports:
-      - '3001:3001'
+      - '3003:3003'
     links:
       - 'localstack:localstack'
       - 'mongodb:mongodb'
@@ -82,7 +82,7 @@ services:
     env_file:
       - 'compose/aws.env'
     environment:
-      PORT: 3001
+      PORT: 3003
       NODE_ENV: development
       LOCALSTACK_ENDPOINT: http://localstack:4566
       MONGO_URI: mongodb://mongodb:27017/
