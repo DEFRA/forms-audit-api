@@ -1,63 +1,26 @@
-import Hapi from '@hapi/hapi'
+import { createServer } from '~/src/api/server.js'
+import { config } from '~/src/config/index.js'
+import { getErrorMessage } from '~/src/helpers/error-message.js'
+import { createLogger } from '~/src/helpers/logging/logger.js'
 
-import { config } from './config.js'
-import { router } from './plugins/router.js'
-import { requestLogger } from './common/helpers/logging/request-logger.js'
-import { mongoDb } from './common/helpers/mongodb.js'
-import { failAction } from './common/helpers/fail-action.js'
-import { secureContext } from './common/helpers/secure-context/index.js'
-import { pulse } from './common/helpers/pulse.js'
-import { requestTracing } from './common/helpers/request-tracing.js'
-import { setupProxy } from './common/helpers/proxy/setup-proxy.js'
+const logger = createLogger()
 
-async function createServer() {
-  setupProxy()
-  const server = Hapi.server({
-    host: config.get('host'),
-    port: config.get('port'),
-    routes: {
-      validate: {
-        options: {
-          abortEarly: false
-        },
-        failAction
-      },
-      security: {
-        hsts: {
-          maxAge: 31536000,
-          includeSubDomains: true,
-          preload: false
-        },
-        xss: 'enabled',
-        noSniff: true,
-        xframe: true
-      }
-    },
-    router: {
-      stripTrailingSlash: true
-    }
-  })
+process.on('unhandledRejection', (error) => {
+  logger.error(
+    `[unhandledRejection] Unhandled rejection - ${getErrorMessage(error)}`
+  )
+  throw error
+})
 
-  // Hapi Plugins:
-  // requestLogger  - automatically logs incoming requests
-  // requestTracing - trace header logging and propagation
-  // secureContext  - loads CA certificates from environment config
-  // pulse          - provides shutdown handlers
-  // mongoDb        - sets up mongo connection pool and attaches to `server` and `request` objects
-  // router         - routes used in the app
-  await server.register([
-    requestLogger,
-    requestTracing,
-    secureContext,
-    pulse,
-    {
-      plugin: mongoDb,
-      options: config.get('mongo')
-    },
-    router
-  ])
+/**
+ * Starts the server.
+ */
+export async function listen() {
+  const server = await createServer()
+  await server.start()
 
-  return server
+  server.logger.info('Server started successfully')
+  server.logger.info(
+    `Access your backend on http://localhost:${config.get('port')}`
+  )
 }
-
-export { createServer }

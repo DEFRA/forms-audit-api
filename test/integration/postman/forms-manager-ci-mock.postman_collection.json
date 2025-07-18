@@ -1,0 +1,1599 @@
+{
+    "info": {
+        "_postman_id": "3aec9dae-9486-48f6-b2f4-21b532ffd6fa",
+        "name": "forms-audit-api",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        "_exporter_id": "37142382"
+    },
+    "item": [
+        {
+            "name": "Find api test for if exists",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const {data} = pm.response.json()",
+                            "    const formToDelete = data.find(form => form.slug === 'api-test-form')",
+                            "    pm.collectionVariables.set('form_id', formToDelete?.id)",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{root}}/forms",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Health",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "",
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{root}}/health",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "health"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{root}}/forms",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const response = pm.response.json()",
+                            "    pm.expect(response.slug).to.eq('api-test-form')",
+                            "    pm.expect(response.status).to.eq('created')",
+                            "    pm.expect(response.id).to.be.a('String')",
+                            "    pm.collectionVariables.set(\"form_id\", response.id);",
+                            "    pm.collectionVariables.set(\"form_slug\", response.slug);",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"title\": \"API test form\",\n    \"organisation\": \"Defra\",\n    \"teamName\": \"Forms Team\",\n    \"teamEmail\": \"name@example.gov.uk\"\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{root}}/forms",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const response = pm.response.json()",
+                            "    pm.expect(response.status).to.eq('updated')",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "PATCH",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"contact\": {\n    \"phone\": \"01234567890\",\n    \"email\": {\n        \"address\": \"{{email}}\",\n        \"responseTime\": \"1 day\"\n    },\n    \"online\": {\n        \"url\": \"http://localhost:3000\",\n        \"text\": \"Some text\"\n    }\n  },\n  \"submissionGuidance\": \"Here is some guidance\",\n  \"privacyNoticeUrl\": \"https://www.gov.uk/help/privacy-notice\",\n  \"notificationEmail\": \"{{email}}\"\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/slug/:form_slug",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{root}}/forms/slug/{{form_slug}}",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "slug",
+                        "{{form_slug}}"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id/definition/draft",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const response = pm.response.json()",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}/definition/draft",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}",
+                        "definition",
+                        "draft"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id/definition/draft v1",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const response = pm.response.json()",
+                            "    pm.expect(response.status).to.eq('updated')",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"name\": \"API test form\",\n    \"startPage\": \"/summary\",\n    \"pages\": [\n        {\n            \"id\": \"449a45f6-4541-4a46-91bd-8b8931b07b50\",\n            \"title\": \"Summary\",\n            \"path\": \"/summary\",\n            \"controller\": \"SummaryPageController\"\n        },\n        {\n            \"title\": \"V1 Page\",\n            \"path\": \"/v1-page\",\n            \"components\": []\n        }\n    ],\n    \"conditions\": [],\n    \"sections\": [\n        {\n            \"name\": \"section\",\n            \"title\": \"Section title\"\n        }\n    ],\n    \"lists\": []\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}/definition/draft",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}",
+                        "definition",
+                        "draft"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id/definition/draft/migrate/v2",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const response = pm.response.json()",
+                            "    pm.expect(response.pages[0].path).to.eq('/v1-page')",
+                            "    pm.expect(response.pages[0].id).to.be.a('String')    ",
+                            "    pm.expect(response.engine).to.eq('V2')",
+                            "    pm.collectionVariables.set('page_id_v1', response.pages[0].id)",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"name\": \"API test form\",\n    \"startPage\": \"/summary\",\n    \"pages\": [\n        {\n            \"id\": \"449a45f6-4541-4a46-91bd-8b8931b07b50\",\n            \"title\": \"Summary\",\n            \"path\": \"/summary\",\n            \"controller\": \"SummaryPageController\"\n        }\n    ],\n    \"conditions\": [],\n    \"sections\": [\n        {\n            \"name\": \"section\",\n            \"title\": \"Section title\"\n        }\n    ],\n    \"lists\": []\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}/definition/draft/migrate/v2",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}",
+                        "definition",
+                        "draft",
+                        "migrate",
+                        "v2"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id/definition/draft/pages 3",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const response = pm.response.json()",
+                            "    pm.collectionVariables.set('page_id_3', response.id)",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"title\": \"Question - should be page 3\",\n    \"path\": \"/page-3\",\n    \"components\": [\n        {\n            \"title\": \"Is this Page 3?\",\n            \"type\": \"TextField\",\n            \"name\": \"AbcDeH\"\n        }\n    ],\n    \"next\": []\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}/definition/draft/pages",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}",
+                        "definition",
+                        "draft",
+                        "pages"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id/definition/draft/pages 2",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const response = pm.response.json()",
+                            "    pm.collectionVariables.set('page_id_2', response.id)",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"title\": \"What is your name to delete?\",\n    \"path\": \"/what-is-your-name-to-delete\",\n    \"components\": [\n        {\n            \"title\": \"What is your name to delete?\",\n            \"type\": \"TextField\",\n            \"name\": \"AbcDeG\"\n        }\n    ],\n    \"next\": []\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}/definition/draft/pages",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}",
+                        "definition",
+                        "draft",
+                        "pages"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id/definition/draft/pages",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const response = pm.response.json()",
+                            "    pm.collectionVariables.set('page_id', response.id)",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"title\": \"What is your address?\",\n    \"path\": \"/what-is-your-address\",\n    \"components\": [\n        {\n            \"title\": \"What is your address?\",\n            \"type\": \"TextField\",\n            \"name\": \"AbcDeF\"\n        }\n    ],\n    \"next\": []\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}/definition/draft/pages",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}",
+                        "definition",
+                        "draft",
+                        "pages"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id/definition/draft/pages/order",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const {pages} = pm.response.json()",
+                            "    pm.expect(pages[0].path).to.eq('/what-is-your-address')",
+                            "    pm.expect(pages[1].path).to.eq('/what-is-your-name-to-delete')",
+                            "    pm.expect(pages[2].path).to.eq('/page-3')",
+                            "    pm.expect(pages[3].path).to.eq('/v1-page')",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "[\n  \"{{page_id}}\",\n  \"{{page_id_2}}\",\n  \"{{page_id_3}}\",\n  \"{{page_id_v1}}\"\n]",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}/definition/draft/pages/order",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}",
+                        "definition",
+                        "draft",
+                        "pages",
+                        "order"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id/definition/draft/pages/:page_id",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "PATCH",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"title\": \"What is your address, really?\"\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}/definition/draft/pages/{{page_id}}",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}",
+                        "definition",
+                        "draft",
+                        "pages",
+                        "{{page_id}}"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id/definition/draft/pages/:page_id/components",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const response = pm.response.json()",
+                            "    pm.expect(response.id).to.be.a('String')",
+                            "    pm.collectionVariables.set('component_id', response.id)",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"name\": \"Ghcbmw\",\n    \"title\": \"Component Test\",\n    \"type\": \"RadiosField\",\n    \"hint\": \"\",\n    \"list\": \"KRcpKo\",\n    \"options\": {},\n    \"schema\": {}\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}/definition/draft/pages/{{page_id}}/components",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}",
+                        "definition",
+                        "draft",
+                        "pages",
+                        "{{page_id}}",
+                        "components"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id/definition/draft/pages/:page_id/components/:component_id",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"name\": \"Ghcbmw\",\n    \"title\": \"Check add id 2\",\n    \"type\": \"RadiosField\",\n    \"hint\": \"\",\n    \"list\": \"KRcpKo\",\n    \"options\": {},\n    \"schema\": {},\n    \"id\": \"{{component_id}}\"\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}/definition/draft/pages/{{page_id}}/components/{{component_id}}",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}",
+                        "definition",
+                        "draft",
+                        "pages",
+                        "{{page_id}}",
+                        "components",
+                        "{{component_id}}"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id/definition/draft/pages/:page_id/components/:component_id",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const response = pm.response.json()",
+                            "    pm.expect(response.status).to.eq('deleted')",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}/definition/draft/pages/{{page_id}}/components/{{component_id}}",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}",
+                        "definition",
+                        "draft",
+                        "pages",
+                        "{{page_id}}",
+                        "components",
+                        "{{component_id}}"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id/definition/draft/lists",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const response = pm.response.json()",
+                            "    pm.collectionVariables.set('list_id', response.id)",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"title\": \"Development language\",\n    \"name\": \"YhmNDD\",\n    \"type\": \"string\",\n    \"items\": [\n        {\n            \"text\": \"Javascript\",\n            \"value\": \"javascript\"\n        },\n        {\n            \"text\": \"TypeScript\",\n            \"value\": \"typescript\"\n        },\n        {\n            \"text\": \"Python\",\n            \"value\": \"python\"\n        },\n        {\n            \"text\": \"Haskell\",\n            \"value\": \"haskell\"\n        },\n        {\n            \"text\": \"Erlang\",\n            \"value\": \"erlang\"\n        },\n        {\n            \"text\": \"Java\",\n            \"value\": \"java\"\n        }\n    ]\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}/definition/draft/lists",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}",
+                        "definition",
+                        "draft",
+                        "lists"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id/definition/draft/lists/:list_id",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"id\":\"{{list_id}}\",\n    \"title\": \"Development language\",\n    \"name\": \"YhmNDP\",\n    \"type\": \"string\",\n    \"items\": [\n        {\n            \"text\": \"Javascript\",\n            \"value\": \"javascript\"\n        },\n        {\n            \"text\": \"TypeScript\",\n            \"value\": \"typescript\"\n        },\n        {\n            \"text\": \"Python\",\n            \"value\": \"python\"\n        },\n        {\n            \"text\": \"Haskell\",\n            \"value\": \"haskell\"\n        },\n        {\n            \"text\": \"Erlang\",\n            \"value\": \"erlang\"\n        },\n        {\n            \"text\": \"Java\",\n            \"value\": \"java\"\n        }\n    ]\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}/definition/draft/lists/{{list_id}}",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}",
+                        "definition",
+                        "draft",
+                        "lists",
+                        "{{list_id}}"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id/definition/draft/lists Copy",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const response = pm.response.json()",
+                            "    pm.collectionVariables.set('list_id', response.id)",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"title\": \"Elements of the Periodic Table\",\n    \"name\": \"Elements\",\n    \"type\": \"number\",\n    \"items\": [\n        { \"text\": \"Hydrogen\", \"value\": 1 },\n        { \"text\": \"Helium\", \"value\": 2 },\n        { \"text\": \"Lithium\", \"value\": 3 },\n        { \"text\": \"Beryllium\", \"value\": 4 },\n        { \"text\": \"Boron\", \"value\": 5 },\n        { \"text\": \"Carbon\", \"value\": 6 },\n        { \"text\": \"Nitrogen\", \"value\": 7 },\n        { \"text\": \"Oxygen\", \"value\": 8 },\n        { \"text\": \"Fluorine\", \"value\": 9 },\n        { \"text\": \"Neon\", \"value\": 10 },\n        { \"text\": \"Sodium\", \"value\": 11 },\n        { \"text\": \"Magnesium\", \"value\": 12 },\n        { \"text\": \"Aluminum\", \"value\": 13 },\n        { \"text\": \"Silicon\", \"value\": 14 },\n        { \"text\": \"Phosphorus\", \"value\": 15 },\n        { \"text\": \"Sulfur\", \"value\": 16 },\n        { \"text\": \"Chlorine\", \"value\": 17 },\n        { \"text\": \"Argon\", \"value\": 18 },\n        { \"text\": \"Potassium\", \"value\": 19 },\n        { \"text\": \"Calcium\", \"value\": 20 },\n        { \"text\": \"Scandium\", \"value\": 21 },\n        { \"text\": \"Titanium\", \"value\": 22 },\n        { \"text\": \"Vanadium\", \"value\": 23 },\n        { \"text\": \"Chromium\", \"value\": 24 },\n        { \"text\": \"Manganese\", \"value\": 25 },\n        { \"text\": \"Iron\", \"value\": 26 },\n        { \"text\": \"Cobalt\", \"value\": 27 },\n        { \"text\": \"Nickel\", \"value\": 28 },\n        { \"text\": \"Copper\", \"value\": 29 },\n        { \"text\": \"Zinc\", \"value\": 30 },\n        { \"text\": \"Gallium\", \"value\": 31 },\n        { \"text\": \"Germanium\", \"value\": 32 },\n        { \"text\": \"Arsenic\", \"value\": 33 },\n        { \"text\": \"Selenium\", \"value\": 34 },\n        { \"text\": \"Bromine\", \"value\": 35 },\n        { \"text\": \"Krypton\", \"value\": 36 },\n        { \"text\": \"Rubidium\", \"value\": 37 },\n        { \"text\": \"Strontium\", \"value\": 38 },\n        { \"text\": \"Yttrium\", \"value\": 39 },\n        { \"text\": \"Zirconium\", \"value\": 40 },\n        { \"text\": \"Niobium\", \"value\": 41 },\n        { \"text\": \"Molybdenum\", \"value\": 42 },\n        { \"text\": \"Technetium\", \"value\": 43 },\n        { \"text\": \"Ruthenium\", \"value\": 44 },\n        { \"text\": \"Rhodium\", \"value\": 45 },\n        { \"text\": \"Palladium\", \"value\": 46 },\n        { \"text\": \"Silver\", \"value\": 47 },\n        { \"text\": \"Cadmium\", \"value\": 48 },\n        { \"text\": \"Indium\", \"value\": 49 },\n        { \"text\": \"Tin\", \"value\": 50 },\n        { \"text\": \"Antimony\", \"value\": 51 },\n        { \"text\": \"Tellurium\", \"value\": 52 },\n        { \"text\": \"Iodine\", \"value\": 53 },\n        { \"text\": \"Xenon\", \"value\": 54 },\n        { \"text\": \"Cesium\", \"value\": 55 },\n        { \"text\": \"Barium\", \"value\": 56 },\n        { \"text\": \"Lanthanum\", \"value\": 57 },\n        { \"text\": \"Cerium\", \"value\": 58 },\n        { \"text\": \"Praseodymium\", \"value\": 59 },\n        { \"text\": \"Neodymium\", \"value\": 60 },\n        { \"text\": \"Promethium\", \"value\": 61 },\n        { \"text\": \"Samarium\", \"value\": 62 },\n        { \"text\": \"Europium\", \"value\": 63 },\n        { \"text\": \"Gadolinium\", \"value\": 64 },\n        { \"text\": \"Terbium\", \"value\": 65 },\n        { \"text\": \"Dysprosium\", \"value\": 66 },\n        { \"text\": \"Holmium\", \"value\": 67 },\n        { \"text\": \"Erbium\", \"value\": 68 },\n        { \"text\": \"Thulium\", \"value\": 69 },\n        { \"text\": \"Ytterbium\", \"value\": 70 },\n        { \"text\": \"Lutetium\", \"value\": 71 },\n        { \"text\": \"Hafnium\", \"value\": 72 },\n        { \"text\": \"Tantalum\", \"value\": 73 },\n        { \"text\": \"Tungsten\", \"value\": 74 },\n        { \"text\": \"Rhenium\", \"value\": 75 },\n        { \"text\": \"Osmium\", \"value\": 76 },\n        { \"text\": \"Iridium\", \"value\": 77 },\n        { \"text\": \"Platinum\", \"value\": 78 },\n        { \"text\": \"Gold\", \"value\": 79 },\n        { \"text\": \"Mercury\", \"value\": 80 },\n        { \"text\": \"Thallium\", \"value\": 81 },\n        { \"text\": \"Lead\", \"value\": 82 },\n        { \"text\": \"Bismuth\", \"value\": 83 },\n        { \"text\": \"Polonium\", \"value\": 84 },\n        { \"text\": \"Astatine\", \"value\": 85 },\n        { \"text\": \"Radon\", \"value\": 86 },\n        { \"text\": \"Francium\", \"value\": 87 },\n        { \"text\": \"Radium\", \"value\": 88 },\n        { \"text\": \"Actinium\", \"value\": 89 },\n        { \"text\": \"Thorium\", \"value\": 90 },\n        { \"text\": \"Protactinium\", \"value\": 91 },\n        { \"text\": \"Uranium\", \"value\": 92 },\n        { \"text\": \"Neptunium\", \"value\": 93 },\n        { \"text\": \"Plutonium\", \"value\": 94 },\n        { \"text\": \"Americium\", \"value\": 95 },\n        { \"text\": \"Curium\", \"value\": 96 },\n        { \"text\": \"Berkelium\", \"value\": 97 },\n        { \"text\": \"Californium\", \"value\": 98 },\n        { \"text\": \"Einsteinium\", \"value\": 99 },\n        { \"text\": \"Fermium\", \"value\": 100 }\n    ]\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}/definition/draft/lists",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}",
+                        "definition",
+                        "draft",
+                        "lists"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Conflict /forms/:form_id/definition/draft/lists/:list_id",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(409);",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"id\": \"{{list_id}}\",\n    \"title\": \"Elements of the Periodic Table\",\n    \"name\": \"YhmNDP\",\n    \"type\": \"number\",\n    \"items\": [\n        { \"text\": \"Hydrogen\", \"value\": 1 },\n        { \"text\": \"Helium\", \"value\": 2 },\n        { \"text\": \"Lithium\", \"value\": 3 },\n        { \"text\": \"Beryllium\", \"value\": 4 },\n        { \"text\": \"Boron\", \"value\": 5 },\n        { \"text\": \"Carbon\", \"value\": 6 },\n        { \"text\": \"Nitrogen\", \"value\": 7 },\n        { \"text\": \"Oxygen\", \"value\": 8 },\n        { \"text\": \"Fluorine\", \"value\": 9 },\n        { \"text\": \"Neon\", \"value\": 10 },\n        { \"text\": \"Sodium\", \"value\": 11 },\n        { \"text\": \"Magnesium\", \"value\": 12 },\n        { \"text\": \"Aluminum\", \"value\": 13 },\n        { \"text\": \"Silicon\", \"value\": 14 },\n        { \"text\": \"Phosphorus\", \"value\": 15 },\n        { \"text\": \"Sulfur\", \"value\": 16 },\n        { \"text\": \"Chlorine\", \"value\": 17 },\n        { \"text\": \"Argon\", \"value\": 18 },\n        { \"text\": \"Potassium\", \"value\": 19 },\n        { \"text\": \"Calcium\", \"value\": 20 },\n        { \"text\": \"Scandium\", \"value\": 21 },\n        { \"text\": \"Titanium\", \"value\": 22 },\n        { \"text\": \"Vanadium\", \"value\": 23 },\n        { \"text\": \"Chromium\", \"value\": 24 },\n        { \"text\": \"Manganese\", \"value\": 25 },\n        { \"text\": \"Iron\", \"value\": 26 },\n        { \"text\": \"Cobalt\", \"value\": 27 },\n        { \"text\": \"Nickel\", \"value\": 28 },\n        { \"text\": \"Copper\", \"value\": 29 },\n        { \"text\": \"Zinc\", \"value\": 30 },\n        { \"text\": \"Gallium\", \"value\": 31 },\n        { \"text\": \"Germanium\", \"value\": 32 },\n        { \"text\": \"Arsenic\", \"value\": 33 },\n        { \"text\": \"Selenium\", \"value\": 34 },\n        { \"text\": \"Bromine\", \"value\": 35 },\n        { \"text\": \"Krypton\", \"value\": 36 },\n        { \"text\": \"Rubidium\", \"value\": 37 },\n        { \"text\": \"Strontium\", \"value\": 38 },\n        { \"text\": \"Yttrium\", \"value\": 39 },\n        { \"text\": \"Zirconium\", \"value\": 40 },\n        { \"text\": \"Niobium\", \"value\": 41 },\n        { \"text\": \"Molybdenum\", \"value\": 42 },\n        { \"text\": \"Technetium\", \"value\": 43 },\n        { \"text\": \"Ruthenium\", \"value\": 44 },\n        { \"text\": \"Rhodium\", \"value\": 45 },\n        { \"text\": \"Palladium\", \"value\": 46 },\n        { \"text\": \"Silver\", \"value\": 47 },\n        { \"text\": \"Cadmium\", \"value\": 48 },\n        { \"text\": \"Indium\", \"value\": 49 },\n        { \"text\": \"Tin\", \"value\": 50 },\n        { \"text\": \"Antimony\", \"value\": 51 },\n        { \"text\": \"Tellurium\", \"value\": 52 },\n        { \"text\": \"Iodine\", \"value\": 53 },\n        { \"text\": \"Xenon\", \"value\": 54 },\n        { \"text\": \"Cesium\", \"value\": 55 },\n        { \"text\": \"Barium\", \"value\": 56 },\n        { \"text\": \"Lanthanum\", \"value\": 57 },\n        { \"text\": \"Cerium\", \"value\": 58 },\n        { \"text\": \"Praseodymium\", \"value\": 59 },\n        { \"text\": \"Neodymium\", \"value\": 60 },\n        { \"text\": \"Promethium\", \"value\": 61 },\n        { \"text\": \"Samarium\", \"value\": 62 },\n        { \"text\": \"Europium\", \"value\": 63 },\n        { \"text\": \"Gadolinium\", \"value\": 64 },\n        { \"text\": \"Terbium\", \"value\": 65 },\n        { \"text\": \"Dysprosium\", \"value\": 66 },\n        { \"text\": \"Holmium\", \"value\": 67 },\n        { \"text\": \"Erbium\", \"value\": 68 },\n        { \"text\": \"Thulium\", \"value\": 69 },\n        { \"text\": \"Ytterbium\", \"value\": 70 },\n        { \"text\": \"Lutetium\", \"value\": 71 },\n        { \"text\": \"Hafnium\", \"value\": 72 },\n        { \"text\": \"Tantalum\", \"value\": 73 },\n        { \"text\": \"Tungsten\", \"value\": 74 },\n        { \"text\": \"Rhenium\", \"value\": 75 },\n        { \"text\": \"Osmium\", \"value\": 76 },\n        { \"text\": \"Iridium\", \"value\": 77 },\n        { \"text\": \"Platinum\", \"value\": 78 },\n        { \"text\": \"Gold\", \"value\": 79 },\n        { \"text\": \"Mercury\", \"value\": 80 },\n        { \"text\": \"Thallium\", \"value\": 81 },\n        { \"text\": \"Lead\", \"value\": 82 },\n        { \"text\": \"Bismuth\", \"value\": 83 },\n        { \"text\": \"Polonium\", \"value\": 84 },\n        { \"text\": \"Astatine\", \"value\": 85 },\n        { \"text\": \"Radon\", \"value\": 86 },\n        { \"text\": \"Francium\", \"value\": 87 },\n        { \"text\": \"Radium\", \"value\": 88 },\n        { \"text\": \"Actinium\", \"value\": 89 },\n        { \"text\": \"Thorium\", \"value\": 90 },\n        { \"text\": \"Protactinium\", \"value\": 91 },\n        { \"text\": \"Uranium\", \"value\": 92 },\n        { \"text\": \"Neptunium\", \"value\": 93 },\n        { \"text\": \"Plutonium\", \"value\": 94 },\n        { \"text\": \"Americium\", \"value\": 95 },\n        { \"text\": \"Curium\", \"value\": 96 },\n        { \"text\": \"Berkelium\", \"value\": 97 },\n        { \"text\": \"Californium\", \"value\": 98 },\n        { \"text\": \"Einsteinium\", \"value\": 99 },\n        { \"text\": \"Fermium\", \"value\": 100 }\n    ]\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}/definition/draft/lists/{{list_id}}",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}",
+                        "definition",
+                        "draft",
+                        "lists",
+                        "{{list_id}}"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id/definition/draft/lists/:list_id",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}/definition/draft/lists/{{list_id}}",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}",
+                        "definition",
+                        "draft",
+                        "lists",
+                        "{{list_id}}"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id/definition/draft Copy",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const response = pm.response.json()",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}/definition/draft",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}",
+                        "definition",
+                        "draft"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id/definition/draft/pages/:page_id",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}/definition/draft/pages/{{page_id}}",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}",
+                        "definition",
+                        "draft",
+                        "pages",
+                        "{{page_id}}"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                    "raw": "{{root}}/forms/{{form_id}}",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{form_id}}"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const response = pm.response.json()",
+                            "    pm.expect(response.slug).to.eq('form-to-go-live')",
+                            "    pm.expect(response.status).to.eq('created')",
+                            "    pm.expect(response.id).to.be.a('String')",
+                            "    pm.collectionVariables.set(\"form_id\", response.id);",
+                            "    pm.collectionVariables.set(\"form_slug\", response.slug);",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"title\": \"Form to go live\",\n    \"organisation\": \"Defra\",\n    \"teamName\": \"Forms Team\",\n    \"teamEmail\": \"name@example.gov.uk\"\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{root}}/forms",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Find form to go live",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const { data } = pm.response.json()",
+                            "    const {id} = data.find(form => form.slug === 'form-to-go-live')",
+                            "    pm.expect(id).to.be.a('String')",
+                            "    pm.collectionVariables.set('go_live_form_id', id)",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{root}}/forms",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const response = pm.response.json()",
+                            "    pm.expect(response.status).to.eq('updated')",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "PATCH",
+                "header": [],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"contact\": {\n    \"phone\": \"01234567890\",\n    \"email\": {\n        \"address\": \"{{email}}\",\n        \"responseTime\": \"1 day\"\n    },\n    \"online\": {\n        \"url\": \"http://localhost:3000\",\n        \"text\": \"Some text\"\n    }\n  },\n  \"submissionGuidance\": \"Here is some guidance\",\n  \"privacyNoticeUrl\": \"https://www.gov.uk/help/privacy-notice\",\n  \"notificationEmail\": \"{{email}}\"\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{root}}/forms/{{go_live_form_id}}",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{go_live_form_id}}"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "{{root}}/forms/{{form_id}}/create-live",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const { status } = pm.response.json()",
+                            "    pm.expect(status).to.eq('created-live')",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                    "raw": "{{root}}/forms/{{go_live_form_id}}/create-live",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{go_live_form_id}}",
+                        "create-live"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "/forms/:form_id/definition",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "exec": [
+                            "pm.test(\"response is ok\", function () {",
+                            "    pm.response.to.have.status(200);",
+                            "    const response = pm.response.json()",
+                            "});"
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                },
+                {
+                    "listen": "prerequest",
+                    "script": {
+                        "exec": [
+                            ""
+                        ],
+                        "type": "text/javascript",
+                        "packages": {}
+                    }
+                }
+            ],
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{root}}/forms/{{go_live_form_id}}/definition",
+                    "host": [
+                        "{{root}}"
+                    ],
+                    "path": [
+                        "forms",
+                        "{{go_live_form_id}}",
+                        "definition"
+                    ]
+                }
+            },
+            "response": []
+        }
+    ],
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{access_token}}",
+                "type": "string"
+            }
+        ]
+    },
+    "event": [
+        {
+            "listen": "prerequest",
+            "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "exec": [
+                    "// Collection Pre-request Script",
+                    "",
+                    "function fetchNewToken() {",
+                    "    const username = pm.environment.get('username');",
+                    "    const password = pm.environment.get('password');",
+                    "    const clientId = pm.environment.get('clientId');",
+                    "    const clientSecret = pm.environment.get('clientSecret');",
+                    "    const scope = pm.environment.get('scope');",
+                    "    const accessTokenUrl = pm.environment.get('accessTokenUrl');",
+                    "",
+                    "    console.log(\"Attempting to fetch new token...\");",
+                    "",
+                    "    let basicAuthHeaderValue = \"\";",
+                    "    try {",
+                    "        const credentialsToEncode = clientId + \":\" + clientSecret;",
+                    "        basicAuthHeaderValue = \"Basic \" + btoa(credentialsToEncode);",
+                    "    } catch (e) {",
+                    "        console.error(\"Error encoding Basic Auth for token request:\", e);",
+                    "        return; ",
+                    "    }",
+                    "",
+                    "    pm.sendRequest({",
+                    "        url: accessTokenUrl,",
+                    "        method: 'POST',",
+                    "        header: [",
+                    "            { key: 'Content-Type', value: 'application/x-www-form-urlencoded' },",
+                    "            { key: 'Authorization', value: basicAuthHeaderValue }",
+                    "        ],",
+                    "        body: {",
+                    "            mode: 'urlencoded',",
+                    "            urlencoded: [",
+                    "                { key: 'grant_type', value: 'password' },",
+                    "                { key: 'username', value: username },",
+                    "                { key: 'password', value: password },",
+                    "                { key: 'scope', value: scope }",
+                    "            ]",
+                    "        }",
+                    "    }, function(err, res) {",
+                    "        if (err) {",
+                    "            console.error('Error fetching token:', JSON.stringify(err));",
+                    "            pm.environment.unset('access_token');",
+                    "            pm.environment.unset('token_expiry_time');",
+                    "        } else {",
+                    "            if (res.code === 200) {",
+                    "                var responseJson = res.json();",
+                    "                pm.environment.set('access_token', responseJson.access_token);",
+                    "                const expiryTime = Date.now() + (responseJson.expires_in * 1000) - 30000; ",
+                    "                pm.environment.set('token_expiry_time', expiryTime);",
+                    "                console.log('New token acquired. Expires around: ' + new Date(expiryTime).toLocaleTimeString());",
+                    "            } else {",
+                    "                console.error('Failed to get new token. Status:', res.code, 'Body:', res.text());",
+                    "                pm.environment.unset('access_token');",
+                    "                pm.environment.unset('token_expiry_time');",
+                    "            }",
+                    "        }",
+                    "    });",
+                    "}",
+                    "",
+                    "const existingToken = pm.environment.get('access_token');",
+                    "const expiryTime = pm.environment.get('token_expiry_time');",
+                    "",
+                    "if (existingToken && expiryTime && Date.now() < parseInt(expiryTime)) {",
+                    "    // console.log('Using existing, valid token.'); // Optional: uncomment for debugging token reuse",
+                    "} else {",
+                    "    fetchNewToken();",
+                    "}"
+                ]
+            }
+        },
+        {
+            "listen": "test",
+            "script": {
+                "type": "text/javascript",
+                "packages": {},
+                "exec": [
+                    ""
+                ]
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "form_id",
+            "value": ""
+        },
+        {
+            "key": "form_slug",
+            "value": ""
+        },
+        {
+            "key": "page_id",
+            "value": ""
+        },
+        {
+            "key": "component_id",
+            "value": ""
+        },
+        {
+            "key": "list_id",
+            "value": ""
+        },
+        {
+            "key": "page_id_v1",
+            "value": ""
+        },
+        {
+            "key": "page_id_3",
+            "value": ""
+        },
+        {
+            "key": "page_id_2",
+            "value": ""
+        },
+        {
+            "key": "go_live_form_id",
+            "value": ""
+        }
+    ]
+}

@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  mongo_test:
+    image: mongo:6.0
+    container_name: forms-audit-api-mongo-test
+    command: ['--replSet', 'rs0', '--bind_ip_all', '--port', '27017']
+    ports:
+      - '27018:27017'
+    volumes:
+      - mongo_test_data:/data/db
+    healthcheck:
+      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo_test:27017'}]}) }" | mongosh --port 27017 --quiet
+      interval: 5s
+      timeout: 30s
+      start_period: 10s
+      retries: 30
+    environment:
+      MONGO_INITDB_DATABASE: forms-audit-api-test
+    networks:
+      - forms_test_net
+
+  oidc:
+    image: ghcr.io/soluto/oidc-server-mock:0.6.0
+    container_name: oidc-mock-test
+    ports:
+      - '5556:80'
+    environment:
+      ISSUER: http://oidc:80
+      PORT: 80
+      USERS_CONFIGURATION_PATH: /data/users.yml
+      CLIENTS_CONFIGURATION_PATH: /data/clients.yml
+      API_SCOPES_INLINE: |
+        - Name: "newman-test-client"
+      API_RESOURCES_INLINE: |
+        - Name: "newman-test-client"
+          DisplayName: "Forms Audit API Test Resource"
+          Scopes: ["newman-test-client"]
+          UserClaims: ["oid", "groups", "email", "name", "preferred_username", "email_verified"]
+      SERVER_OPTIONS_INLINE: |
+        {
+          "IssuerUri": "http://oidc:80",
+          "AccessTokenJwtType": "JWT",
+          "Discovery": {
+            "ShowKeySet": true
+          },
+          "Events": { "RaiseErrorEvents": true, "RaiseSuccessEvents": true, "RaiseInformationEvents": true }
+        }
+    volumes:
+      - ./test/integration/postman/oidc-config:/data:ro
+    networks:
+      - forms_test_net
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'wget -q --spider http://localhost:80/.well-known/openid-configuration || exit 1'
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 18
+      start_period: 90s
+
+  app_test:
+    build:
+      context: .
+      target: production
+    container_name: forms-audit-api-app-test
+    ports:
+      - '3001:3001'
+    environment:
+      MONGO_URI: mongodb://mongo_test:27017/forms-audit-api-test?replicaSet=rs0&directConnection=true
+      PORT: 3001
+      NODE_ENV: production
+      OIDC_JWKS_URI: 'http://oidc:80/.well-known/openid-configuration/jwks'
+      OIDC_VERIFY_AUD: 'newman-test-client'
+      OIDC_VERIFY_ISS: 'http://oidc:80'
+      ROLE_EDITOR_GROUP_ID: '7049296f-2156-4d61-8ac3-349276438ef9'
+    depends_on:
+      mongo_test:
+        condition: service_healthy
+      oidc:
+        condition: service_started
+    command: ['npm', 'start', '--ignore-scripts']
+    networks:
+      - forms_test_net
+
+  newman:
+    image: postman/newman:latest
+    container_name: forms-audit-api-newman-test
+    environment:
+      NEWMAN_TOKEN_URL: 'http://oidc:80/connect/token'
+      NEWMAN_USERNAME: 'newman-service-account'
+      NEWMAN_PASSWORD: 'newman-mock-password'
+      NEWMAN_CLIENT_ID: 'newman-test-client'
+      NEWMAN_CLIENT_SECRET: 'newman-mock-secret'
+      NEWMAN_SCOPE: 'openid profile email newman-test-client'
+      NEWMAN_TEST_EMAIL: 'test.email@defra.gov.uk'
+      API_URL: 'http://app_test:3001'
+    volumes:
+      - ./test/integration/postman:/etc/newman
+      - ./newman-reports:/etc/newman/reports
+    depends_on:
+      - app_test
+    networks:
+      - forms_test_net
+
+volumes:
+  mongo_test_data:
+
+networks:
+  forms_test_net:
