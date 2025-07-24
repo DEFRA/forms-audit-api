@@ -10,3 +10,4 @@ coverage
 .env
 newman-reports
 *.tsbuildinfo
+*.env
