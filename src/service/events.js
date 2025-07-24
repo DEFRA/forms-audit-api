@@ -35,7 +35,7 @@ export function mapAuditEvent(message) {
 }
 
 /**
- * @param {Message} messages
+ * @param {SQSMessage[]} messages
  * @returns
  */
 export async function createAuditEvents(messages) {
