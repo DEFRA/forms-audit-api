@@ -14,7 +14,8 @@ const receiveMessageTimeout = config.get('receiveMessageTimeout')
  */
 const input = {
   QueueUrl: config.get('sqsEventsQueueUrl'),
-  MaxNumberOfMessages: 10
+  MaxNumberOfMessages: 10, // TODO: env variable
+  VisibilityTimeout: (receiveMessageTimeout / 1000) * 2
 }
 
 /**
@@ -33,7 +34,7 @@ export function receiveEventMessages() {
  */
 async function saveEvents(messages) {
   logger.info(messages)
-
+  // batch save in mongo, return the failed ones - if succeeded delete, otherwise leave
   return Promise.resolve(true)
 }
 
@@ -49,7 +50,7 @@ export async function runTask() {
 
   logger.info(`Received ${messageCount} queue messages`)
 
-  if (messages) {
+  if (messages && messageCount) {
     logger.info('Saving queue messages to DB')
 
     await saveEvents(messages)
