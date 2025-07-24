@@ -12,6 +12,9 @@ import { prepareDb } from '~/src/mongo.js'
 import { router } from '~/src/plugins/router.js'
 import { transformErrors } from '~/src/plugins/transform-errors.js'
 import { prepareSecureContext } from '~/src/secure-context.js'
+import { runTask } from '~/src/tasks/receive-messages.js'
+
+await runTask()
 
 const isProduction = config.get('isProduction')
 

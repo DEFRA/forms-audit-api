@@ -185,6 +185,12 @@ export const config = convict({
     format: String,
     default: '',
     env: 'EVENTS_SQS_QUEUE_URL'
+  },
+  receiveMessageTimeout: {
+    doc: 'The wait time between each poll in milliseconds',
+    format: Number,
+    default: 30 * 1000,
+    env: 'RECEIVE_MESSAGE_TIMEOUT_MS'
   }
 })
 
