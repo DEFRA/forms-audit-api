@@ -14,8 +14,6 @@ import { transformErrors } from '~/src/plugins/transform-errors.js'
 import { prepareSecureContext } from '~/src/secure-context.js'
 import { runTask } from '~/src/tasks/receive-messages.js'
 
-await runTask()
-
 const isProduction = config.get('isProduction')
 
 const proxyAgent = new ProxyAgent()
@@ -68,6 +66,8 @@ export async function createServer() {
   await prepareDb(server.logger)
   await server.register(transformErrors)
   await server.register(router)
+
+  await runTask()
 
   return server
 }
