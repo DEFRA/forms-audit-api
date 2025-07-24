@@ -1,86 +1,53 @@
-import {
-  DeleteMessageBatchCommand,
-  ReceiveMessageCommand
-} from '@aws-sdk/client-sqs'
-
-import { config } from '~/src/config/index.js'
 import { createLogger } from '~/src/helpers/logging/logger.js'
+import {
+  deleteEventMessages,
+  receiveEventMessages,
+  receiveMessageTimeout
+} from '~/src/messaging/event.js'
 import { createAuditEvents } from '~/src/service/events.js'
-import { sqsClient } from '~/src/tasks/sqs.js'
 
 const logger = createLogger()
 
-const receiveMessageTimeout = config.get('receiveMessageTimeout')
-const queueUrl = config.get('sqsEventsQueueUrl')
-
 /**
- * @type {ReceiveMessageCommandInput}
+ * @returns {Promise<void>}
  */
-const input = {
-  QueueUrl: queueUrl,
-  MaxNumberOfMessages: 10, // TODO: env variable
-  VisibilityTimeout: (receiveMessageTimeout / 1000) * 2
-}
-
-/**
- * Receive event messages
- * @returns {Promise<ReceiveMessageResult>}
- */
-export function receiveEventMessages() {
-  const command = new ReceiveMessageCommand(input)
-  return sqsClient.send(command)
-}
-
-/**
- * Delete event messages
- * @param {Message[]} messages
- * @returns {Promise<DeleteMessageBatchCommandOutput>}
- */
-export function deleteEventMessages(messages) {
-  const command = new DeleteMessageBatchCommand({
-    QueueUrl: queueUrl,
-    Entries: messages.map((message) => ({
-      Id: message.MessageId,
-      ReceiptHandle: message.ReceiptHandle
-    }))
-  })
-
-  return sqsClient.send(command)
-}
-
-/**
- * Task to poll for messages and store the result in the DB
- */
-export async function runTask() {
+export async function runTaskOnce() {
   logger.info('Receiving queue messages')
 
-  const result = await receiveEventMessages()
-  const messages = result.Messages
-  const messageCount = messages ? messages.length : 0
+  try {
+    const result = await receiveEventMessages()
+    const messages = result.Messages
+    const messageCount = messages ? messages.length : 0
 
-  logger.info(`Received ${messageCount} queue messages`)
+    logger.info(`Received ${messageCount} queue messages`)
 
-  if (messages && messageCount) {
-    logger.info('Saving queue messages to DB')
+    if (messages && messageCount) {
+      logger.info('Saving queue messages to DB')
 
-    const savedMessageIds = await createAuditEvents(messages)
-    const savedMessageCount = savedMessageIds.length
+      const { saved, savedMessageCount } = await createAuditEvents(messages)
 
-    logger.info(`Saved ${savedMessageCount} queue messages to DB`)
+      logger.info(`Saved ${savedMessageCount} queue messages to DB`)
 
-    if (savedMessageCount > 0) {
-      const messagesToDelete = messages.filter((message) =>
-        savedMessageIds.includes(message.MessageId)
-      )
+      if (savedMessageCount > 0) {
+        await deleteEventMessages(saved)
 
-      await deleteEventMessages(messagesToDelete)
-
-      logger.info(`Deleted ${savedMessageCount}`)
+        logger.info(`Deleted ${savedMessageCount}`)
+      }
     }
+  } catch (e) {
+    logger.error(`Receive messages task failed`, e)
   }
+}
+/**
+ * Task to poll for messages and store the result in the DB
+ * @returns {Promise<void>}
+ */
+export async function runTask() {
+  await runTaskOnce()
 
   logger.info(`Adding task to stack in ${receiveMessageTimeout} milliseconds`)
 
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises
   setTimeout(runTask, receiveMessageTimeout)
 
   logger.info(`Added task to stack`)
