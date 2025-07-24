@@ -8,7 +8,7 @@ const logger = createLogger()
 
 /**
  *
- * @param {SQSMessage} message
+ * @param {Message} message
  * @returns {AuditRecord}
  */
 export function mapAuditEvent(message) {
@@ -21,9 +21,12 @@ export function mapAuditEvent(message) {
   }
 
   /**
-   * @type {MessageBody}
+   * @type {SNSMessage}
    */
   const messageBody = JSON.parse(message.Body)
+  /**
+   * @type {Message}
+   */
   const messageData = JSON.parse(messageBody.Message)
 
   const value = Joi.attempt(messageData, messageSchema)
@@ -35,68 +38,49 @@ export function mapAuditEvent(message) {
 }
 
 /**
- * @param {SQSMessage[]} messages
- * @returns
+ * @param {Message[]} messages
+ * @returns {Promise<{ savedIds: {id: string, receiptHandle: string}[]; failedIds: {id: string, receiptHandle: string}[] }>}
  */
 export async function createAuditEvents(messages) {
   logger.info('Inserting audit records')
-  logger.info(messages)
-  const coll = /** @satisfies {Collection<AuditRecord>} */ (
+  const coll = /** @type {Collection<AuditRecord>} */ (
     db.collection(AUDIT_RECORDS_COLLECTION_NAME)
   )
 
-  const documents = messages.map(mapAuditEvent)
-  // const bulkWriteCommands = documents.map((document) => {
-  //   return {
-  //     insertOne: {
-  //       document
-  //     }
-  //   }
-  // })
-  // const result = await coll.bulkWrite(bulkWriteCommands, {
-  //   ordered: false
-  // })
+  /**
+   * @type {{id: string, receiptHandle: string}[]}
+   */
+  const savedIds = []
+  /**
+   * @type {{id: string, receiptHandle: string}[]}
+   */
+  const failedIds = []
 
-  let result
-  try {
-    result = await coll.insertMany(documents, {
-      ordered: false
-    })
-  } catch (err) {
-    result = err.result
-  } finally {
-    logger.info('Inserted audit records')
+  for (const message of messages) {
+    try {
+      const document = mapAuditEvent(message)
+      await coll.insertOne(document)
+      savedIds.push({
+        id: message.MessageId,
+        receiptHandle: message.ReceiptHandle
+      })
+    } catch (e) {
+      failedIds.push({
+        id: message.MessageId,
+        receiptHandle: message.ReceiptHandle
+      })
+      console.error('Failed to insert message', e)
+    }
   }
 
-  const mismatch = documents.length !== result.insertedCount
-  const messageIdsToDelete = []
+  logger.info('Inserted audit records')
 
-  if (mismatch && result.insertedCount) {
-    const idsToDelete = await coll
-      .find(
-        {
-          _id: {
-            $in: Object.values(result.insertedIds)
-          }
-        },
-        {
-          projection: {
-            messageId: 1
-          }
-        }
-      )
-      .toArray()
-
-    messageIdsToDelete.push(...idsToDelete.map((doc) => doc.messageId))
-
-    return messageIdsToDelete
-  }
-
-  return messages.map((message) => message.MessageId)
+  return { savedIds, failedIds }
 }
 
 /**
- * @import { Message as SQSMessage } from '@aws-sdk/client-sqs'
- * @import { Message, AuditRecord, MessageBody } from '@defra/forms-model'
+ * @import { Message } from '@aws-sdk/client-sqs'
+ * @import { AuditMessage, AuditRecord, MessageBody } from '@defra/forms-model'
  * @import { Collection } from 'mongodb'
+ * @import { SNSMessage } from 'aws-lambda'
  */
