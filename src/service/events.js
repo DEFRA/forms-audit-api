@@ -39,7 +39,7 @@ export function mapAuditEvent(message) {
 
 /**
  * @param {Message[]} messages
- * @returns {Promise<{ savedIds: {id: string, receiptHandle: string}[]; failedIds: {id: string, receiptHandle: string}[] }>}
+ * @returns {Promise<{ savedIds: Message[]; failedIds: Message[] }>}
  */
 export async function createAuditEvents(messages) {
   logger.info('Inserting audit records')
@@ -48,11 +48,11 @@ export async function createAuditEvents(messages) {
   )
 
   /**
-   * @type {{id: string, receiptHandle: string}[]}
+   * @type {Message[]}
    */
   const savedIds = []
   /**
-   * @type {{id: string, receiptHandle: string}[]}
+   * @type {Message[]}
    */
   const failedIds = []
 
@@ -60,15 +60,9 @@ export async function createAuditEvents(messages) {
     try {
       const document = mapAuditEvent(message)
       await coll.insertOne(document)
-      savedIds.push({
-        id: message.MessageId,
-        receiptHandle: message.ReceiptHandle
-      })
+      savedIds.push(message)
     } catch (e) {
-      failedIds.push({
-        id: message.MessageId,
-        receiptHandle: message.ReceiptHandle
-      })
+      failedIds.push(message)
       console.error('Failed to insert message', e)
     }
   }
