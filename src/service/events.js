@@ -21,7 +21,7 @@ export function mapAuditEvents(message) {
   }
 
   /**
-   * @type {Message}
+   * @type {MessageBody}
    */
   const messageBody = JSON.parse(message.Body)
   const messageData = JSON.parse(messageBody.Message)
@@ -36,30 +36,54 @@ export function mapAuditEvents(message) {
 
 export async function createAuditEvents(messages) {
   logger.info('Inserting audit records')
-
+  logger.info(messages)
   const coll = /** @satisfies {Collection<AuditRecord>} */ (
     db.collection(AUDIT_RECORDS_COLLECTION_NAME)
   )
 
   const documents = messages.map(mapAuditEvents)
-
-  const result = await coll.insertMany(documents, {
+  const bulkWriteCommands = documents.map((document) => {
+    return {
+      insertOne: {
+        document
+      }
+    }
+  })
+  const result = await coll.bulkWrite(bulkWriteCommands, {
     ordered: false
   })
+
+  // const result = await coll.insertMany(documents, {
+  //   ordered: false
+  // })
 
   logger.info('Inserted audit records')
 
   const mismatch = documents.length !== result.insertedCount
+  const messageIdsToDelete = []
 
-  logger.info('Delete consumed messages')
+  if (mismatch) {
+    const idsToDelete = await coll.find(
+      {
+        _id: {
+          $in: result.insertedIds
+        }
+      },
+      {
+        projection: {
+          messageId: 1
+        }
+      }
+    )
+    messageIdsToDelete.push(...idsToDelete.map((doc) => doc.messageId))
 
-  // Delete message here...
-
-  logger.info('Deleted consumed messages')
+    return messageIdsToDelete
+  }
+  return messages.map((message) => message.messageId)
 }
 
 /**
  * @import { Message as SQSMessage } from '@aws-sdk/client-sqs'
- * @import { Message, AuditRecord } from '@defra/forms-model'
+ * @import { Message, AuditRecord, MessageBody } from '@defra/forms-model'
  * @import { Collection } from 'mongodb'
  */

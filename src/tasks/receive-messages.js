@@ -33,13 +33,13 @@ export function receiveEventMessages() {
 
 /**
  * Delete event messages
- * @param {string[]} messageId
+ * @param {string[]} messageIds
  * @returns {Promise<DeleteMessageBatchCommandOutput>}
  */
-export function deleteEventMessages(messageId) {
+export function deleteEventMessages(messageIds) {
   const command = new DeleteMessageBatchCommand({
     QueueUrl: queueUrl,
-    Entries: messageId.map((id) => ({ Id: id, ReceiptHandle: '' }))
+    Entries: messageIds.map((id) => ({ Id: id, ReceiptHandle: '' }))
   })
 
   return sqsClient.send(command)
@@ -71,10 +71,15 @@ export async function runTask() {
   if (messages && messageCount) {
     logger.info('Saving queue messages to DB')
 
-    await createAuditEvents(messages)
-    // await saveEvents(messages)
+    const savedMessageIds = await createAuditEvents(messages)
+    const savedMessageCount = savedMessageIds.length
 
-    logger.info('Saved queue messages to DB')
+    logger.info(`Saved ${savedMessageCount} queue messages to DB`)
+
+    if (savedMessageCount > 0) {
+      await deleteEventMessages(savedMessageIds)
+      logger.info(`Deleted ${savedMessageCount}`)
+    }
   }
 
   logger.info(`Adding task to stack in ${receiveMessageTimeout} milliseconds`)
