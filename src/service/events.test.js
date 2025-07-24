@@ -4,7 +4,7 @@ import {
 } from '@defra/forms-model'
 import { ValidationError } from 'joi'
 
-import { mapAuditEvents } from '~/src/service/events.js'
+import { mapAuditEvent } from '~/src/service/events.js'
 
 describe('events', () => {
   describe('mapAuditEvents', () => {
@@ -22,7 +22,7 @@ describe('events', () => {
     }
 
     it('should map the message', () => {
-      expect(mapAuditEvents(auditEventMessage)).toEqual({
+      expect(mapAuditEvent(auditEventMessage)).toEqual({
         messageId: 'fbafb17e-86f0-4ac6-b864-3f32cd60b228',
         category: AuditEventMessageCategory.FORM,
         createdAt: new Date('2025-07-23T00:00:00.000Z'),
@@ -57,7 +57,7 @@ describe('events', () => {
           'YTBkZjk3ZTAtODA4ZC00NTQ5LTg4MzMtOWY3NjA2MDJlMjUxIGFybjphd3M6c3FzOmV1LXdlc3QtMjowMDAwMDAwMDAwMDA6Zm9ybXNfYXVkaXRfZXZlbnRzIGZiYWZiMTdlLTg2ZjAtNGFjNi1iODY0LTNmMzJjZDYwYjIyOCAxNzUzMzU0ODY4LjgzMjUzMzQ='
       }
 
-      expect(() => mapAuditEvents(auditEventMessage)).toThrow(
+      expect(() => mapAuditEvent(auditEventMessage)).toThrow(
         new ValidationError('"createdAt" is required')
       )
     })

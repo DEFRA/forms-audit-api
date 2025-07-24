@@ -33,31 +33,23 @@ export function receiveEventMessages() {
 
 /**
  * Delete event messages
- * @param {string[]} messageIds
+ * @param {Message[]} messages
  * @returns {Promise<DeleteMessageBatchCommandOutput>}
  */
-export function deleteEventMessages(messageIds) {
+export function deleteEventMessages(messages) {
   const command = new DeleteMessageBatchCommand({
     QueueUrl: queueUrl,
-    Entries: messageIds.map((id) => ({ Id: id, ReceiptHandle: '' }))
+    Entries: messages.map((message) => ({
+      Id: message.MessageId,
+      ReceiptHandle: message.ReceiptHandle
+    }))
   })
 
   return sqsClient.send(command)
 }
 
-// /**
-//  *
-//  * @param {Message[]} messages
-//  * @returns
-//  */
-// async function saveEvents(messages) {
-//   logger.info(messages)
-//   // batch save in mongo, return the failed ones - if succeeded delete, otherwise leave
-//   return Promise.resolve(true)
-// }
-
 /**
- * Task to poll for message and store the result in the DB
+ * Task to poll for messages and store the result in the DB
  */
 export async function runTask() {
   logger.info('Receiving queue messages')
@@ -77,7 +69,12 @@ export async function runTask() {
     logger.info(`Saved ${savedMessageCount} queue messages to DB`)
 
     if (savedMessageCount > 0) {
-      await deleteEventMessages(savedMessageIds)
+      const messagesToDelete = messages.filter((message) =>
+        savedMessageIds.includes(message.MessageId)
+      )
+
+      await deleteEventMessages(messagesToDelete)
+
       logger.info(`Deleted ${savedMessageCount}`)
     }
   }
@@ -90,5 +87,5 @@ export async function runTask() {
 }
 
 /**
- * @import { ReceiveMessageCommandInput, ReceiveMessageResult, DeleteMessageBatchCommandOutput } from '@aws-sdk/client-sqs'
+ * @import { ReceiveMessageCommandInput, ReceiveMessageResult, DeleteMessageBatchCommandOutput, Message } from '@aws-sdk/client-sqs'
  */

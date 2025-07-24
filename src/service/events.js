@@ -11,7 +11,7 @@ const logger = createLogger()
  * @param {SQSMessage} message
  * @returns {AuditRecord}
  */
-export function mapAuditEvents(message) {
+export function mapAuditEvent(message) {
   if (!message.MessageId) {
     throw new Error('Unexpected missing Message.MessageId')
   }
@@ -34,6 +34,11 @@ export function mapAuditEvents(message) {
   }
 }
 
+/**
+ *
+ * @param {*} messages
+ * @returns
+ */
 export async function createAuditEvents(messages) {
   logger.info('Inserting audit records')
   logger.info(messages)
@@ -41,45 +46,54 @@ export async function createAuditEvents(messages) {
     db.collection(AUDIT_RECORDS_COLLECTION_NAME)
   )
 
-  const documents = messages.map(mapAuditEvents)
-  const bulkWriteCommands = documents.map((document) => {
-    return {
-      insertOne: {
-        document
-      }
-    }
-  })
-  const result = await coll.bulkWrite(bulkWriteCommands, {
-    ordered: false
-  })
-
-  // const result = await coll.insertMany(documents, {
+  const documents = messages.map(mapAuditEvent)
+  // const bulkWriteCommands = documents.map((document) => {
+  //   return {
+  //     insertOne: {
+  //       document
+  //     }
+  //   }
+  // })
+  // const result = await coll.bulkWrite(bulkWriteCommands, {
   //   ordered: false
   // })
 
-  logger.info('Inserted audit records')
+  let result
+  try {
+    result = await coll.insertMany(documents, {
+      ordered: false
+    })
+  } catch (err) {
+    result = err.result
+  } finally {
+    logger.info('Inserted audit records')
+  }
 
   const mismatch = documents.length !== result.insertedCount
   const messageIdsToDelete = []
 
-  if (mismatch) {
-    const idsToDelete = await coll.find(
-      {
-        _id: {
-          $in: result.insertedIds
+  if (mismatch && result.insertedCount) {
+    const idsToDelete = await coll
+      .find(
+        {
+          _id: {
+            $in: Object.values(result.insertedIds)
+          }
+        },
+        {
+          projection: {
+            messageId: 1
+          }
         }
-      },
-      {
-        projection: {
-          messageId: 1
-        }
-      }
-    )
+      )
+      .toArray()
+
     messageIdsToDelete.push(...idsToDelete.map((doc) => doc.messageId))
 
     return messageIdsToDelete
   }
-  return messages.map((message) => message.messageId)
+
+  return messages.map((message) => message.MessageId)
 }
 
 /**
