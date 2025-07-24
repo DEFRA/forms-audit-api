@@ -35,8 +35,7 @@ export function mapAuditEvent(message) {
 }
 
 /**
- *
- * @param {*} messages
+ * @param {Message} messages
  * @returns
  */
 export async function createAuditEvents(messages) {
