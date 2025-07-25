@@ -1,6 +1,5 @@
 import { createLogger } from '~/src/helpers/logging/logger.js'
 import {
-  deleteEventMessages,
   receiveEventMessages,
   receiveMessageTimeout
 } from '~/src/messaging/event.js'
@@ -24,15 +23,9 @@ export async function runTaskOnce() {
     if (messages && messageCount) {
       logger.info('Saving queue messages to DB')
 
-      const { saved, savedMessageCount } = await createAuditEvents(messages)
+      const { savedMessageCount } = await createAuditEvents(messages)
 
       logger.info(`Saved ${savedMessageCount} queue messages to DB`)
-
-      if (savedMessageCount > 0) {
-        await deleteEventMessages(saved)
-
-        logger.info(`Deleted ${savedMessageCount}`)
-      }
     }
   } catch (e) {
     logger.error(`Receive messages task failed`, e)

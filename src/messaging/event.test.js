@@ -1,5 +1,5 @@
 import {
-  DeleteMessageBatchCommand,
+  DeleteMessageCommand,
   ReceiveMessageCommand,
   SQSClient
 } from '@aws-sdk/client-sqs'
@@ -7,7 +7,7 @@ import { mockClient } from 'aws-sdk-client-mock'
 
 import 'aws-sdk-client-mock-jest'
 import {
-  deleteEventMessages,
+  deleteEventMessage,
   receiveEventMessages
 } from '~/src/messaging/event.js'
 
@@ -34,30 +34,25 @@ describe('event', () => {
     })
   })
 
-  describe('deleteEventMessages', () => {
-    it('should delete event messages', async () => {
+  describe('deleteEventMessage', () => {
+    it('should delete event message', async () => {
       /**
-       * @type {DeleteMessageBatchResult}
+       * @type {DeleteMessageCommandOutput}
        */
-      const deleteBatchResult = {
-        Successful: [{ Id: messageId }],
-        Failed: []
+      const deleteResult = {
+        $metadata: {}
       }
-      snsMock.on(DeleteMessageBatchCommand).resolves(deleteBatchResult)
-      await deleteEventMessages([messageStub])
-      expect(snsMock).toHaveReceivedCommandWith(DeleteMessageBatchCommand, {
+
+      snsMock.on(DeleteMessageCommand).resolves(deleteResult)
+      await deleteEventMessage(messageStub)
+      expect(snsMock).toHaveReceivedCommandWith(DeleteMessageCommand, {
         QueueUrl: expect.stringContaining('forms_audit_events'),
-        Entries: [
-          {
-            Id: messageId,
-            ReceiptHandle: receiptHandle
-          }
-        ]
+        ReceiptHandle: receiptHandle
       })
     })
   })
 })
 
 /**
- * @import {DeleteMessageBatchResult} from '@aws-sdk/client-sqs'
+ * @import { DeleteMessageCommandOutput } from '@aws-sdk/client-sqs'
  */

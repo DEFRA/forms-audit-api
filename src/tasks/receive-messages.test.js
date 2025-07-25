@@ -1,5 +1,4 @@
 import {
-  deleteEventMessages,
   receiveEventMessages,
   receiveMessageTimeout
 } from '~/src/messaging/event.js'
@@ -39,7 +38,6 @@ describe('receive-messages', () => {
       jest.mocked(createAuditEvents).mockResolvedValueOnce(auditEventResult)
       await runTaskOnce()
       expect(createAuditEvents).toHaveBeenCalledWith([message])
-      expect(deleteEventMessages).toHaveBeenCalledWith([message])
     })
   })
 
@@ -77,5 +75,5 @@ describe('receive-messages', () => {
 })
 
 /**
- * @import { ReceiveMessageCommandInput, ReceiveMessageResult, DeleteMessageBatchCommandOutput, Message } from '@aws-sdk/client-sqs'
+ * @import { ReceiveMessageResult, Message } from '@aws-sdk/client-sqs'
  */

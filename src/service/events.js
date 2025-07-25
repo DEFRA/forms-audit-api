@@ -2,6 +2,7 @@ import { messageSchema } from '@defra/forms-model'
 import Joi from 'joi'
 
 import { createLogger } from '~/src/helpers/logging/logger.js'
+import { deleteEventMessage } from '~/src/messaging/event.js'
 import { AUDIT_RECORDS_COLLECTION_NAME, db } from '~/src/mongo.js'
 
 const logger = createLogger()
@@ -30,8 +31,8 @@ export function mapAuditEvent(message) {
 
   return {
     messageId: message.MessageId,
-    recordCreatedAt: new Date(),
-    ...value
+    ...value,
+    recordCreatedAt: new Date()
   }
 }
 
@@ -57,7 +58,19 @@ export async function createAuditEvents(messages) {
   for (const message of messages) {
     try {
       const document = mapAuditEvent(message)
+
+      logger.info(`Inserting ${message.MessageId}`)
+
       await coll.insertOne(document)
+
+      logger.info(`Inserted ${message.MessageId}`)
+
+      logger.info(`Deleting ${message.MessageId}`)
+
+      await deleteEventMessage(message)
+
+      logger.info(`Deleted ${message.MessageId}`)
+
       saved.push(message)
     } catch (e) {
       failed.push(message)

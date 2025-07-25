@@ -1,5 +1,5 @@
 import {
-  DeleteMessageBatchCommand,
+  DeleteMessageCommand,
   ReceiveMessageCommand
 } from '@aws-sdk/client-sqs'
 
@@ -28,22 +28,19 @@ export function receiveEventMessages() {
 }
 
 /**
- * Delete event messages
- * @param {Message[]} messages
- * @returns {Promise<DeleteMessageBatchCommandOutput>}
+ * Delete event message
+ * @param {Message} message
+ * @returns {Promise<DeleteMessageCommandOutput>}
  */
-export function deleteEventMessages(messages) {
-  const command = new DeleteMessageBatchCommand({
+export function deleteEventMessage(message) {
+  const command = new DeleteMessageCommand({
     QueueUrl: queueUrl,
-    Entries: messages.map((message) => ({
-      Id: message.MessageId,
-      ReceiptHandle: message.ReceiptHandle
-    }))
+    ReceiptHandle: message.ReceiptHandle
   })
 
   return sqsClient.send(command)
 }
 
 /**
- * @import { ReceiveMessageCommandInput, ReceiveMessageResult, DeleteMessageBatchCommandOutput, Message } from '@aws-sdk/client-sqs'
+ * @import { ReceiveMessageCommandInput, ReceiveMessageResult, DeleteMessageCommandOutput, Message } from '@aws-sdk/client-sqs'
  */
