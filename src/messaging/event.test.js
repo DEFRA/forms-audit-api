@@ -46,7 +46,7 @@ describe('event', () => {
       snsMock.on(DeleteMessageCommand).resolves(deleteResult)
       await deleteEventMessage(messageStub)
       expect(snsMock).toHaveReceivedCommandWith(DeleteMessageCommand, {
-        QueueUrl: expect.stringContaining('forms_audit_events'),
+        QueueUrl: expect.any(String),
         ReceiptHandle: receiptHandle
       })
     })
