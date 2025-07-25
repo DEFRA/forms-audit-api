@@ -42,6 +42,7 @@ export function mapAuditEvent(message) {
  */
 export async function createAuditEvents(messages) {
   logger.info('Inserting audit records')
+
   const coll = /** @type {Collection<AuditRecord>} */ (
     db.collection(AUDIT_RECORDS_COLLECTION_NAME)
   )
@@ -55,7 +56,10 @@ export async function createAuditEvents(messages) {
    */
   const failed = []
 
-  for (const message of messages) {
+  /**
+   * @param {Message} message
+   */
+  async function createAuditEvent(message) {
     try {
       const document = mapAuditEvent(message)
 
@@ -77,6 +81,8 @@ export async function createAuditEvents(messages) {
       logger.error('Failed to insert message', e)
     }
   }
+
+  await Promise.allSettled(messages.map(createAuditEvent))
 
   logger.info('Inserted audit records')
 
