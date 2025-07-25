@@ -167,6 +167,30 @@ export const config = convict({
       default: 'x-cdp-request-id',
       env: 'TRACING_HEADER'
     }
+  },
+  awsRegion: {
+    doc: 'AWS region',
+    format: String,
+    default: 'eu-west-2',
+    env: 'AWS_REGION'
+  },
+  sqsEndpoint: {
+    doc: 'The SQS endpoint, if required (e.g. a local development dev service)',
+    format: String,
+    default: '',
+    env: 'SQS_ENDPOINT'
+  },
+  sqsEventsQueueUrl: {
+    doc: 'SQS queue URL',
+    format: String,
+    default: '',
+    env: 'EVENTS_SQS_QUEUE_URL'
+  },
+  receiveMessageTimeout: {
+    doc: 'The wait time between each poll in milliseconds',
+    format: Number,
+    default: 30 * 1000,
+    env: 'RECEIVE_MESSAGE_TIMEOUT_MS'
   }
 })
 

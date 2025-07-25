@@ -64,5 +64,4 @@ export class FormAlreadyExistsError extends ApplicationError {
 
 /**
  * @import { ValidationError } from 'joi'
- * @import { ErrorMatchPath } from '@defra/forms-model'
  */
