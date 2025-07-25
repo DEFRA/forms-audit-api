@@ -6,6 +6,20 @@ import { ValidationError } from 'joi'
 
 import { mapAuditEvent } from '~/src/service/events.js'
 
+/**
+ * @param {boolean} rawMessageDelivery
+ * @param {string} body
+ * @returns {string}
+ */
+function rawMessageDelivery(rawMessageDelivery, body) {
+  if (rawMessageDelivery) {
+    return body
+  }
+  return JSON.stringify({
+    Message: body
+  })
+}
+
 describe('events', () => {
   describe('mapAuditEvents', () => {
     /**
@@ -13,10 +27,10 @@ describe('events', () => {
      * @type {Message}
      */
     const auditEventMessage = {
-      Body: JSON.stringify({
-        Message:
-          '{\n     "category": "FORM",\n     "createdAt": "2025-07-23T00:00:00.000Z",\n     "createdBy":  {\n       "displayName": "Enrique Chase",\n         "id": "83f09a7d-c80c-4e15-bcf3-641559c7b8a7"\n       },\n     "data":  {\n       "formId": "3b1bf4b2-1603-4ca5-b885-c509245567aa",\n         "organisation": "Defra",\n         "slug": "audit-form",\n         "teamEmail": "forms@example.com",\n         "teamName": "Forms",\n         "title": "My Audit Event Form"\n       },\n     "schemaVersion": 1,\n     "type": "FORM_CREATED"\n   }'
-      }),
+      Body: rawMessageDelivery(
+        true,
+        '{\n     "category": "FORM",\n     "createdAt": "2025-07-23T00:00:00.000Z",\n     "createdBy":  {\n       "displayName": "Enrique Chase",\n         "id": "83f09a7d-c80c-4e15-bcf3-641559c7b8a7"\n       },\n     "data":  {\n       "formId": "3b1bf4b2-1603-4ca5-b885-c509245567aa",\n         "organisation": "Defra",\n         "slug": "audit-form",\n         "teamEmail": "forms@example.com",\n         "teamName": "Forms",\n         "title": "My Audit Event Form"\n       },\n     "schemaVersion": 1,\n     "type": "FORM_CREATED"\n   }'
+      ),
       MD5OfBody: 'a06ffc5688321b187cec5fdb9bcc62fa',
       MessageAttributes: {},
       MessageId: 'fbafb17e-86f0-4ac6-b864-3f32cd60b228',
@@ -52,10 +66,10 @@ describe('events', () => {
        * @type {Message}
        */
       const auditEventMessage = {
-        Body: JSON.stringify({
-          Message:
-            '{\n     "category": "FORM",\n     "createdBy":  {\n       "displayName": "Enrique Chase",\n         "id": "83f09a7d-c80c-4e15-bcf3-641559c7b8a7"\n       },\n     "data":  {\n       "formId": "3b1bf4b2-1603-4ca5-b885-c509245567aa",\n         "organisation": "Defra",\n         "slug": "audit-form",\n         "teamEmail": "forms@example.com",\n         "teamName": "Forms",\n         "title": "My Audit Event Form"\n       },\n     "schemaVersion": 1,\n     "type": "FORM_CREATED"\n   }'
-        }),
+        Body: rawMessageDelivery(
+          true,
+          '{\n     "category": "FORM",\n     "createdBy":  {\n       "displayName": "Enrique Chase",\n         "id": "83f09a7d-c80c-4e15-bcf3-641559c7b8a7"\n       },\n     "data":  {\n       "formId": "3b1bf4b2-1603-4ca5-b885-c509245567aa",\n         "organisation": "Defra",\n         "slug": "audit-form",\n         "teamEmail": "forms@example.com",\n         "teamName": "Forms",\n         "title": "My Audit Event Form"\n       },\n     "schemaVersion": 1,\n     "type": "FORM_CREATED"\n   }'
+        ),
         MD5OfBody: 'a06ffc5688321b187cec5fdb9bcc62fa',
         MessageAttributes: {},
         MessageId: 'fbafb17e-86f0-4ac6-b864-3f32cd60b228',

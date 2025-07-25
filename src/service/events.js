@@ -21,15 +21,15 @@ export function mapAuditEvent(message) {
   }
 
   /**
-   * @type {SNSMessage}
+   * @type {AuditMessage}
    */
   const messageBody = JSON.parse(message.Body)
-  /**
-   * @type {Message}
-   */
-  const messageData = JSON.parse(messageBody.Message)
+  // /**
+  //  * @type {Message}
+  //  */
+  // const messageData = JSON.parse(messageBody.Message)
 
-  const value = Joi.attempt(messageData, messageSchema)
+  const value = Joi.attempt(messageBody, messageSchema)
 
   return {
     messageId: message.MessageId,
