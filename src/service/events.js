@@ -29,7 +29,6 @@ export function mapAuditEvent(message) {
   })
 
   return {
-    entityId: value.data.formId,
     messageId: message.MessageId,
     recordCreatedAt: new Date(),
     ...value
@@ -73,6 +72,6 @@ export async function createAuditEvents(messages) {
 
 /**
  * @import { Message } from '@aws-sdk/client-sqs'
- * @import { AuditMessage, AuditRecord, MessageBody } from '@defra/forms-model'
+ * @import { AuditMessage, AuditRecord } from '@defra/forms-model'
  * @import { Collection } from 'mongodb'
  */

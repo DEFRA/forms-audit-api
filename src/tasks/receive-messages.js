@@ -53,7 +53,3 @@ export async function runTask() {
 
   logger.info(`Added task to stack`)
 }
-
-/**
- * @import { ReceiveMessageCommandInput, ReceiveMessageResult, DeleteMessageBatchCommandOutput, Message } from '@aws-sdk/client-sqs'
- */
