@@ -38,6 +38,7 @@ export async function runTaskOnce() {
     logger.error(`Receive messages task failed`, e)
   }
 }
+
 /**
  * Task to poll for messages and store the result in the DB
  * @returns {Promise<void>}

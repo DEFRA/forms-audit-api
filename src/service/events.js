@@ -7,7 +7,6 @@ import { AUDIT_RECORDS_COLLECTION_NAME, db } from '~/src/mongo.js'
 const logger = createLogger()
 
 /**
- *
  * @param {Message} message
  * @returns {AuditRecord}
  */
@@ -24,15 +23,15 @@ export function mapAuditEvent(message) {
    * @type {AuditMessage}
    */
   const messageBody = JSON.parse(message.Body)
-  // /**
-  //  * @type {Message}
-  //  */
-  // const messageData = JSON.parse(messageBody.Message)
 
-  const value = Joi.attempt(messageBody, messageSchema)
+  const value = Joi.attempt(messageBody, messageSchema, {
+    abortEarly: false
+  })
 
   return {
+    entityId: value.data.formId,
     messageId: message.MessageId,
+    recordCreatedAt: new Date(),
     ...value
   }
 }
