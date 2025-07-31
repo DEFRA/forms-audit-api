@@ -1,6 +1,7 @@
 import { messageSchema } from '@defra/forms-model'
 import Joi from 'joi'
 
+import { getErrorMessage } from '~/src/helpers/error-message.js'
 import { createLogger } from '~/src/helpers/logging/logger.js'
 import { deleteEventMessage } from '~/src/messaging/event.js'
 import { AUDIT_RECORDS_COLLECTION_NAME, db } from '~/src/mongo.js'
@@ -76,9 +77,11 @@ export async function createAuditEvents(messages) {
       logger.info(`Deleted ${message.MessageId}`)
 
       saved.push(message)
-    } catch (e) {
+    } catch (err) {
       failed.push(message)
-      logger.error('Failed to insert message', e)
+      logger.error(
+        `[createAuditEvent] Failed to insert message - ${getErrorMessage(err)}`
+      )
     }
   }
 

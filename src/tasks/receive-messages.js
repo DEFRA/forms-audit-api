@@ -1,3 +1,4 @@
+import { getErrorMessage } from '~/src/helpers/error-message.js'
 import { createLogger } from '~/src/helpers/logging/logger.js'
 import {
   receiveEventMessages,
@@ -27,8 +28,10 @@ export async function runTaskOnce() {
 
       logger.info(`Saved ${savedMessageCount} queue messages to DB`)
     }
-  } catch (e) {
-    logger.error(`Receive messages task failed`, e)
+  } catch (err) {
+    logger.error(
+      `[runTaskOnce] Receive messages task failed - ${getErrorMessage(err)}`
+    )
   }
 }
 
