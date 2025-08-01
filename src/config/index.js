@@ -40,7 +40,7 @@ export const config = convict({
   }),
   cdpEnvironment: {
     doc: 'The CDP environment the app is running in. With the addition of "local" for local development',
-    format: ['local', 'dev', 'test', 'perf-test', 'prod'],
+    format: ['local', 'dev', 'test', 'perf-test', 'prod', 'ext-test'],
     default: 'local',
     env: 'ENVIRONMENT'
   },
