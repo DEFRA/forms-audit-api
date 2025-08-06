@@ -1,5 +1,6 @@
 import {
   AuditEventMessageCategory,
+  AuditEventMessageSource,
   AuditEventMessageType
 } from '@defra/forms-model'
 import { ValidationError } from 'joi'
@@ -29,7 +30,7 @@ describe('events', () => {
     const auditEventMessage = {
       Body: rawMessageDelivery(
         true,
-        '{\n     "entityId": "3b1bf4b2-1603-4ca5-b885-c509245567aa",\n     "category": "FORM",\n     "messageCreatedAt": "2025-07-23T00:00:00.000Z",\n     "createdAt": "2025-07-23T00:00:00.000Z",\n     "createdBy":  {\n       "displayName": "Enrique Chase",\n         "id": "83f09a7d-c80c-4e15-bcf3-641559c7b8a7"\n       },\n     "data":  {\n       "formId": "3b1bf4b2-1603-4ca5-b885-c509245567aa",\n         "organisation": "Defra",\n         "slug": "audit-form",\n         "teamEmail": "forms@example.com",\n         "teamName": "Forms",\n         "title": "My Audit Event Form"\n       },\n     "schemaVersion": 1,\n     "type": "FORM_CREATED"\n   }'
+        '{\n     "entityId": "3b1bf4b2-1603-4ca5-b885-c509245567aa",\n     "category": "FORM",\n     "messageCreatedAt": "2025-07-23T00:00:00.000Z",\n     "createdAt": "2025-07-23T00:00:00.000Z",\n     "createdBy":  {\n       "displayName": "Enrique Chase",\n         "id": "83f09a7d-c80c-4e15-bcf3-641559c7b8a7"\n       },\n     "data":  {\n       "formId": "3b1bf4b2-1603-4ca5-b885-c509245567aa",\n         "organisation": "Defra",\n         "slug": "audit-form",\n         "teamEmail": "forms@example.com",\n         "teamName": "Forms",\n         "title": "My Audit Event Form"\n       },\n     "schemaVersion": 1,\n     "type": "FORM_CREATED"\n,\n     "source": "FORMS_MANAGER"\n   }'
       ),
       MD5OfBody: 'a06ffc5688321b187cec5fdb9bcc62fa',
       MessageAttributes: {},
@@ -59,7 +60,8 @@ describe('events', () => {
           title: 'My Audit Event Form'
         },
         schemaVersion: 1,
-        type: AuditEventMessageType.FORM_CREATED
+        type: AuditEventMessageType.FORM_CREATED,
+        source: AuditEventMessageSource.FORMS_MANAGER
       })
     })
 
@@ -71,7 +73,7 @@ describe('events', () => {
       const auditEventMessage = {
         Body: rawMessageDelivery(
           true,
-          '{\n     "entityId": "3b1bf4b2-1603-4ca5-b885-c509245567aa",\n     "category": "FORM",\n     "messageCreatedAt": "2025-07-23T00:00:00.000Z",\n     "createdBy":  {\n       "displayName": "Enrique Chase",\n         "id": "83f09a7d-c80c-4e15-bcf3-641559c7b8a7"\n       },\n     "data":  {\n       "formId": "3b1bf4b2-1603-4ca5-b885-c509245567aa",\n         "organisation": "Defra",\n         "slug": "audit-form",\n         "teamEmail": "forms@example.com",\n         "teamName": "Forms",\n         "title": "My Audit Event Form"\n       },\n     "schemaVersion": 1,\n     "type": "FORM_CREATED"\n   }'
+          '{\n     "entityId": "3b1bf4b2-1603-4ca5-b885-c509245567aa",\n     "category": "FORM",\n     "messageCreatedAt": "2025-07-23T00:00:00.000Z",\n     "createdBy":  {\n       "displayName": "Enrique Chase",\n         "id": "83f09a7d-c80c-4e15-bcf3-641559c7b8a7"\n       },\n     "data":  {\n       "formId": "3b1bf4b2-1603-4ca5-b885-c509245567aa",\n         "organisation": "Defra",\n         "slug": "audit-form",\n         "teamEmail": "forms@example.com",\n         "teamName": "Forms",\n         "title": "My Audit Event Form"\n       },\n     "schemaVersion": 1,\n     "type": "FORM_CREATED"\n,\n     "source": "FORMS_MANAGER"\n   }'
         ),
         MD5OfBody: 'a06ffc5688321b187cec5fdb9bcc62fa',
         MessageAttributes: {},
