@@ -13,7 +13,7 @@ const MAX_RECORDS = 100
 
 /**
  * @param {Message} message
- * @returns {AuditRecord}
+ * @returns {Omit<AuditRecord, 'id'>}
  */
 export function mapAuditEvent(message) {
   if (!message.MessageId) {
