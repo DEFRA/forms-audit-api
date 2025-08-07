@@ -13,7 +13,7 @@ const MAX_RECORDS = 100
 
 /**
  * @param {Message} message
- * @returns {Omit<AuditRecord, 'id'>}
+ * @returns {AuditRecordInput}
  */
 export function mapAuditEvent(message) {
   if (!message.MessageId) {
@@ -48,7 +48,7 @@ export function mapAuditEvent(message) {
 export async function createAuditEvents(messages) {
   logger.info('Inserting audit records')
 
-  const coll = /** @type {Collection<AuditRecord>} */ (
+  const coll = /** @type {Collection<AuditRecordInput>} */ (
     db.collection(AUDIT_RECORDS_COLLECTION_NAME)
   )
 
@@ -103,7 +103,7 @@ export async function createAuditEvents(messages) {
 export async function readAuditEvents(filter) {
   logger.info('Reading audit records')
 
-  const coll = /** @type {Collection<AuditRecord>} */ (
+  const coll = /** @type {Collection<AuditRecordInput>} */ (
     db.collection(AUDIT_RECORDS_COLLECTION_NAME)
   )
 
@@ -116,6 +116,6 @@ export async function readAuditEvents(filter) {
 
 /**
  * @import { Message } from '@aws-sdk/client-sqs'
- * @import { AuditMessage, AuditRecord } from '@defra/forms-model'
+ * @import { AuditRecordInput, AuditMessage, AuditRecord } from '@defra/forms-model'
  * @import { Collection } from 'mongodb'
  */
