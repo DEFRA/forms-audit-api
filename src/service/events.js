@@ -87,12 +87,13 @@ export async function createAuditEvents(messages) {
         saved.push(message)
       })
     } catch (err) {
-      await session.endSession()
       failed.push(message)
       logger.error(
         `[createAuditEvent] Failed to insert message - ${getErrorMessage(err)}`
       )
       throw err
+    } finally {
+      await session.endSession()
     }
   }
 
