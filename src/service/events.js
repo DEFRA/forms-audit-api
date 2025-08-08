@@ -4,6 +4,7 @@ import Joi from 'joi'
 import { getErrorMessage } from '~/src/helpers/error-message.js'
 import { createLogger } from '~/src/helpers/logging/logger.js'
 import { deleteEventMessage } from '~/src/messaging/event.js'
+import { client } from '~/src/mongo.js'
 import * as auditRecord from '~/src/repositories/audit-record-repository.js'
 import { mapAuditRecord } from '~/src/routes/shared.js'
 
@@ -69,19 +70,24 @@ export async function createAuditEvents(messages) {
    * @param {Message} message
    */
   async function createAuditEvent(message) {
+    const session = client.startSession()
+
     try {
-      const document = mapAuditEvent(message)
+      await session.withTransaction(async () => {
+        const document = mapAuditEvent(message)
 
-      await auditRecord.createAuditRecord(document)
+        await auditRecord.createAuditRecord(document, session)
 
-      logger.info(`Deleting ${message.MessageId}`)
+        logger.info(`Deleting ${message.MessageId}`)
 
-      await deleteEventMessage(message)
+        await deleteEventMessage(message)
 
-      logger.info(`Deleted ${message.MessageId}`)
+        logger.info(`Deleted ${message.MessageId}`)
 
-      saved.push(message)
+        saved.push(message)
+      })
     } catch (err) {
+      await session.endSession()
       failed.push(message)
       logger.error(
         `[createAuditEvent] Failed to insert message - ${getErrorMessage(err)}`

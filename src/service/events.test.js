@@ -222,15 +222,18 @@ describe('events', () => {
       expect(auditRecord.createAuditRecord).toHaveBeenCalledTimes(3)
       expect(auditRecord.createAuditRecord).toHaveBeenNthCalledWith(
         1,
-        expectedMapped1
+        expectedMapped1,
+        expect.anything()
       )
       expect(auditRecord.createAuditRecord).toHaveBeenNthCalledWith(
         2,
-        expectedMapped2
+        expectedMapped2,
+        expect.anything()
       )
       expect(auditRecord.createAuditRecord).toHaveBeenNthCalledWith(
         3,
-        expectedMapped3
+        expectedMapped3,
+        expect.anything()
       )
       expect(deleteEventMessage).toHaveBeenCalledTimes(3)
       expect(deleteEventMessage).toHaveBeenNthCalledWith(1, message1)
