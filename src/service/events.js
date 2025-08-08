@@ -5,11 +5,10 @@ import { getErrorMessage } from '~/src/helpers/error-message.js'
 import { createLogger } from '~/src/helpers/logging/logger.js'
 import { deleteEventMessage } from '~/src/messaging/event.js'
 import { AUDIT_RECORDS_COLLECTION_NAME, db } from '~/src/mongo.js'
+import { getAuditRecords } from '~/src/repositories/audit-record-repository.js'
 import { mapAuditRecord } from '~/src/routes/shared.js'
 
 const logger = createLogger()
-
-const MAX_RECORDS = 100
 
 /**
  * @param {Message} message
@@ -101,15 +100,7 @@ export async function createAuditEvents(messages) {
  * @param {{ entityId: string }} filter
  */
 export async function readAuditEvents(filter) {
-  logger.info('Reading audit records')
-
-  const coll = /** @type {Collection<AuditRecordInput>} */ (
-    db.collection(AUDIT_RECORDS_COLLECTION_NAME)
-  )
-
-  const results = await coll.find(filter).limit(MAX_RECORDS).toArray()
-
-  logger.info('Read audit records')
+  const results = await getAuditRecords(filter)
 
   return results.map(mapAuditRecord)
 }

@@ -4,9 +4,53 @@ import {
   AuditEventMessageType
 } from '@defra/forms-model'
 import { ValidationError } from 'joi'
+import { ObjectId } from 'mongodb'
+import { pino } from 'pino'
 
-import { mapAuditEvent } from '~/src/service/events.js'
+import {
+  STUB_AUDIT_RECORD_ID,
+  buildAuditMetaBase,
+  buildAuditRecord,
+  buildAuditRecordDocument,
+  buildAuditRecordInput,
+  buildLiveCreatedFromDraftMessage
+} from '~/src/api/forms/__stubs__/audit.js'
+import { prepareDb } from '~/src/mongo.js'
+import * as auditRecord from '~/src/repositories/audit-record-repository.js'
+import { mapAuditEvent, readAuditEvents } from '~/src/service/events.js'
 
+jest.mock('~/src/messaging/event.js')
+jest.mock('~/src/repositories/audit-record-repository.js')
+
+jest.mock('~/src/mongo.js', () => {
+  let isPrepared = false
+
+  return {
+    get client() {
+      if (!isPrepared) {
+        return undefined
+      }
+
+      return {
+        startSession: () => ({
+          endSession: jest.fn().mockResolvedValue(undefined),
+          withTransaction: jest.fn(
+            /**
+             * Mock transaction handler
+             * @param {() => Promise<void>} fn
+             */
+            async (fn) => fn()
+          )
+        })
+      }
+    },
+
+    prepareDb() {
+      isPrepared = true
+      return Promise.resolve()
+    }
+  }
+})
 /**
  * @param {boolean} rawMessageDelivery
  * @param {string} body
@@ -22,6 +66,25 @@ function rawMessageDelivery(rawMessageDelivery, body) {
 }
 
 describe('events', () => {
+  const recordInput = buildAuditMetaBase({
+    recordCreatedAt: new Date('2025-08-08'),
+    messageId: '23b3e93c-5bea-4bcc-ab27-be69ce82a190'
+  })
+  const entityId = '68836f68210543a49431e4b2'
+  const auditMessage = buildLiveCreatedFromDraftMessage({
+    entityId
+  })
+  const auditRecordInput = buildAuditRecordInput(auditMessage, recordInput)
+  const documentId = new ObjectId(STUB_AUDIT_RECORD_ID)
+  const auditDocument = buildAuditRecordDocument(auditMessage, {
+    _id: documentId,
+    ...auditRecordInput
+  })
+
+  beforeAll(async () => {
+    await prepareDb(pino())
+  })
+
   describe('mapAuditEvents', () => {
     /**
      *
@@ -65,6 +128,25 @@ describe('events', () => {
       })
     })
 
+    it('should fail if there is no MessageId', () => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { MessageId, ...auditEventMessageWithoutMessageId } =
+        auditEventMessage
+
+      expect(() => mapAuditEvent(auditEventMessageWithoutMessageId)).toThrow(
+        new Error('Unexpected missing Message.MessageId')
+      )
+    })
+
+    it('should fail if there is no Body', () => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { Body, ...auditEventMessageWithoutBody } = auditEventMessage
+
+      expect(() => mapAuditEvent(auditEventMessageWithoutBody)).toThrow(
+        new Error('Unexpected empty Message.Body')
+      )
+    })
+
     it('should fail if the message is invalid', () => {
       /**
        *
@@ -85,6 +167,21 @@ describe('events', () => {
       expect(() => mapAuditEvent(auditEventMessage)).toThrow(
         new ValidationError('"createdAt" is required', [], auditEventMessage)
       )
+    })
+  })
+
+  describe('readAuditEvents', () => {
+    it('should read the audit events', async () => {
+      const expectedAuditRecord = buildAuditRecord(auditMessage, {
+        id: STUB_AUDIT_RECORD_ID,
+        ...recordInput
+      })
+      jest
+        .mocked(auditRecord.getAuditRecords)
+        .mockResolvedValueOnce([auditDocument])
+
+      const auditRecords = await readAuditEvents({ entityId })
+      expect(auditRecords).toEqual([expectedAuditRecord])
     })
   })
 })
