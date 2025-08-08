@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 import {
   AuditEventMessageCategory,
   AuditEventMessageSchemaVersion,
@@ -78,7 +79,7 @@ export function buildLiveCreatedFromDraftMessage(
  * @param {Partial<FormUpdatedMessage>} partialFormUpdatedMessage
  * @returns {FormUpdatedMessage}
  */
-export function buildFormUpdatedMessage(partialFormUpdatedMessage) {
+export function buildFormUpdatedMessage(partialFormUpdatedMessage = {}) {
   return {
     category: AuditEventMessageCategory.FORM,
     type: AuditEventMessageType.FORM_UPDATED,
@@ -193,7 +194,60 @@ export function buildAuditRecordDocument(
     ...buildAuditRecordDocumentMeta(partialAuditDocumentMeta)
   }
 }
+
+/**
+ * @param {boolean} rawMessageDelivery
+ * @param {string} body
+ * @returns {string}
+ */
+export function rawMessageDelivery(rawMessageDelivery, body) {
+  if (rawMessageDelivery) {
+    return body
+  }
+  return JSON.stringify({
+    Message: body
+  })
+}
+
+/**
+ * Builds a message from a Message Partial
+ * @param {Partial<Message>} partialMessage
+ * @returns {Message}
+ */
+export function buildMessage(partialMessage = {}) {
+  return {
+    Body: rawMessageDelivery(
+      true,
+      '{\n     "entityId": "3b1bf4b2-1603-4ca5-b885-c509245567aa",\n     "category": "FORM",\n     "messageCreatedAt": "2025-07-23T00:00:00.000Z",\n     "createdBy":  {\n       "displayName": "Enrique Chase",\n         "id": "83f09a7d-c80c-4e15-bcf3-641559c7b8a7"\n       },\n     "data":  {\n       "formId": "3b1bf4b2-1603-4ca5-b885-c509245567aa",\n         "organisation": "Defra",\n         "slug": "audit-form",\n         "teamEmail": "forms@example.com",\n         "teamName": "Forms",\n         "title": "My Audit Event Form"\n       },\n     "schemaVersion": 1,\n     "type": "FORM_CREATED"\n,\n     "source": "FORMS_MANAGER"\n   }'
+    ),
+    MD5OfBody: 'a06ffc5688321b187cec5fdb9bcc62fa',
+    MessageAttributes: {},
+    MessageId: 'fbafb17e-86f0-4ac6-b864-3f32cd60b228',
+    ReceiptHandle:
+      'YTBkZjk3ZTAtODA4ZC00NTQ5LTg4MzMtOWY3NjA2MDJlMjUxIGFybjphd3M6c3FzOmV1LXdlc3QtMjowMDAwMDAwMDAwMDA6Zm9ybXNfYXVkaXRfZXZlbnRzIGZiYWZiMTdlLTg2ZjAtNGFjNi1iODY0LTNmMzJjZDYwYjIyOCAxNzUzMzU0ODY4LjgzMjUzMzQ=',
+    ...partialMessage
+  }
+}
+
+/**
+ * Builds a message from a Message Partial and AuditMessage
+ * @param {AuditMessage} auditMessage
+ * @param {Partial<Message>} partialMessage
+ * @returns {Message}
+ */
+export function buildMessageFromAuditMessage(
+  auditMessage,
+  partialMessage = {}
+) {
+  const Body = JSON.stringify(auditMessage)
+
+  return {
+    ...buildMessage(partialMessage),
+    Body
+  }
+}
 /**
  * @import { WithId } from 'mongodb'
  * @import { AuditRecordInput, AuditMessage, FormUpdatedMessage, AuditInputMeta, AuditMetaBase, AuditRecord, FormLiveCreatedFromDraftMessage } from '@defra/forms-model'
+ * @import { Message } from '@aws-sdk/client-sqs'
  */

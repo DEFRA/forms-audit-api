@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 /**
  * Get the author from the auth credentials
  * @returns {FormMetadataAuthor}

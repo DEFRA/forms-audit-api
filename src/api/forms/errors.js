@@ -44,24 +44,5 @@ export class InvalidFormDefinitionError extends ApplicationError {
 }
 
 /**
- * Indicates the form already exists so cannot be created again.
- */
-export class FormAlreadyExistsError extends ApplicationError {
-  name = 'FormAlreadyExistsError'
-
-  /**
-   * Constructs an error
-   * @param {string} slug
-   * @param {ErrorOptions} [options]
-   */
-  constructor(slug, options = {}) {
-    super(`Form with slug ${slug} already exists`, {
-      ...options,
-      statusCode: 400
-    })
-  }
-}
-
-/**
  * @import { ValidationError } from 'joi'
  */

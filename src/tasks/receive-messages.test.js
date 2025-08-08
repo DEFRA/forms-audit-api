@@ -39,6 +39,12 @@ describe('receive-messages', () => {
       await runTaskOnce()
       expect(createAuditEvents).toHaveBeenCalledWith([message])
     })
+
+    it('should handle undefined messages', async () => {
+      jest.mocked(receiveEventMessages).mockResolvedValueOnce({})
+      await runTaskOnce()
+      expect(createAuditEvents).not.toHaveBeenCalled()
+    })
   })
 
   describe('runTask', () => {
