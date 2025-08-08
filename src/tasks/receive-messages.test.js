@@ -6,6 +6,7 @@ import { createAuditEvents } from '~/src/service/events.js'
 import { runTask, runTaskOnce } from '~/src/tasks/receive-messages.js'
 jest.mock('~/src/messaging/event.js')
 jest.mock('~/src/service/events.js')
+jest.mock('~/src/helpers/logging/logger.js')
 
 describe('receive-messages', () => {
   const message = /** @type {Message} */ ({
@@ -38,6 +39,12 @@ describe('receive-messages', () => {
       jest.mocked(createAuditEvents).mockResolvedValueOnce(auditEventResult)
       await runTaskOnce()
       expect(createAuditEvents).toHaveBeenCalledWith([message])
+    })
+
+    it('should handle undefined messages', async () => {
+      jest.mocked(receiveEventMessages).mockResolvedValueOnce({})
+      await runTaskOnce()
+      expect(createAuditEvents).not.toHaveBeenCalled()
     })
   })
 
