@@ -17,6 +17,11 @@ import {
 
 const mockCollection = buildMockCollection()
 
+/**
+ * @type {any}
+ */
+const mockSession = {}
+
 jest.mock('~/src/mongo.js', () => {
   let isPrepared = false
   const collection =
@@ -105,16 +110,18 @@ describe('audit-record-repository', () => {
 
   describe('createAuditRecord', () => {
     it('should create an audit record', async () => {
-      await createAuditRecord(auditRecordInput)
-      const [insertedAuditRecordInput] = mockCollection.insertOne.mock.calls[0]
+      await createAuditRecord(auditRecordInput, mockSession)
+      const [insertedAuditRecordInput, session] =
+        mockCollection.insertOne.mock.calls[0]
       expect(insertedAuditRecordInput).toEqual(auditRecordInput)
+      expect(session).toEqual({ session: mockSession })
     })
 
     it('should handle failures', async () => {
       mockCollection.insertOne.mockRejectedValueOnce(new Error('Failed'))
-      await expect(createAuditRecord(auditRecordInput)).rejects.toThrow(
-        new Error('Failed')
-      )
+      await expect(
+        createAuditRecord(auditRecordInput, mockSession)
+      ).rejects.toThrow(new Error('Failed'))
     })
   })
 })
