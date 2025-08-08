@@ -179,6 +179,21 @@ export function buildLiveCreatedFromDraftAuditRecord(
 }
 
 /**
+ *
+ * @param {AuditMessage} auditMessage
+ * @param {Partial<WithId<AuditMetaBase>>} partialAuditDocumentMeta
+ * @returns {WithId<AuditRecordInput>}
+ */
+export function buildAuditRecordDocument(
+  auditMessage,
+  partialAuditDocumentMeta
+) {
+  return {
+    ...auditMessage,
+    ...buildAuditRecordDocumentMeta(partialAuditDocumentMeta)
+  }
+}
+/**
  * @import { WithId } from 'mongodb'
  * @import { AuditRecordInput, AuditMessage, FormUpdatedMessage, AuditInputMeta, AuditMetaBase, AuditRecord, FormLiveCreatedFromDraftMessage } from '@defra/forms-model'
  */
