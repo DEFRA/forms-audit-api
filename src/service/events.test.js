@@ -13,14 +13,24 @@ import {
   buildAuditRecord,
   buildAuditRecordDocument,
   buildAuditRecordInput,
-  buildLiveCreatedFromDraftMessage
+  buildFormUpdatedMessage,
+  buildLiveCreatedFromDraftMessage,
+  buildMessage,
+  buildMessageFromAuditMessage,
+  rawMessageDelivery
 } from '~/src/api/forms/__stubs__/audit.js'
+import { deleteEventMessage } from '~/src/messaging/event.js'
 import { prepareDb } from '~/src/mongo.js'
 import * as auditRecord from '~/src/repositories/audit-record-repository.js'
-import { mapAuditEvent, readAuditEvents } from '~/src/service/events.js'
+import {
+  createAuditEvents,
+  mapAuditEvent,
+  readAuditEvents
+} from '~/src/service/events.js'
 
 jest.mock('~/src/messaging/event.js')
 jest.mock('~/src/repositories/audit-record-repository.js')
+jest.mock('~/src/messaging/event.js')
 
 jest.mock('~/src/mongo.js', () => {
   let isPrepared = false
@@ -51,19 +61,6 @@ jest.mock('~/src/mongo.js', () => {
     }
   }
 })
-/**
- * @param {boolean} rawMessageDelivery
- * @param {string} body
- * @returns {string}
- */
-function rawMessageDelivery(rawMessageDelivery, body) {
-  if (rawMessageDelivery) {
-    return body
-  }
-  return JSON.stringify({
-    Message: body
-  })
-}
 
 describe('events', () => {
   const recordInput = buildAuditMetaBase({
@@ -90,7 +87,7 @@ describe('events', () => {
      *
      * @type {Message}
      */
-    const auditEventMessage = {
+    const auditEventMessage = buildMessage({
       Body: rawMessageDelivery(
         true,
         '{\n     "entityId": "3b1bf4b2-1603-4ca5-b885-c509245567aa",\n     "category": "FORM",\n     "messageCreatedAt": "2025-07-23T00:00:00.000Z",\n     "createdAt": "2025-07-23T00:00:00.000Z",\n     "createdBy":  {\n       "displayName": "Enrique Chase",\n         "id": "83f09a7d-c80c-4e15-bcf3-641559c7b8a7"\n       },\n     "data":  {\n       "formId": "3b1bf4b2-1603-4ca5-b885-c509245567aa",\n         "organisation": "Defra",\n         "slug": "audit-form",\n         "teamEmail": "forms@example.com",\n         "teamName": "Forms",\n         "title": "My Audit Event Form"\n       },\n     "schemaVersion": 1,\n     "type": "FORM_CREATED"\n,\n     "source": "FORMS_MANAGER"\n   }'
@@ -100,7 +97,7 @@ describe('events', () => {
       MessageId: 'fbafb17e-86f0-4ac6-b864-3f32cd60b228',
       ReceiptHandle:
         'YTBkZjk3ZTAtODA4ZC00NTQ5LTg4MzMtOWY3NjA2MDJlMjUxIGFybjphd3M6c3FzOmV1LXdlc3QtMjowMDAwMDAwMDAwMDA6Zm9ybXNfYXVkaXRfZXZlbnRzIGZiYWZiMTdlLTg2ZjAtNGFjNi1iODY0LTNmMzJjZDYwYjIyOCAxNzUzMzU0ODY4LjgzMjUzMzQ='
-    }
+    })
 
     it('should map the message', () => {
       expect(mapAuditEvent(auditEventMessage)).toEqual({
@@ -152,7 +149,7 @@ describe('events', () => {
        *
        * @type {Message}
        */
-      const auditEventMessage = {
+      const auditEventMessage = buildMessage({
         Body: rawMessageDelivery(
           true,
           '{\n     "entityId": "3b1bf4b2-1603-4ca5-b885-c509245567aa",\n     "category": "FORM",\n     "messageCreatedAt": "2025-07-23T00:00:00.000Z",\n     "createdBy":  {\n       "displayName": "Enrique Chase",\n         "id": "83f09a7d-c80c-4e15-bcf3-641559c7b8a7"\n       },\n     "data":  {\n       "formId": "3b1bf4b2-1603-4ca5-b885-c509245567aa",\n         "organisation": "Defra",\n         "slug": "audit-form",\n         "teamEmail": "forms@example.com",\n         "teamName": "Forms",\n         "title": "My Audit Event Form"\n       },\n     "schemaVersion": 1,\n     "type": "FORM_CREATED"\n,\n     "source": "FORMS_MANAGER"\n   }'
@@ -162,7 +159,7 @@ describe('events', () => {
         MessageId: 'fbafb17e-86f0-4ac6-b864-3f32cd60b228',
         ReceiptHandle:
           'YTBkZjk3ZTAtODA4ZC00NTQ5LTg4MzMtOWY3NjA2MDJlMjUxIGFybjphd3M6c3FzOmV1LXdlc3QtMjowMDAwMDAwMDAwMDA6Zm9ybXNfYXVkaXRfZXZlbnRzIGZiYWZiMTdlLTg2ZjAtNGFjNi1iODY0LTNmMzJjZDYwYjIyOCAxNzUzMzU0ODY4LjgzMjUzMzQ='
-      }
+      })
 
       expect(() => mapAuditEvent(auditEventMessage)).toThrow(
         new ValidationError('"createdAt" is required', [], auditEventMessage)
@@ -182,6 +179,91 @@ describe('events', () => {
 
       const auditRecords = await readAuditEvents({ entityId })
       expect(auditRecords).toEqual([expectedAuditRecord])
+    })
+  })
+
+  describe('createAuditEvents', () => {
+    const messageId1 = '01267dd5-8cc7-4749-9802-40190f6429eb'
+    const messageId2 = '5dd16f40-6118-4797-97c9-60a298c9a898'
+    const messageId3 = '70c0155c-e9a9-4b90-a45f-a839924fca65'
+    const auditMessage2 = buildFormUpdatedMessage()
+    const auditMessage3 = buildLiveCreatedFromDraftMessage()
+    const message1 = buildMessageFromAuditMessage(auditMessage, {
+      MessageId: messageId1
+    })
+    const message2 = buildMessageFromAuditMessage(auditMessage2, {
+      MessageId: messageId2
+    })
+    const message3 = buildMessageFromAuditMessage(auditMessage3, {
+      MessageId: messageId3
+    })
+    const messages = [message1, message2, message3]
+
+    it('should create a list of audit events', async () => {
+      const expectedMapped1 = {
+        ...auditMessage,
+        ...recordInput,
+        recordCreatedAt: expect.any(Date),
+        messageId: messageId1
+      }
+      const expectedMapped2 = {
+        ...auditMessage2,
+        ...recordInput,
+        recordCreatedAt: expect.any(Date),
+        messageId: messageId2
+      }
+      const expectedMapped3 = {
+        ...auditMessage3,
+        ...recordInput,
+        recordCreatedAt: expect.any(Date),
+        messageId: messageId3
+      }
+      const result = await createAuditEvents(messages)
+      expect(auditRecord.createAuditRecord).toHaveBeenCalledTimes(3)
+      expect(auditRecord.createAuditRecord).toHaveBeenNthCalledWith(
+        1,
+        expectedMapped1
+      )
+      expect(auditRecord.createAuditRecord).toHaveBeenNthCalledWith(
+        2,
+        expectedMapped2
+      )
+      expect(auditRecord.createAuditRecord).toHaveBeenNthCalledWith(
+        3,
+        expectedMapped3
+      )
+      expect(deleteEventMessage).toHaveBeenCalledTimes(3)
+      expect(deleteEventMessage).toHaveBeenNthCalledWith(1, message1)
+      expect(deleteEventMessage).toHaveBeenNthCalledWith(2, message2)
+      expect(deleteEventMessage).toHaveBeenNthCalledWith(3, message3)
+
+      expect(result).toEqual({
+        saved: messages,
+        failed: [],
+        savedMessageCount: 3
+      })
+    })
+
+    it('should handle failures', async () => {
+      jest
+        .mocked(auditRecord.createAuditRecord)
+        .mockResolvedValueOnce(undefined)
+      jest
+        .mocked(auditRecord.createAuditRecord)
+        .mockRejectedValueOnce(undefined)
+      jest
+        .mocked(auditRecord.createAuditRecord)
+        .mockResolvedValueOnce(undefined)
+      jest.mocked(deleteEventMessage).mockResolvedValueOnce({
+        $metadata: { httpStatusCode: 200 }
+      })
+      jest.mocked(deleteEventMessage).mockRejectedValueOnce(new Error('error'))
+      const result = await createAuditEvents(messages)
+      expect(result).toEqual({
+        saved: [message1],
+        failed: [message2, message3],
+        savedMessageCount: 1
+      })
     })
   })
 })
