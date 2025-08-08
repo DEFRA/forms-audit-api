@@ -9,15 +9,13 @@ import { readAuditEvents } from '~/src/service/events.js'
 export default {
   method: 'GET',
   path: '/audit/forms/{id}',
-  async handler(request) {
+  handler(request) {
     const { params } = request
     const { id } = params
 
-    const auditRecords = await readAuditEvents({
+    return readAuditEvents({
       entityId: id
     })
-
-    return auditRecords
   },
   options: {
     auth: false,
