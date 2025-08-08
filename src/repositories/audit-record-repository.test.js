@@ -68,5 +68,12 @@ describe('audit-record-repository', () => {
       const [insertedAuditRecordInput] = mockCollection.insertOne.mock.calls[0]
       expect(insertedAuditRecordInput).toEqual(auditRecordInput)
     })
+
+    it('should handle failures', async () => {
+      mockCollection.insertOne.mockRejectedValueOnce(new Error('Failed'))
+      await expect(
+        createAuditRecord(auditRecordInput, mockSession)
+      ).rejects.toThrow(new Error('Failed'))
+    })
   })
 })

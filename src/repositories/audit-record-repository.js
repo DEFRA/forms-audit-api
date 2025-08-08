@@ -14,9 +14,15 @@ export async function createAuditRecord(auditRecordInput, session) {
     db.collection(AUDIT_RECORDS_COLLECTION_NAME)
   )
 
-  await coll.insertOne(auditRecordInput, { session })
-
-  logger.info(`Inserted ${auditRecordInput.messageId}`)
+  try {
+    await coll.insertOne(auditRecordInput, { session })
+    logger.info(`Inserted ${auditRecordInput.messageId}`)
+  } catch (e) {
+    logger.error(
+      `Failed to insert ${auditRecordInput.messageId} - ${e.toString()} `
+    )
+    throw e
+  }
 }
 
 /**
