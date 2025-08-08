@@ -21,6 +21,8 @@ export async function getAuditRecords(filter) {
   try {
     const results = await coll.find(filter).limit(MAX_RECORDS).toArray()
 
+    logger.info('Read audit records')
+
     return results
   } catch (e) {
     logger.error(`Failed to read audit records - ${getErrorMessage(e)}`)
