@@ -2,6 +2,7 @@ import { buildFormUpdateAuditRecord } from '~/src/api/forms/__stubs__/audit.js'
 import { createServer } from '~/src/api/server.js'
 import { readAuditEvents } from '~/src/service/events.js'
 
+jest.mock('~/src/mongo.js')
 jest.mock('~/src/service/events.js')
 jest.mock('~/src/helpers/logging/logger.js')
 
