@@ -4,13 +4,15 @@ import Joi from 'joi'
 import { getErrorMessage } from '~/src/helpers/error-message.js'
 import { createLogger } from '~/src/helpers/logging/logger.js'
 import { deleteEventMessage } from '~/src/messaging/event.js'
-import { AUDIT_RECORDS_COLLECTION_NAME, db } from '~/src/mongo.js'
+import { client } from '~/src/mongo.js'
+import * as auditRecord from '~/src/repositories/audit-record-repository.js'
+import { mapAuditRecord } from '~/src/routes/shared.js'
 
 const logger = createLogger()
 
 /**
  * @param {Message} message
- * @returns {AuditRecord}
+ * @returns {AuditRecordInput}
  */
 export function mapAuditEvent(message) {
   if (!message.MessageId) {
@@ -38,15 +40,22 @@ export function mapAuditEvent(message) {
 }
 
 /**
+ * Query audit records
+ * @param {{ entityId: string }} filter
+ */
+export async function readAuditEvents(filter) {
+  const results = await auditRecord.getAuditRecords(filter)
+
+  return results.map(mapAuditRecord)
+}
+
+/**
+ * Create audit records
  * @param {Message[]} messages
  * @returns {Promise<{ saved: Message[]; failed: Message[]; savedMessageCount: number }>}
  */
 export async function createAuditEvents(messages) {
   logger.info('Inserting audit records')
-
-  const coll = /** @type {Collection<AuditRecord>} */ (
-    db.collection(AUDIT_RECORDS_COLLECTION_NAME)
-  )
 
   /**
    * @type {Message[]}
@@ -61,27 +70,30 @@ export async function createAuditEvents(messages) {
    * @param {Message} message
    */
   async function createAuditEvent(message) {
+    const session = client.startSession()
+
     try {
-      const document = mapAuditEvent(message)
+      await session.withTransaction(async () => {
+        const document = mapAuditEvent(message)
 
-      logger.info(`Inserting ${message.MessageId}`)
+        await auditRecord.createAuditRecord(document, session)
 
-      await coll.insertOne(document)
+        logger.info(`Deleting ${message.MessageId}`)
 
-      logger.info(`Inserted ${message.MessageId}`)
+        await deleteEventMessage(message)
 
-      logger.info(`Deleting ${message.MessageId}`)
+        logger.info(`Deleted ${message.MessageId}`)
 
-      await deleteEventMessage(message)
-
-      logger.info(`Deleted ${message.MessageId}`)
-
-      saved.push(message)
+        saved.push(message)
+      })
     } catch (err) {
       failed.push(message)
       logger.error(
         `[createAuditEvent] Failed to insert message - ${getErrorMessage(err)}`
       )
+      throw err
+    } finally {
+      await session.endSession()
     }
   }
 
@@ -94,6 +106,5 @@ export async function createAuditEvents(messages) {
 
 /**
  * @import { Message } from '@aws-sdk/client-sqs'
- * @import { AuditMessage, AuditRecord } from '@defra/forms-model'
- * @import { Collection } from 'mongodb'
+ * @import { AuditRecordInput, AuditMessage } from '@defra/forms-model'
  */

@@ -11,6 +11,8 @@ import {
   receiveEventMessages
 } from '~/src/messaging/event.js'
 
+jest.mock('~/src/helpers/logging/logger.js')
+
 describe('event', () => {
   const snsMock = mockClient(SQSClient)
   const messageId = '31cb6fff-8317-412e-8488-308d099034c4'
