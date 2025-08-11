@@ -106,6 +106,5 @@ export async function createAuditEvents(messages) {
 
 /**
  * @import { Message } from '@aws-sdk/client-sqs'
- * @import { AuditRecordInput, AuditMessage, AuditRecord } from '@defra/forms-model'
- * @import { Collection } from 'mongodb'
+ * @import { AuditRecordInput, AuditMessage } from '@defra/forms-model'
  */

@@ -53,7 +53,6 @@ export async function createAuditRecord(auditRecordInput, session) {
 }
 
 /**
- * @import { AuditRecordInput, FormDefinition, Page, ComponentDef, PatchPageFields, List, Engine, ConditionWrapperV2 } from '@defra/forms-model'
+ * @import { AuditRecordInput } from '@defra/forms-model'
  * @import { ClientSession, Collection, Filter, WithId } from 'mongodb'
- * @import { ObjectSchema } from 'joi'
  */
