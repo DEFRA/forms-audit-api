@@ -6,10 +6,10 @@
 export function mapAuditRecord(document) {
   const { _id, ...rest } = document
 
-  return /** @type {AuditRecord} */ ({
+  return {
     ...rest,
     id: _id.toString()
-  })
+  }
 }
 
 /**
