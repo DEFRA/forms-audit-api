@@ -29,7 +29,8 @@ export function mapAuditEvent(message) {
   const messageBody = JSON.parse(message.Body)
 
   const value = Joi.attempt(messageBody, messageSchema, {
-    abortEarly: false
+    abortEarly: false,
+    stripUnknown: true
   })
 
   return {

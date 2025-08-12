@@ -7,6 +7,7 @@ import { readAuditEvents } from '~/src/service/events.js'
 jest.mock('~/src/mongo.js')
 jest.mock('~/src/service/events.js')
 jest.mock('~/src/helpers/logging/logger.js')
+jest.mock('~/src/tasks/receive-messages.js')
 
 describe('Forms audit route', () => {
   /** @type {Server} */

@@ -6,6 +6,7 @@ import convict from 'convict'
 const isProduction = process.env.NODE_ENV === 'production'
 const isDev = process.env.NODE_ENV !== 'production'
 const isTest = process.env.NODE_ENV === 'test'
+const DEFAULT_MESSAGE_TIMEOUT = 30
 
 export const config = convict({
   env: {
@@ -189,8 +190,20 @@ export const config = convict({
   receiveMessageTimeout: {
     doc: 'The wait time between each poll in milliseconds',
     format: Number,
-    default: 30 * 1000,
+    default: DEFAULT_MESSAGE_TIMEOUT * 1000,
     env: 'RECEIVE_MESSAGE_TIMEOUT_MS'
+  },
+  maxNumberOfMessages: {
+    doc: 'The maximum number of messages to be received from queue at a time',
+    format: Number,
+    default: 10,
+    env: 'SQS_MAX_NUMBER_OF_MESSAGES'
+  },
+  visibilityTimeout: {
+    doc: 'The number of seconds that a message is hidden from other consumers after being retrieved from the queue.',
+    format: Number,
+    default: 30,
+    env: 'SQS_VISIBILITY_TIMEOUT'
   }
 })
 
