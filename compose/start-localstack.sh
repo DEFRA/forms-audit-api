@@ -8,6 +8,16 @@ export AWS_SECRET_ACCESS_KEY=test
 
 # queues
 aws --endpoint-url=http://localhost:4566 sqs create-queue --queue-name forms_audit_events
+aws --endpoint-url=http://localhost:4566 sqs create-queue --queue-name forms_audit_events-deadletter
+
+# dead letter
+aws --endpoint-url=http://localhost:4566 sqs set-queue-attributes \
+    --queue-url http://sqs.eu-west-2.127.0.0.1:4566/000000000000/forms_audit_events \
+    --attributes '{
+    "RedrivePolicy": "{\"deadLetterTargetArn\":\"http://sqs.eu-west-2.127.0.0.1:4566/000000000000/forms_audit_events-deadletter\",\"maxReceiveCount\":\"3\"}",
+    "ReceiveMessagesWaitTimeSeconds": "20",
+    "VisibilityTimeout": "60"
+}'
 
 # topics
 aws --endpoint-url=http://localhost:4566 sns create-topic --name forms_manager_events
