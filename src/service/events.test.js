@@ -128,8 +128,10 @@ describe('events', () => {
     it('should allow unknown fields the message', () => {
       const event = mapAuditEvent({
         ...auditEventMessage,
+        // @ts-expect-error - unknown field
         unknownField: 'visible'
       })
+      // @ts-expect-error - unknown field
       expect(event.unknownField).toBeUndefined()
     })
 
