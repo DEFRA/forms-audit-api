@@ -25,7 +25,7 @@ aws --endpoint-url=http://localhost:4566 sqs set-queue-attributes \
     --queue-url http://sqs.eu-west-2.127.0.0.1:4566/000000000000/forms_audit_events \
     --attributes '{
     "RedrivePolicy": "{\"deadLetterTargetArn\":\"http://sqs.eu-west-2.127.0.0.1:4566/000000000000/forms_audit_events-deadletter\",\"maxReceiveCount\":\"3\"}",
-    "ReceiveMessagesWaitTimeSeconds": "20",
+    "ReceiveMessageWaitTimeSeconds": "20",
     "VisibilityTimeout": "60"
 }'
 
