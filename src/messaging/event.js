@@ -8,14 +8,16 @@ import { sqsClient } from '~/src/tasks/sqs.js'
 
 export const receiveMessageTimeout = config.get('receiveMessageTimeout')
 const queueUrl = config.get('sqsEventsQueueUrl')
+const maxNumberOfMessages = config.get('maxNumberOfMessages')
+const visibilityTimeout = config.get('visibilityTimeout')
 
 /**
  * @type {ReceiveMessageCommandInput}
  */
 const input = {
   QueueUrl: queueUrl,
-  MaxNumberOfMessages: 10, // TODO: env variable
-  VisibilityTimeout: (receiveMessageTimeout / 1000) * 2
+  MaxNumberOfMessages: maxNumberOfMessages,
+  VisibilityTimeout: visibilityTimeout
 }
 
 /**
