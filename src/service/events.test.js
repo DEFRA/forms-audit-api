@@ -125,6 +125,14 @@ describe('events', () => {
       })
     })
 
+    it('should allow unknown fields the message', () => {
+      const event = mapAuditEvent({
+        ...auditEventMessage,
+        unknownField: 'visible'
+      })
+      expect(event.unknownField).toBeUndefined()
+    })
+
     it('should fail if there is no MessageId', () => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { MessageId, ...auditEventMessageWithoutMessageId } =
