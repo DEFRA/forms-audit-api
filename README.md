@@ -101,6 +101,33 @@ To mimic the application running in `production` mode locally run:
 npm start
 ```
 
+### Notes on SQS queue configuration
+
+`ReceiveMessageWaitTime` - this is probably the most important queue setting and controls what amazon call long polling vs short polling. When `ReceiveMessageWaitTime` is greater than 0, long polling is in effect. The max `ReceiveMessageWaitTime` is 20s.
+
+This is the code affect by this setting:
+
+```js
+export function receiveEventMessages() {
+  const command = new ReceiveMessageCommand(input)
+  return sqsClient.send(command)
+}
+```
+
+With short-polling, line 3 fetches any messages from SQS and yields immediately.
+
+With long-polling, if there aren’t any messages found, the HTTP connection is kept open for up to 20s until some arrive. The consumer of receiveEventMessages is left waiting while that happens.
+
+By default, CDP set `ReceiveMessageWaitTime` to 20s. The auditing queue also uses this default.
+
+#### Queue configuration in forms-audit-api
+
+`RECEIVE_MESSAGE_TIMEOUT_MS` - the amount of time to wait between calls to receive messages
+
+`SQS_MAX_NUMBER_OF_MESSAGES` - the number of messages to receive at once (max 10)
+
+`SQS_VISIBILITY_TIMEOUT` - when receiving a message from an Amazon SQS queue, it remains in the queue but becomes temporarily invisible to other consumers. This invisibility is controlled by the visibility timeout, which ensures that other consumers cannot process the same message while you are working on it.
+
 ### Npm scripts
 
 All available Npm scripts can be seen in [package.json](./package.json).
