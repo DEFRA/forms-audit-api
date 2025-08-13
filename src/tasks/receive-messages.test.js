@@ -30,8 +30,7 @@ describe('receive-messages', () => {
       })
       const auditEventResult = {
         failed: [],
-        saved: [message],
-        savedMessageCount: 1
+        saved: [message]
       }
       jest
         .mocked(receiveEventMessages)
@@ -60,8 +59,7 @@ describe('receive-messages', () => {
       })
       jest.mocked(createAuditEvents).mockResolvedValueOnce({
         failed: [],
-        saved: [],
-        savedMessageCount: 0
+        saved: []
       })
       await runTask()
       expect(setTimeoutSpy).toHaveBeenCalledWith(runTask, receiveMessageTimeout)

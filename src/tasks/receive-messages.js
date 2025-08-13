@@ -24,9 +24,9 @@ export async function runTaskOnce() {
     if (messages && messageCount) {
       logger.info('Saving queue messages to DB')
 
-      const { savedMessageCount } = await createAuditEvents(messages)
+      const { saved } = await createAuditEvents(messages)
 
-      logger.info(`Saved ${savedMessageCount} queue messages to DB`)
+      logger.info(`Saved ${saved.length} queue messages to DB`)
     }
   } catch (err) {
     logger.error(

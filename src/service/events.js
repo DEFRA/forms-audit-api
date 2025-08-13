@@ -53,19 +53,10 @@ export async function readAuditEvents(filter) {
 /**
  * Create audit records
  * @param {Message[]} messages
- * @returns {Promise<{ saved: Message[]; failed: Message[]; savedMessageCount: number }>}
+ * @returns {Promise<{ saved: Message[]; failed: any[] }>}
  */
 export async function createAuditEvents(messages) {
   logger.info('Inserting audit records')
-
-  /**
-   * @type {Message[]}
-   */
-  const saved = []
-  /**
-   * @type {Message[]}
-   */
-  const failed = []
 
   /**
    * @param {Message} message
@@ -74,7 +65,7 @@ export async function createAuditEvents(messages) {
     const session = client.startSession()
 
     try {
-      await session.withTransaction(async () => {
+      return await session.withTransaction(async () => {
         const document = mapAuditEvent(message)
 
         await auditRecord.createAuditRecord(document, session)
@@ -85,10 +76,9 @@ export async function createAuditEvents(messages) {
 
         logger.info(`Deleted ${message.MessageId}`)
 
-        saved.push(message)
+        return message
       })
     } catch (err) {
-      failed.push(message)
       logger.error(
         `[createAuditEvent] Failed to insert message - ${getErrorMessage(err)}`
       )
@@ -98,11 +88,19 @@ export async function createAuditEvents(messages) {
     }
   }
 
-  await Promise.allSettled(messages.map(createAuditEvent))
+  const results = await Promise.allSettled(messages.map(createAuditEvent))
 
   logger.info('Inserted audit records')
 
-  return { saved, failed, savedMessageCount: saved.length }
+  const saved = results
+    .filter((result) => result.status === 'fulfilled')
+    .map((result) => result.value)
+
+  const failed = results
+    .filter((result) => result.status === 'rejected')
+    .map((result) => result.reason)
+
+  return { saved, failed }
 }
 
 /**
