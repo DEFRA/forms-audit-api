@@ -90,15 +90,22 @@ export async function createAuditEvents(messages) {
 
   const results = await Promise.allSettled(messages.map(createAuditEvent))
 
-  logger.info('Inserted audit records')
-
   const saved = results
     .filter((result) => result.status === 'fulfilled')
     .map((result) => result.value)
+  const message = saved.map((item) => item.MessageId).join(',')
+
+  logger.info(`Inserted audit records: ${message}`)
 
   const failed = results
     .filter((result) => result.status === 'rejected')
     .map((result) => result.reason)
+
+  if (failed.length) {
+    const message = failed.map((item) => getErrorMessage(item)).join(',')
+
+    logger.info(`Failed to insert audit records: ${message}`)
+  }
 
   return { saved, failed }
 }
