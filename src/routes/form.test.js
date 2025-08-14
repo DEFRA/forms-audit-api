@@ -43,6 +43,10 @@ describe('Forms audit route', () => {
       expect(response.statusCode).toEqual(okStatusCode)
       expect(response.headers['content-type']).toContain(jsonContentType)
       expect(response.result).toMatchObject([formUpdateAuditRecord])
+      expect(readAuditEvents).toHaveBeenCalledWith({
+        entityId: formId,
+        category: 'FORM'
+      })
     })
 
     test('Testing GET /audit/forms/{id} route returns 500', async () => {

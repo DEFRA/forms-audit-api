@@ -1,4 +1,4 @@
-import { idSchema } from '@defra/forms-model'
+import { AuditEventMessageCategory, idSchema } from '@defra/forms-model'
 import Joi from 'joi'
 
 import { readAuditEvents } from '~/src/service/events.js'
@@ -14,6 +14,7 @@ export default {
     const { id } = params
 
     return readAuditEvents({
+      category: AuditEventMessageCategory.FORM,
       entityId: id
     })
   },
