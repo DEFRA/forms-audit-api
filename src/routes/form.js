@@ -9,20 +9,31 @@ import { readAuditEvents } from '~/src/service/events.js'
 export default {
   method: 'GET',
   path: '/audit/forms/{id}',
-  handler(request) {
-    const { params } = request
+  async handler(request) {
+    const { params, query } = request
     const { id } = params
-
-    return readAuditEvents({
-      category: AuditEventMessageCategory.FORM,
-      entityId: id
-    })
+    const { skip } = query
+    const skipCount = skip ?? 0
+    const auditRecords = await readAuditEvents(
+      {
+        category: AuditEventMessageCategory.FORM,
+        entityId: id
+      },
+      skipCount
+    )
+    return {
+      auditRecords,
+      skip: skipCount
+    }
   },
   options: {
     auth: false,
     validate: {
       params: Joi.object().keys({
         id: idSchema
+      }),
+      query: Joi.object().keys({
+        skip: Joi.number().optional()
       })
     }
   }

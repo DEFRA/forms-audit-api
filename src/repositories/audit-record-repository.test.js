@@ -96,6 +96,23 @@ describe('audit-record-repository', () => {
       expect(auditRecords).toEqual([auditDocument])
     })
 
+    it('should get audit records with skip count', async () => {
+      const toArrayStub = jest.fn().mockResolvedValueOnce([auditDocument])
+      const limitStub = jest.fn().mockReturnValue({
+        toArray: toArrayStub
+      })
+      mockCollection.find.mockReturnValueOnce({
+        limit: limitStub
+      })
+      const auditRecords = await getAuditRecords({
+        entityId: STUB_AUDIT_RECORD_ID
+      })
+      const [filter] = mockCollection.find.mock.calls[0]
+      expect(filter).toEqual({ entityId: STUB_AUDIT_RECORD_ID })
+      expect(limitStub).toHaveBeenCalledWith(1000)
+      expect(auditRecords).toEqual([auditDocument])
+    })
+
     it('should handle get audit record failures', async () => {
       mockCollection.find.mockImplementation(() => {
         throw new Error('an error')
