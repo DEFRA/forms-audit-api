@@ -115,8 +115,10 @@ export function receiveEventMessages() {
 ```
 
 With short-polling, line 3 fetches any messages from SQS and yields immediately.
+It may sample only a subset of the queue’s partitions, so you might not see all currently available messages on that call.
 
 With long-polling, if there aren’t any messages found, the HTTP connection is kept open for up to 20s until some arrive. The consumer of receiveEventMessages is left waiting while that happens.
+It will fetch all currently available messages up to the message limit across the queue's partitions.
 
 By default, CDP set `ReceiveMessageWaitTime` to 20s. The auditing queue also uses this default.
 
