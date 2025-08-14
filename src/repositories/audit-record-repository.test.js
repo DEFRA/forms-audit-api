@@ -92,7 +92,7 @@ describe('audit-record-repository', () => {
       })
       const [filter] = mockCollection.find.mock.calls[0]
       expect(filter).toEqual({ entityId: STUB_AUDIT_RECORD_ID })
-      expect(limitStub).toHaveBeenCalledWith(100)
+      expect(limitStub).toHaveBeenCalledWith(1000)
       expect(auditRecords).toEqual([auditDocument])
     })
 

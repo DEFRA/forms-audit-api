@@ -4,7 +4,7 @@ import { AUDIT_RECORDS_COLLECTION_NAME, db } from '~/src/mongo.js'
 
 const logger = createLogger()
 
-const MAX_RECORDS = 100
+const MAX_RECORDS = 1000
 
 /**
  * Gets a filtered list of audit records
