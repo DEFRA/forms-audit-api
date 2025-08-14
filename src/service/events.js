@@ -93,18 +93,18 @@ export async function createAuditEvents(messages) {
   const saved = results
     .filter((result) => result.status === 'fulfilled')
     .map((result) => result.value)
-  const message = saved.map((item) => item.MessageId).join(',')
+  const savedMessage = saved.map((item) => item.MessageId).join(',')
 
-  logger.info(`Inserted audit records: ${message}`)
+  logger.info(`Inserted audit records: ${savedMessage}`)
 
   const failed = results
     .filter((result) => result.status === 'rejected')
     .map((result) => result.reason)
 
   if (failed.length) {
-    const message = failed.map((item) => getErrorMessage(item)).join(',')
+    const failedMessage = failed.map((item) => getErrorMessage(item)).join(',')
 
-    logger.info(`Failed to insert audit records: ${message}`)
+    logger.info(`Failed to insert audit records: ${failedMessage}`)
   }
 
   return { saved, failed }
