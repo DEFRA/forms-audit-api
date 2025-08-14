@@ -187,7 +187,7 @@ describe('events', () => {
         .mocked(auditRecord.getAuditRecords)
         .mockResolvedValueOnce([auditDocument])
 
-      const auditRecords = await readAuditEvents({ entityId })
+      const auditRecords = await readAuditEvents({ entityId }, 0)
       expect(auditRecords).toEqual([expectedAuditRecord])
     })
   })

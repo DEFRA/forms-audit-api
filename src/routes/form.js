@@ -1,4 +1,4 @@
-import { idSchema } from '@defra/forms-model'
+import { AuditEventMessageCategory, idSchema } from '@defra/forms-model'
 import Joi from 'joi'
 
 import { readAuditEvents } from '~/src/service/events.js'
@@ -9,19 +9,30 @@ import { readAuditEvents } from '~/src/service/events.js'
 export default {
   method: 'GET',
   path: '/audit/forms/{id}',
-  handler(request) {
-    const { params } = request
+  async handler(request) {
+    const { params, query } = request
     const { id } = params
-
-    return readAuditEvents({
-      entityId: id
-    })
+    const { skip } = query
+    const auditRecords = await readAuditEvents(
+      {
+        category: AuditEventMessageCategory.FORM,
+        entityId: id
+      },
+      skip
+    )
+    return {
+      auditRecords,
+      skip
+    }
   },
   options: {
     auth: false,
     validate: {
       params: Joi.object().keys({
         id: idSchema
+      }),
+      query: Joi.object().keys({
+        skip: Joi.number().default(0).optional()
       })
     }
   }

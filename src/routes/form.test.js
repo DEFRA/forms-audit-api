@@ -28,6 +28,8 @@ describe('Forms audit route', () => {
   const formId = '688131eeff67f889d52c66cc'
 
   describe('Success responses', () => {
+    const formUpdateAuditRecord = buildFormUpdateAuditRecord()
+
     test('Testing GET /audit/forms/{id} route returns 200', async () => {
       const formUpdateAuditRecord = buildFormUpdateAuditRecord()
 
@@ -42,7 +44,42 @@ describe('Forms audit route', () => {
 
       expect(response.statusCode).toEqual(okStatusCode)
       expect(response.headers['content-type']).toContain(jsonContentType)
-      expect(response.result).toMatchObject([formUpdateAuditRecord])
+      expect(response.result).toMatchObject({
+        auditRecords: [formUpdateAuditRecord],
+        skip: 0
+      })
+      expect(readAuditEvents).toHaveBeenCalledWith(
+        {
+          entityId: formId,
+          category: 'FORM'
+        },
+        0
+      )
+    })
+
+    test('Testing GET /audit/forms/{id} route returns 200 with skip parameter', async () => {
+      jest
+        .mocked(readAuditEvents)
+        .mockResolvedValueOnce([formUpdateAuditRecord])
+
+      const response = await server.inject({
+        method: 'GET',
+        url: `/audit/forms/${formId}?skip=20`
+      })
+
+      expect(response.statusCode).toEqual(okStatusCode)
+      expect(response.headers['content-type']).toContain(jsonContentType)
+      expect(response.result).toMatchObject({
+        auditRecords: [formUpdateAuditRecord],
+        skip: 20
+      })
+      expect(readAuditEvents).toHaveBeenCalledWith(
+        {
+          entityId: formId,
+          category: 'FORM'
+        },
+        20
+      )
     })
 
     test('Testing GET /audit/forms/{id} route returns 500', async () => {
