@@ -43,9 +43,10 @@ export function mapAuditEvent(message) {
 /**
  * Query audit records
  * @param {{ entityId: string; category?: AuditEventMessageCategory }} filter
+ * @param {number} skip
  */
-export async function readAuditEvents(filter) {
-  const results = await auditRecord.getAuditRecords(filter)
+export async function readAuditEvents(filter, skip) {
+  const results = await auditRecord.getAuditRecords(filter, skip)
 
   return results.map(mapAuditRecord)
 }

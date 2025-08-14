@@ -4,14 +4,15 @@ import { AUDIT_RECORDS_COLLECTION_NAME, db } from '~/src/mongo.js'
 
 const logger = createLogger()
 
-const MAX_RECORDS = 1000
+const MAX_RECORDS = 100
 
 /**
  * Gets a filtered list of audit records
  * @param {Filter<WithId<AuditRecordInput>>} filter
+ * @param {number} skip
  * @returns {Promise<WithId<AuditRecordInput>[]>}
  */
-export async function getAuditRecords(filter) {
+export async function getAuditRecords(filter, skip) {
   logger.info('Reading audit records')
 
   const coll = /** @type {Collection<AuditRecordInput>} */ (
@@ -19,14 +20,18 @@ export async function getAuditRecords(filter) {
   )
 
   try {
-    const results = await coll.find(filter).limit(MAX_RECORDS).toArray()
+    const results = await coll
+      .find(filter)
+      .limit(MAX_RECORDS)
+      .skip(skip)
+      .toArray()
 
     logger.info('Read audit records')
 
     return results
-  } catch (e) {
-    logger.error(`Failed to read audit records - ${getErrorMessage(e)}`)
-    throw e
+  } catch (err) {
+    logger.error(`Failed to read audit records - ${getErrorMessage(err)}`)
+    throw err
   }
 }
 

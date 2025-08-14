@@ -81,36 +81,49 @@ describe('audit-record-repository', () => {
   describe('getAuditRecords', () => {
     it('should get audit records', async () => {
       const toArrayStub = jest.fn().mockResolvedValueOnce([auditDocument])
-      const limitStub = jest.fn().mockReturnValue({
+      const skipStub = jest.fn().mockReturnValue({
         toArray: toArrayStub
+      })
+      const limitStub = jest.fn().mockReturnValue({
+        skip: skipStub
       })
       mockCollection.find.mockReturnValueOnce({
         limit: limitStub
       })
-      const auditRecords = await getAuditRecords({
-        entityId: STUB_AUDIT_RECORD_ID
-      })
+      const auditRecords = await getAuditRecords(
+        {
+          entityId: STUB_AUDIT_RECORD_ID
+        },
+        0
+      )
       const [filter] = mockCollection.find.mock.calls[0]
       expect(filter).toEqual({ entityId: STUB_AUDIT_RECORD_ID })
-      expect(limitStub).toHaveBeenCalledWith(1000)
+      expect(limitStub).toHaveBeenCalledWith(100)
       expect(auditRecords).toEqual([auditDocument])
+      expect(skipStub).toHaveBeenCalledWith(0)
     })
 
     it('should get audit records with skip count', async () => {
       const toArrayStub = jest.fn().mockResolvedValueOnce([auditDocument])
-      const limitStub = jest.fn().mockReturnValue({
+      const skipStub = jest.fn().mockReturnValue({
         toArray: toArrayStub
+      })
+      const limitStub = jest.fn().mockReturnValue({
+        skip: skipStub
       })
       mockCollection.find.mockReturnValueOnce({
         limit: limitStub
       })
-      const auditRecords = await getAuditRecords({
-        entityId: STUB_AUDIT_RECORD_ID
-      })
+      const auditRecords = await getAuditRecords(
+        {
+          entityId: STUB_AUDIT_RECORD_ID
+        },
+        20
+      )
       const [filter] = mockCollection.find.mock.calls[0]
       expect(filter).toEqual({ entityId: STUB_AUDIT_RECORD_ID })
-      expect(limitStub).toHaveBeenCalledWith(1000)
       expect(auditRecords).toEqual([auditDocument])
+      expect(skipStub).toHaveBeenCalledWith(20)
     })
 
     it('should handle get audit record failures', async () => {
