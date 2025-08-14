@@ -131,9 +131,12 @@ describe('audit-record-repository', () => {
         throw new Error('an error')
       })
       await expect(
-        getAuditRecords({
-          entityId: STUB_AUDIT_RECORD_ID
-        })
+        getAuditRecords(
+          {
+            entityId: STUB_AUDIT_RECORD_ID
+          },
+          0
+        )
       ).rejects.toThrow(new Error('an error'))
     })
   })

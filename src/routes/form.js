@@ -13,17 +13,16 @@ export default {
     const { params, query } = request
     const { id } = params
     const { skip } = query
-    const skipCount = skip ?? 0
     const auditRecords = await readAuditEvents(
       {
         category: AuditEventMessageCategory.FORM,
         entityId: id
       },
-      skipCount
+      skip
     )
     return {
       auditRecords,
-      skip: skipCount
+      skip
     }
   },
   options: {
@@ -33,7 +32,7 @@ export default {
         id: idSchema
       }),
       query: Joi.object().keys({
-        skip: Joi.number().optional()
+        skip: Joi.number().default(0).optional()
       })
     }
   }
