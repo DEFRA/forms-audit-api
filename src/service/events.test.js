@@ -252,8 +252,7 @@ describe('events', () => {
 
       expect(result).toEqual({
         saved: messages,
-        failed: [],
-        savedMessageCount: 3
+        failed: []
       })
     })
 
@@ -263,19 +262,20 @@ describe('events', () => {
         .mockResolvedValueOnce(undefined)
       jest
         .mocked(auditRecord.createAuditRecord)
-        .mockRejectedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('error in create'))
       jest
         .mocked(auditRecord.createAuditRecord)
         .mockResolvedValueOnce(undefined)
       jest.mocked(deleteEventMessage).mockResolvedValueOnce({
         $metadata: { httpStatusCode: 200 }
       })
-      jest.mocked(deleteEventMessage).mockRejectedValueOnce(new Error('error'))
+      jest
+        .mocked(deleteEventMessage)
+        .mockRejectedValueOnce(new Error('error in delete'))
       const result = await createAuditEvents(messages)
       expect(result).toEqual({
         saved: [message1],
-        failed: [message2, message3],
-        savedMessageCount: 1
+        failed: [new Error('error in create'), new Error('error in delete')]
       })
     })
   })

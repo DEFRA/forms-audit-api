@@ -37,12 +37,14 @@ export async function getAuditRecords(filter) {
  */
 export async function createAuditRecord(auditRecordInput, session) {
   logger.info(`Inserting ${auditRecordInput.messageId}`)
+
   const coll = /** @type {Collection<AuditRecordInput>} */ (
     db.collection(AUDIT_RECORDS_COLLECTION_NAME)
   )
 
   try {
     await coll.insertOne(auditRecordInput, { session })
+
     logger.info(`Inserted ${auditRecordInput.messageId}`)
   } catch (e) {
     logger.error(
