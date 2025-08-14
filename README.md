@@ -120,6 +120,8 @@ With long-polling, if there aren’t any messages found, the HTTP connection is 
 
 By default, CDP set `ReceiveMessageWaitTime` to 20s. The auditing queue also uses this default.
 
+See [here](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-short-and-long-polling.html) for more information.
+
 #### Queue configuration in forms-audit-api
 
 `RECEIVE_MESSAGE_TIMEOUT_MS` - the amount of time to wait between calls to receive messages
