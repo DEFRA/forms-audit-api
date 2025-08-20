@@ -13,6 +13,7 @@ import('~/src/server.js')
   .catch((/** @type {unknown} */ error) => {
     logger.info('Server failed to start :(')
     logger.error(
+      error,
       `[serverStartup] Server failed to start - ${getErrorMessage(error)}`
     )
     throw error

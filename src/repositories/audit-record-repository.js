@@ -30,7 +30,7 @@ export async function getAuditRecords(filter, skip) {
 
     return results
   } catch (err) {
-    logger.error(`Failed to read audit records - ${getErrorMessage(err)}`)
+    logger.error(err, `Failed to read audit records - ${getErrorMessage(err)}`)
     throw err
   }
 }

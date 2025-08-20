@@ -7,6 +7,7 @@ const logger = createLogger()
 
 process.on('unhandledRejection', (error) => {
   logger.error(
+    error,
     `[unhandledRejection] Unhandled rejection - ${getErrorMessage(error)}`
   )
   throw error

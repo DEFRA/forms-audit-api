@@ -9,6 +9,7 @@ const logger = createLogger()
  */
 export const failAction = (_request, _h, error) => {
   logger.error(
+    error,
     `[validationFailed] Request validation failed - ${getErrorMessage(error)}`
   )
 

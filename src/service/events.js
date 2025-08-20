@@ -83,6 +83,7 @@ export async function createAuditEvents(messages) {
       })
     } catch (err) {
       logger.error(
+        err,
         `[createAuditEvent] Failed to insert message - ${getErrorMessage(err)}`
       )
       throw err
