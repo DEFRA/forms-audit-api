@@ -28,6 +28,8 @@ export function mapAuditEvent(message) {
    */
   const messageBody = JSON.parse(message.Body)
 
+  logger.debug(`Received message of type: ${messageBody.type}`)
+
   const value = Joi.attempt(messageBody, messageSchema, {
     abortEarly: false,
     stripUnknown: true
@@ -81,6 +83,7 @@ export async function createAuditEvents(messages) {
       })
     } catch (err) {
       logger.error(
+        err,
         `[createAuditEvent] Failed to insert message - ${getErrorMessage(err)}`
       )
       throw err
