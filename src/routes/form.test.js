@@ -23,6 +23,7 @@ describe('Forms audit route', () => {
   })
 
   const okStatusCode = 200
+  const badRequestStatusCode = 400
   const internalErrorStatusCode = 500
   const jsonContentType = 'application/json'
   const formId = '688131eeff67f889d52c66cc'
@@ -92,6 +93,14 @@ describe('Forms audit route', () => {
         url: `/audit/forms/${formId}`
       })
       expect(response.statusCode).toEqual(internalErrorStatusCode)
+    })
+
+    test('Testing GET /audit/forms/{id} route with negative skip parameter returns 400', async () => {
+      const response = await server.inject({
+        method: 'GET',
+        url: `/audit/forms/${formId}?skip=-1`
+      })
+      expect(response.statusCode).toEqual(badRequestStatusCode)
     })
   })
 })
