@@ -32,7 +32,7 @@ export default {
         id: idSchema
       }),
       query: Joi.object().keys({
-        skip: Joi.number().default(0).optional()
+        skip: Joi.number().min(0).default(0).optional()
       })
     }
   }

@@ -51,11 +51,12 @@ export async function createAuditRecord(auditRecordInput, session) {
     await coll.insertOne(auditRecordInput, { session })
 
     logger.info(`Inserted ${auditRecordInput.messageId}`)
-  } catch (e) {
+  } catch (err) {
     logger.error(
-      `Failed to insert ${auditRecordInput.messageId} - ${getErrorMessage(e)} `
+      err,
+      `Failed to insert ${auditRecordInput.messageId} - ${getErrorMessage(err)} `
     )
-    throw e
+    throw err
   }
 }
 
