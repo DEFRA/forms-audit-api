@@ -7,13 +7,13 @@ const logger = createLogger()
  * Log and throw an error
  * @type {Lifecycle.Method}
  */
-export const failAction = (_request, _h, error) => {
+export const failAction = (_request, _h, err) => {
   logger.error(
-    error,
-    `[validationFailed] Request validation failed - ${getErrorMessage(error)}`
+    err,
+    `[validationFailed] Request validation failed - ${getErrorMessage(err)}`
   )
 
-  throw error instanceof Error ? error : new Error(String(error))
+  throw err instanceof Error ? err : new Error(String(err))
 }
 
 /**
