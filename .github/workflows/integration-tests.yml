@@ -83,7 +83,7 @@ jobs:
         done
 
     - name: Upload Test Report
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       if: github.event_name == 'push' && github.ref == 'refs/heads/main' && success()
       with:
         name: integration-test-report
