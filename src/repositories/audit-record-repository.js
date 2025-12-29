@@ -22,6 +22,7 @@ export async function getAuditRecords(filter, skip) {
   try {
     const results = await coll
       .find(filter)
+      .sort({ createdAt: -1 })
       .limit(MAX_RECORDS)
       .skip(skip)
       .toArray()
