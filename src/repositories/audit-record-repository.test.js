@@ -79,7 +79,7 @@ describe('audit-record-repository', () => {
   })
 
   describe('getAuditRecords', () => {
-    it('should get audit records', async () => {
+    it('should get audit records sorted by createdAt descending', async () => {
       const toArrayStub = jest.fn().mockResolvedValueOnce([auditDocument])
       const skipStub = jest.fn().mockReturnValue({
         toArray: toArrayStub
@@ -87,8 +87,11 @@ describe('audit-record-repository', () => {
       const limitStub = jest.fn().mockReturnValue({
         skip: skipStub
       })
-      mockCollection.find.mockReturnValueOnce({
+      const sortStub = jest.fn().mockReturnValue({
         limit: limitStub
+      })
+      mockCollection.find.mockReturnValueOnce({
+        sort: sortStub
       })
       const auditRecords = await getAuditRecords(
         {
@@ -98,6 +101,7 @@ describe('audit-record-repository', () => {
       )
       const [filter] = mockCollection.find.mock.calls[0]
       expect(filter).toEqual({ entityId: STUB_AUDIT_RECORD_ID })
+      expect(sortStub).toHaveBeenCalledWith({ createdAt: -1 })
       expect(limitStub).toHaveBeenCalledWith(100)
       expect(auditRecords).toEqual([auditDocument])
       expect(skipStub).toHaveBeenCalledWith(0)
@@ -111,8 +115,11 @@ describe('audit-record-repository', () => {
       const limitStub = jest.fn().mockReturnValue({
         skip: skipStub
       })
-      mockCollection.find.mockReturnValueOnce({
+      const sortStub = jest.fn().mockReturnValue({
         limit: limitStub
+      })
+      mockCollection.find.mockReturnValueOnce({
+        sort: sortStub
       })
       const auditRecords = await getAuditRecords(
         {
@@ -122,6 +129,7 @@ describe('audit-record-repository', () => {
       )
       const [filter] = mockCollection.find.mock.calls[0]
       expect(filter).toEqual({ entityId: STUB_AUDIT_RECORD_ID })
+      expect(sortStub).toHaveBeenCalledWith({ createdAt: -1 })
       expect(auditRecords).toEqual([auditDocument])
       expect(skipStub).toHaveBeenCalledWith(20)
     })
