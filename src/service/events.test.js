@@ -178,17 +178,50 @@ describe('events', () => {
   })
 
   describe('readAuditEvents', () => {
-    it('should read the audit events', async () => {
+    it('should read the audit events with pagination', async () => {
       const expectedAuditRecord = buildAuditRecord(auditMessage, {
         id: STUB_AUDIT_RECORD_ID,
         ...recordInput
       })
-      jest
-        .mocked(auditRecord.getAuditRecords)
-        .mockResolvedValueOnce([auditDocument])
+      jest.mocked(auditRecord.getAuditRecords).mockResolvedValueOnce({
+        documents: [auditDocument],
+        totalItems: 1
+      })
 
-      const auditRecords = await readAuditEvents({ entityId }, 0)
-      expect(auditRecords).toEqual([expectedAuditRecord])
+      const result = await readAuditEvents(
+        { entityId },
+        { page: 1, perPage: 100 }
+      )
+
+      expect(result).toEqual({
+        auditRecords: [expectedAuditRecord],
+        totalItems: 1
+      })
+      expect(auditRecord.getAuditRecords).toHaveBeenCalledWith(
+        { entityId },
+        { page: 1, perPage: 100 }
+      )
+    })
+
+    it('should pass custom pagination parameters', async () => {
+      jest.mocked(auditRecord.getAuditRecords).mockResolvedValueOnce({
+        documents: [],
+        totalItems: 50
+      })
+
+      const result = await readAuditEvents(
+        { entityId },
+        { page: 3, perPage: 10 }
+      )
+
+      expect(result).toEqual({
+        auditRecords: [],
+        totalItems: 50
+      })
+      expect(auditRecord.getAuditRecords).toHaveBeenCalledWith(
+        { entityId },
+        { page: 3, perPage: 10 }
+      )
     })
   })
 

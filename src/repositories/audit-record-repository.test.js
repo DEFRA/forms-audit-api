@@ -79,71 +79,103 @@ describe('audit-record-repository', () => {
   })
 
   describe('getAuditRecords', () => {
-    it('should get audit records sorted by createdAt descending', async () => {
+    it('should get audit records sorted by createdAt descending with default pagination', async () => {
       const toArrayStub = jest.fn().mockResolvedValueOnce([auditDocument])
-      const skipStub = jest.fn().mockReturnValue({
+      const limitStub = jest.fn().mockReturnValue({
         toArray: toArrayStub
       })
-      const limitStub = jest.fn().mockReturnValue({
-        skip: skipStub
+      const skipStub = jest.fn().mockReturnValue({
+        limit: limitStub
       })
       const sortStub = jest.fn().mockReturnValue({
-        limit: limitStub
+        skip: skipStub
       })
       mockCollection.find.mockReturnValueOnce({
         sort: sortStub
       })
-      const auditRecords = await getAuditRecords(
-        {
-          entityId: STUB_AUDIT_RECORD_ID
-        },
-        0
+      mockCollection.countDocuments.mockResolvedValueOnce(1)
+
+      const result = await getAuditRecords(
+        { entityId: STUB_AUDIT_RECORD_ID },
+        { page: 1, perPage: 100 }
       )
+
       const [filter] = mockCollection.find.mock.calls[0]
       expect(filter).toEqual({ entityId: STUB_AUDIT_RECORD_ID })
       expect(sortStub).toHaveBeenCalledWith({ createdAt: -1 })
-      expect(limitStub).toHaveBeenCalledWith(100)
-      expect(auditRecords).toEqual([auditDocument])
       expect(skipStub).toHaveBeenCalledWith(0)
+      expect(limitStub).toHaveBeenCalledWith(100)
+      expect(result).toEqual({
+        documents: [auditDocument],
+        totalItems: 1
+      })
     })
 
-    it('should get audit records with skip count', async () => {
+    it('should get audit records with custom pagination', async () => {
       const toArrayStub = jest.fn().mockResolvedValueOnce([auditDocument])
-      const skipStub = jest.fn().mockReturnValue({
+      const limitStub = jest.fn().mockReturnValue({
         toArray: toArrayStub
       })
-      const limitStub = jest.fn().mockReturnValue({
-        skip: skipStub
+      const skipStub = jest.fn().mockReturnValue({
+        limit: limitStub
       })
       const sortStub = jest.fn().mockReturnValue({
-        limit: limitStub
+        skip: skipStub
       })
       mockCollection.find.mockReturnValueOnce({
         sort: sortStub
       })
-      const auditRecords = await getAuditRecords(
-        {
-          entityId: STUB_AUDIT_RECORD_ID
-        },
-        20
+      mockCollection.countDocuments.mockResolvedValueOnce(50)
+
+      const result = await getAuditRecords(
+        { entityId: STUB_AUDIT_RECORD_ID },
+        { page: 2, perPage: 10 }
       )
+
       const [filter] = mockCollection.find.mock.calls[0]
       expect(filter).toEqual({ entityId: STUB_AUDIT_RECORD_ID })
       expect(sortStub).toHaveBeenCalledWith({ createdAt: -1 })
-      expect(auditRecords).toEqual([auditDocument])
-      expect(skipStub).toHaveBeenCalledWith(20)
+      expect(skipStub).toHaveBeenCalledWith(10)
+      expect(limitStub).toHaveBeenCalledWith(10)
+      expect(result).toEqual({
+        documents: [auditDocument],
+        totalItems: 50
+      })
+    })
+
+    it('should cap perPage at MAX_RESULTS', async () => {
+      const toArrayStub = jest.fn().mockResolvedValueOnce([auditDocument])
+      const limitStub = jest.fn().mockReturnValue({
+        toArray: toArrayStub
+      })
+      const skipStub = jest.fn().mockReturnValue({
+        limit: limitStub
+      })
+      const sortStub = jest.fn().mockReturnValue({
+        skip: skipStub
+      })
+      mockCollection.find.mockReturnValueOnce({
+        sort: sortStub
+      })
+      mockCollection.countDocuments.mockResolvedValueOnce(500)
+
+      await getAuditRecords(
+        { entityId: STUB_AUDIT_RECORD_ID },
+        { page: 1, perPage: 200 }
+      )
+
+      expect(limitStub).toHaveBeenCalledWith(100)
     })
 
     it('should handle get audit record failures', async () => {
       mockCollection.find.mockImplementation(() => {
         throw new Error('an error')
       })
+
       await expect(
         getAuditRecords(
-          {
-            entityId: STUB_AUDIT_RECORD_ID
-          },
-          0
+          { entityId: STUB_AUDIT_RECORD_ID },
+          { page: 1, perPage: 100 }
         )
       ).rejects.toThrow(new Error('an error'))
     })
