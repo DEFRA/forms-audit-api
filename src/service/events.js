@@ -45,12 +45,19 @@ export function mapAuditEvent(message) {
 /**
  * Query audit records
  * @param {{ entityId: string; category?: AuditEventMessageCategory }} filter
- * @param {number} skip
+ * @param {PaginationOptions} pagination
+ * @returns {Promise<{ auditRecords: AuditRecord[], totalItems: number }>}
  */
-export async function readAuditEvents(filter, skip) {
-  const results = await auditRecord.getAuditRecords(filter, skip)
+export async function readAuditEvents(filter, pagination) {
+  const { documents, totalItems } = await auditRecord.getAuditRecords(
+    filter,
+    pagination
+  )
 
-  return results.map(mapAuditRecord)
+  return {
+    auditRecords: documents.map(mapAuditRecord),
+    totalItems
+  }
 }
 
 /**
@@ -116,5 +123,5 @@ export async function createAuditEvents(messages) {
 
 /**
  * @import { Message } from '@aws-sdk/client-sqs'
- * @import { AuditRecordInput, AuditMessage, AuditEventMessageCategory } from '@defra/forms-model'
+ * @import { AuditRecordInput, AuditMessage, AuditEventMessageCategory, AuditRecord, PaginationOptions } from '@defra/forms-model'
  */

@@ -31,12 +31,11 @@ describe('Forms audit route', () => {
   describe('Success responses', () => {
     const formUpdateAuditRecord = buildFormUpdateAuditRecord()
 
-    test('Testing GET /audit/forms/{id} route returns 200', async () => {
-      const formUpdateAuditRecord = buildFormUpdateAuditRecord()
-
-      jest
-        .mocked(readAuditEvents)
-        .mockResolvedValueOnce([formUpdateAuditRecord])
+    test('Testing GET /audit/forms/{id} route returns 200 with default pagination', async () => {
+      jest.mocked(readAuditEvents).mockResolvedValueOnce({
+        auditRecords: [formUpdateAuditRecord],
+        totalItems: 1
+      })
 
       const response = await server.inject({
         method: 'GET',
@@ -45,45 +44,124 @@ describe('Forms audit route', () => {
 
       expect(response.statusCode).toEqual(okStatusCode)
       expect(response.headers['content-type']).toContain(jsonContentType)
-      expect(response.result).toMatchObject({
+      expect(response.result).toEqual({
         auditRecords: [formUpdateAuditRecord],
-        skip: 0
+        meta: {
+          pagination: {
+            page: 1,
+            perPage: 25,
+            totalItems: 1,
+            totalPages: 1
+          },
+          sorting: {
+            sortBy: 'createdAt',
+            order: 'desc'
+          }
+        }
       })
       expect(readAuditEvents).toHaveBeenCalledWith(
         {
           entityId: formId,
           category: 'FORM'
         },
-        0
+        { page: 1, perPage: 25 }
       )
     })
 
-    test('Testing GET /audit/forms/{id} route returns 200 with skip parameter', async () => {
-      jest
-        .mocked(readAuditEvents)
-        .mockResolvedValueOnce([formUpdateAuditRecord])
+    test('Testing GET /audit/forms/{id} route returns 200 with custom pagination parameters', async () => {
+      jest.mocked(readAuditEvents).mockResolvedValueOnce({
+        auditRecords: [formUpdateAuditRecord],
+        totalItems: 50
+      })
 
       const response = await server.inject({
         method: 'GET',
-        url: `/audit/forms/${formId}?skip=20`
+        url: `/audit/forms/${formId}?page=2&perPage=10`
       })
 
       expect(response.statusCode).toEqual(okStatusCode)
       expect(response.headers['content-type']).toContain(jsonContentType)
-      expect(response.result).toMatchObject({
+      expect(response.result).toEqual({
         auditRecords: [formUpdateAuditRecord],
-        skip: 20
+        meta: {
+          pagination: {
+            page: 2,
+            perPage: 10,
+            totalItems: 50,
+            totalPages: 5
+          },
+          sorting: {
+            sortBy: 'createdAt',
+            order: 'desc'
+          }
+        }
       })
       expect(readAuditEvents).toHaveBeenCalledWith(
         {
           entityId: formId,
           category: 'FORM'
         },
-        20
+        { page: 2, perPage: 10 }
       )
     })
 
-    test('Testing GET /audit/forms/{id} route returns 500', async () => {
+    test('Testing GET /audit/forms/{id} route returns empty data array with pagination', async () => {
+      jest.mocked(readAuditEvents).mockResolvedValueOnce({
+        auditRecords: [],
+        totalItems: 0
+      })
+
+      const response = await server.inject({
+        method: 'GET',
+        url: `/audit/forms/${formId}`
+      })
+
+      expect(response.statusCode).toEqual(okStatusCode)
+      expect(response.headers['content-type']).toContain(jsonContentType)
+      expect(response.result).toEqual({
+        auditRecords: [],
+        meta: {
+          pagination: {
+            page: 1,
+            perPage: 25,
+            totalItems: 0,
+            totalPages: 0
+          },
+          sorting: {
+            sortBy: 'createdAt',
+            order: 'desc'
+          }
+        }
+      })
+    })
+
+    test('Testing GET /audit/forms/{id} route calculates totalPages correctly', async () => {
+      jest.mocked(readAuditEvents).mockResolvedValueOnce({
+        auditRecords: [formUpdateAuditRecord],
+        totalItems: 25
+      })
+
+      const response = await server.inject({
+        method: 'GET',
+        url: `/audit/forms/${formId}?perPage=10`
+      })
+
+      expect(response.statusCode).toEqual(okStatusCode)
+      expect(response.result).toMatchObject({
+        meta: {
+          pagination: {
+            page: 1,
+            perPage: 10,
+            totalItems: 25,
+            totalPages: 3
+          }
+        }
+      })
+    })
+  })
+
+  describe('Error responses', () => {
+    test('Testing GET /audit/forms/{id} route returns 500 on service error', async () => {
       jest
         .mocked(readAuditEvents)
         .mockRejectedValue(Boom.internal('Internal error'))
@@ -92,15 +170,159 @@ describe('Forms audit route', () => {
         method: 'GET',
         url: `/audit/forms/${formId}`
       })
+
       expect(response.statusCode).toEqual(internalErrorStatusCode)
     })
 
-    test('Testing GET /audit/forms/{id} route with negative skip parameter returns 400', async () => {
+    test('Testing GET /audit/forms/{id} route with page less than 1 returns 400', async () => {
       const response = await server.inject({
         method: 'GET',
-        url: `/audit/forms/${formId}?skip=-1`
+        url: `/audit/forms/${formId}?page=0`
       })
+
       expect(response.statusCode).toEqual(badRequestStatusCode)
+
+      const result = /** @type {{ error: string; message: string }} */ (
+        response.result
+      )
+      expect(result.error).toBe('Bad Request')
+      expect(result.message).toContain(
+        '"page" must be greater than or equal to 1'
+      )
+    })
+
+    test('Testing GET /audit/forms/{id} route with negative page returns 400', async () => {
+      const response = await server.inject({
+        method: 'GET',
+        url: `/audit/forms/${formId}?page=-1`
+      })
+
+      expect(response.statusCode).toEqual(badRequestStatusCode)
+
+      const result = /** @type {{ error: string; message: string }} */ (
+        response.result
+      )
+      expect(result.error).toBe('Bad Request')
+      expect(result.message).toContain(
+        '"page" must be greater than or equal to 1'
+      )
+    })
+
+    test('Testing GET /audit/forms/{id} route with perPage less than 1 returns 400', async () => {
+      const response = await server.inject({
+        method: 'GET',
+        url: `/audit/forms/${formId}?perPage=0`
+      })
+
+      expect(response.statusCode).toEqual(badRequestStatusCode)
+
+      const result = /** @type {{ error: string; message: string }} */ (
+        response.result
+      )
+      expect(result.error).toBe('Bad Request')
+      expect(result.message).toContain(
+        '"perPage" must be greater than or equal to 1'
+      )
+    })
+
+    test('Testing GET /audit/forms/{id} route with perPage exceeding max returns 400', async () => {
+      const response = await server.inject({
+        method: 'GET',
+        url: `/audit/forms/${formId}?perPage=101`
+      })
+
+      expect(response.statusCode).toEqual(badRequestStatusCode)
+      expect(response.result).toMatchObject({
+        error: 'Bad Request',
+        message: '"perPage" must be less than or equal to 100'
+      })
+    })
+
+    test('Testing GET /audit/forms/{id} route with non-integer page returns 400', async () => {
+      const response = await server.inject({
+        method: 'GET',
+        url: `/audit/forms/${formId}?page=1.5`
+      })
+
+      expect(response.statusCode).toEqual(badRequestStatusCode)
+      expect(response.result).toMatchObject({
+        error: 'Bad Request',
+        message: '"page" must be an integer'
+      })
+    })
+
+    test('Testing GET /audit/forms/{id} route with invalid page type returns 400', async () => {
+      const response = await server.inject({
+        method: 'GET',
+        url: `/audit/forms/${formId}?page=abc`
+      })
+
+      expect(response.statusCode).toEqual(badRequestStatusCode)
+      expect(response.result).toMatchObject({
+        error: 'Bad Request',
+        message: '"page" must be a number'
+      })
+    })
+
+    test('Testing GET /audit/forms/{id} route with invalid form ID returns 400', async () => {
+      const response = await server.inject({
+        method: 'GET',
+        url: '/audit/forms/invalid-id'
+      })
+
+      expect(response.statusCode).toEqual(badRequestStatusCode)
+    })
+
+    test('Testing GET /audit/forms/{id} route with negative perPage returns 400', async () => {
+      const response = await server.inject({
+        method: 'GET',
+        url: `/audit/forms/${formId}?perPage=-5`
+      })
+
+      expect(response.statusCode).toEqual(badRequestStatusCode)
+
+      const result = /** @type {{ error: string; message: string }} */ (
+        response.result
+      )
+      expect(result.error).toBe('Bad Request')
+      expect(result.message).toContain(
+        '"perPage" must be greater than or equal to 1'
+      )
+    })
+
+    test('Testing GET /audit/forms/{id} route with non-integer perPage returns 400', async () => {
+      const response = await server.inject({
+        method: 'GET',
+        url: `/audit/forms/${formId}?perPage=2.5`
+      })
+
+      expect(response.statusCode).toEqual(badRequestStatusCode)
+      expect(response.result).toMatchObject({
+        error: 'Bad Request',
+        message: '"perPage" must be an integer'
+      })
+    })
+
+    test('Testing GET /audit/forms/{id} route with multiple invalid parameters returns combined validation errors', async () => {
+      const response = await server.inject({
+        method: 'GET',
+        url: `/audit/forms/${formId}?page=abc&perPage=-5`
+      })
+
+      expect(response.statusCode).toEqual(badRequestStatusCode)
+
+      const result =
+        /** @type {{ error: string; message: string; validation: { source: string; keys: string[] } }} */ (
+          response.result
+        )
+      expect(result.error).toBe('Bad Request')
+      expect(result.message).toContain('"page" must be a number')
+      expect(result.message).toContain(
+        '"perPage" must be greater than or equal to 1'
+      )
+      expect(result.validation.source).toBe('query')
+      expect(result.validation.keys).toContain('page')
+      expect(result.validation.keys).toContain('perPage')
     })
   })
 })

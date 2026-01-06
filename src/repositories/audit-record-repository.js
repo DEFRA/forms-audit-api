@@ -1,35 +1,37 @@
 import { getErrorMessage } from '~/src/helpers/error-message.js'
 import { createLogger } from '~/src/helpers/logging/logger.js'
 import { AUDIT_RECORDS_COLLECTION_NAME, db } from '~/src/mongo.js'
+import { MAX_RESULTS } from '~/src/plugins/query-handler/config.js'
 
 const logger = createLogger()
 
-const MAX_RECORDS = 100
-
 /**
- * Gets a filtered list of audit records
+ * Gets a filtered list of audit records with pagination
  * @param {Filter<WithId<AuditRecordInput>>} filter
- * @param {number} skip
- * @returns {Promise<WithId<AuditRecordInput>[]>}
+ * @param {PaginationOptions} pagination
+ * @returns {Promise<{ documents: WithId<AuditRecordInput>[], totalItems: number }>}
  */
-export async function getAuditRecords(filter, skip) {
-  logger.info('Reading audit records')
-
+export async function getAuditRecords(filter, pagination) {
   const coll = /** @type {Collection<AuditRecordInput>} */ (
     db.collection(AUDIT_RECORDS_COLLECTION_NAME)
   )
 
+  const { page, perPage } = pagination
+  const skip = (page - 1) * perPage
+  const limit = Math.min(perPage, MAX_RESULTS)
+
   try {
-    const results = await coll
-      .find(filter)
-      .sort({ createdAt: -1 })
-      .limit(MAX_RECORDS)
-      .skip(skip)
-      .toArray()
+    const [documents, totalItems] = await Promise.all([
+      coll
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .toArray(),
+      coll.countDocuments(filter)
+    ])
 
-    logger.info('Read audit records')
-
-    return results
+    return { documents, totalItems }
   } catch (err) {
     logger.error(err, `Failed to read audit records - ${getErrorMessage(err)}`)
     throw err
@@ -62,6 +64,6 @@ export async function createAuditRecord(auditRecordInput, session) {
 }
 
 /**
- * @import { AuditRecordInput } from '@defra/forms-model'
+ * @import { AuditRecordInput, PaginationOptions } from '@defra/forms-model'
  * @import { ClientSession, Collection, Filter, WithId } from 'mongodb'
  */
