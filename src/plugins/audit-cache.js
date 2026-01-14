@@ -6,12 +6,8 @@ import { MAX_RESULTS } from '~/src/plugins/query-handler/config.js'
 const logger = createLogger()
 
 export const CONSOLIDATED_CACHE_COLLECTION_NAME = 'consolidated-audit-cache'
-
-/**
- * Sort index value for metadata documents.
- * Records use 0, 1, 2, etc. Metadata uses -1 to separate concerns.
- */
 const METADATA_SORT_INDEX = -1
+const CACHE_ENABLED_CONFIG_KEY = 'cache.enabled'
 
 /**
  * Gets the cache collection
@@ -29,7 +25,7 @@ function getCacheCollection() {
  * @returns {Promise<boolean>}
  */
 export async function isCachePopulated(entityId) {
-  if (!config.get('cache.enabled')) {
+  if (!config.get(CACHE_ENABLED_CONFIG_KEY)) {
     return false
   }
 
@@ -54,7 +50,7 @@ export async function isCachePopulated(entityId) {
  * @returns {Promise<CacheResult | null>}
  */
 export async function getCachedRecords(entityId, pagination) {
-  if (!config.get('cache.enabled')) {
+  if (!config.get(CACHE_ENABLED_CONFIG_KEY)) {
     return null
   }
 
@@ -105,7 +101,7 @@ export async function getCachedRecords(entityId, pagination) {
  * @returns {Promise<void>}
  */
 export async function populateCache(entityId, records, totalItems) {
-  if (!config.get('cache.enabled')) {
+  if (!config.get(CACHE_ENABLED_CONFIG_KEY)) {
     return
   }
 
@@ -162,7 +158,7 @@ export async function populateCache(entityId, records, totalItems) {
  * @returns {Promise<void>}
  */
 export async function invalidateCache(entityId) {
-  if (!config.get('cache.enabled')) {
+  if (!config.get(CACHE_ENABLED_CONFIG_KEY)) {
     return
   }
 
@@ -187,7 +183,7 @@ export async function invalidateCache(entityId) {
  * @returns {Promise<void>}
  */
 export async function ensureCacheIndexes() {
-  if (!config.get('cache.enabled')) {
+  if (!config.get(CACHE_ENABLED_CONFIG_KEY)) {
     return
   }
 
