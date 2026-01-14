@@ -204,6 +204,14 @@ export const config = convict({
     format: Number,
     default: 30,
     env: 'SQS_VISIBILITY_TIMEOUT'
+  },
+  cache: {
+    enabled: {
+      doc: 'Enable server-side caching for audit queries',
+      format: Boolean,
+      default: true,
+      env: 'CACHE_ENABLED'
+    }
   }
 })
 
