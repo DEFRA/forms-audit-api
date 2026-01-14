@@ -1,6 +1,9 @@
+import Boom from '@hapi/boom'
+
 import { getErrorMessage } from '~/src/helpers/error-message.js'
 import { createLogger } from '~/src/helpers/logging/logger.js'
 import { AUDIT_RECORDS_COLLECTION_NAME, db } from '~/src/mongo.js'
+import { getCachedRecords, populateCache } from '~/src/plugins/audit-cache.js'
 import { MAX_RESULTS } from '~/src/plugins/query-handler/config.js'
 import {
   buildConsolidationPipeline,
@@ -57,15 +60,32 @@ export async function getAuditRecords(filter, pagination) {
 /**
  * Gets consolidated audit records using aggregation pipeline.
  * Filters out no-change events and consolidates consecutive FORM_UPDATED events by the same user.
- * @param {Filter<WithId<AuditRecordInput>>} filter
+ * Results are cached in MongoDB to avoid repeated expensive aggregations.
+ * @param {Filter<WithId<AuditRecordInput>>} filter - Must include entityId
  * @param {PaginationOptions} pagination
  * @returns {Promise<{ documents: ConsolidatedAuditResult[], totalItems: number }>}
  */
 export async function getConsolidatedAuditRecords(filter, pagination) {
+  const entityId = filter.entityId
+  if (typeof entityId !== 'string') {
+    throw Boom.badRequest('entityId is required for consolidated audit records')
+  }
+
+  const { page, perPage } = pagination
+  const limit = Math.min(perPage, MAX_RESULTS)
+
+  const cached = await getCachedRecords(entityId, pagination)
+  if (cached) {
+    return {
+      documents: cached.documents.slice(0, limit),
+      totalItems: cached.totalItems
+    }
+  }
+
   const coll = getCollection()
 
   try {
-    const pipeline = buildConsolidationPipeline(filter, pagination)
+    const pipeline = buildConsolidationPipeline(filter)
     const results = await coll.aggregate(pipeline).toArray()
     const result = /** @type {FacetResult | undefined} */ (results[0])
 
@@ -75,7 +95,12 @@ export async function getConsolidatedAuditRecords(filter, pagination) {
 
     const { metadata, records } = result
     const totalItems = metadata[0]?.totalItems ?? 0
-    const documents = mapConsolidationResults(records)
+    const allDocuments = mapConsolidationResults(records)
+
+    await populateCache(entityId, allDocuments, totalItems)
+
+    const skip = (page - 1) * perPage
+    const documents = allDocuments.slice(skip, skip + limit)
 
     return { documents, totalItems }
   } catch (err) {
@@ -88,7 +113,8 @@ export async function getConsolidatedAuditRecords(filter, pagination) {
 }
 
 /**
- * Creates an audit record from AuditRecordInput
+ * Creates an audit record from AuditRecordInput.
+ * Note: Cache invalidation should be done after transaction commits.
  * @param {AuditRecordInput} auditRecordInput
  * @param {ClientSession} session
  */
@@ -99,7 +125,6 @@ export async function createAuditRecord(auditRecordInput, session) {
 
   try {
     await coll.insertOne(auditRecordInput, { session })
-
     logger.info(`Inserted ${auditRecordInput.messageId}`)
   } catch (err) {
     logger.error(

@@ -5,6 +5,7 @@ import { getErrorMessage } from '~/src/helpers/error-message.js'
 import { createLogger } from '~/src/helpers/logging/logger.js'
 import { deleteEventMessage } from '~/src/messaging/event.js'
 import { client } from '~/src/mongo.js'
+import { invalidateCache } from '~/src/plugins/audit-cache.js'
 import * as auditRecord from '~/src/repositories/audit-record-repository.js'
 import {
   mapAuditRecord,
@@ -96,9 +97,9 @@ export async function createAuditEvents(messages) {
     const session = client.startSession()
 
     try {
-      return await session.withTransaction(async () => {
-        const document = mapAuditEvent(message)
+      const document = mapAuditEvent(message)
 
+      await session.withTransaction(async () => {
         await auditRecord.createAuditRecord(document, session)
 
         logger.info(`Deleting ${message.MessageId}`)
@@ -106,9 +107,11 @@ export async function createAuditEvents(messages) {
         await deleteEventMessage(message)
 
         logger.info(`Deleted ${message.MessageId}`)
-
-        return message
       })
+
+      await invalidateCache(document.entityId)
+
+      return message
     } catch (err) {
       logger.error(
         err,
