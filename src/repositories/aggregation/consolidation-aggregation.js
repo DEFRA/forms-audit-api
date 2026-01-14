@@ -216,16 +216,13 @@ export function addPaginationFacetStage(pipeline, skip, limit) {
 
 /**
  * Builds the complete aggregation pipeline for consolidated audit records.
- * Handles filtering, consecutive grouping by user, and pagination.
+ * Handles filtering, consecutive grouping by user, and optional pagination.
+ * When pagination is omitted, returns all records (used for cache population).
  * @param {object} filter - MongoDB filter for base query
- * @param {PaginationOptions} pagination - Pagination options
+ * @param {PaginationOptions} [pagination] - Optional pagination options
  * @returns {PipelineStage[]}
  */
 export function buildConsolidationPipeline(filter, pagination) {
-  const { page, perPage } = pagination
-  const skip = (page - 1) * perPage
-  const limit = Math.min(perPage, MAX_RESULTS)
-
   /** @type {PipelineStage[]} */
   const pipeline = []
 
@@ -250,8 +247,20 @@ export function buildConsolidationPipeline(filter, pagination) {
   // 7. Sort by the newest record's createdAt (grouping disrupts order)
   pipeline.push({ $sort: { 'record.createdAt': -1 } })
 
-  // 8. Use $facet for pagination and total count
-  addPaginationFacetStage(pipeline, skip, limit)
+  // 8. Use $facet for pagination (if provided) and total count
+  if (pagination) {
+    const { page, perPage } = pagination
+    const skip = (page - 1) * perPage
+    const limit = Math.min(perPage, MAX_RESULTS)
+    addPaginationFacetStage(pipeline, skip, limit)
+  } else {
+    pipeline.push({
+      $facet: {
+        metadata: [{ $count: 'totalItems' }],
+        records: []
+      }
+    })
+  }
 
   return pipeline
 }

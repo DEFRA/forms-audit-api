@@ -30,9 +30,11 @@
  */
 
 /**
+ * Result from consolidation pipeline $facet stage.
+ * Contains metadata (count) and records (paginated or all).
  * @typedef {object} FacetResult
  * @property {Array<{ totalItems: number }>} metadata - Count result
- * @property {ConsolidatedAggregationResult[]} records - Paginated records
+ * @property {ConsolidatedAggregationResult[]} records - Records (paginated or all)
  */
 
 /**
