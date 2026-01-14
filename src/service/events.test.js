@@ -21,16 +21,18 @@ import {
 } from '~/src/api/forms/__stubs__/audit.js'
 import { deleteEventMessage } from '~/src/messaging/event.js'
 import { prepareDb } from '~/src/mongo.js'
+import { invalidateCache } from '~/src/plugins/audit-cache.js'
 import * as auditRecord from '~/src/repositories/audit-record-repository.js'
 import {
   createAuditEvents,
   mapAuditEvent,
-  readAuditEvents
+  readAuditEvents,
+  readConsolidatedAuditEvents
 } from '~/src/service/events.js'
 
 jest.mock('~/src/messaging/event.js')
 jest.mock('~/src/repositories/audit-record-repository.js')
-jest.mock('~/src/messaging/event.js')
+jest.mock('~/src/plugins/audit-cache.js')
 
 jest.mock('~/src/mongo.js', () => {
   let isPrepared = false
@@ -225,6 +227,117 @@ describe('events', () => {
     })
   })
 
+  describe('readConsolidatedAuditEvents', () => {
+    const user1 = { id: 'user-1', displayName: 'User One' }
+
+    /**
+     * Creates a mock consolidated result for testing
+     * @param {object} overrides
+     * @returns {ConsolidatedAuditResult}
+     */
+    function createMockConsolidatedResult(overrides = {}) {
+      return /** @type {ConsolidatedAuditResult} */ ({
+        ...auditDocument,
+        _id: new ObjectId(),
+        ...overrides
+      })
+    }
+
+    it('should return consolidated results from aggregation', async () => {
+      const consolidatedDoc = createMockConsolidatedResult({
+        type: AuditEventMessageType.FORM_UPDATED,
+        createdAt: new Date('2025-08-07T12:00:00Z'),
+        createdBy: user1,
+        consolidatedCount: 3,
+        consolidatedFrom: new Date('2025-08-07T10:00:00Z'),
+        consolidatedTo: new Date('2025-08-07T12:00:00Z')
+      })
+
+      jest
+        .mocked(auditRecord.getConsolidatedAuditRecords)
+        .mockResolvedValueOnce({
+          documents: [consolidatedDoc],
+          totalItems: 1
+        })
+
+      const result = await readConsolidatedAuditEvents(
+        { entityId },
+        { page: 1, perPage: 10 }
+      )
+
+      expect(result.totalItems).toBe(1)
+      expect(result.auditRecords).toHaveLength(1)
+      expect(result.auditRecords[0]).toMatchObject({
+        consolidatedCount: 3,
+        consolidatedFrom: new Date('2025-08-07T10:00:00Z'),
+        consolidatedTo: new Date('2025-08-07T12:00:00Z')
+      })
+    })
+
+    it('should return non-consolidated records unchanged', async () => {
+      const doc1 = createMockConsolidatedResult({
+        type: AuditEventMessageType.FORM_UPDATED,
+        createdAt: new Date('2025-08-07T12:00:00Z'),
+        createdBy: user1
+      })
+      const doc2 = createMockConsolidatedResult({
+        type: AuditEventMessageType.FORM_CREATED,
+        createdAt: new Date('2025-08-07T11:00:00Z'),
+        createdBy: user1
+      })
+
+      jest
+        .mocked(auditRecord.getConsolidatedAuditRecords)
+        .mockResolvedValueOnce({
+          documents: [doc1, doc2],
+          totalItems: 2
+        })
+
+      const result = await readConsolidatedAuditEvents(
+        { entityId },
+        { page: 1, perPage: 10 }
+      )
+
+      expect(result.totalItems).toBe(2)
+      expect(result.auditRecords).toHaveLength(2)
+      expect(result.auditRecords[0]).not.toHaveProperty('consolidatedCount')
+      expect(result.auditRecords[1]).not.toHaveProperty('consolidatedCount')
+    })
+
+    it('should return empty array when no results', async () => {
+      jest
+        .mocked(auditRecord.getConsolidatedAuditRecords)
+        .mockResolvedValueOnce({
+          documents: [],
+          totalItems: 0
+        })
+
+      const result = await readConsolidatedAuditEvents(
+        { entityId },
+        { page: 1, perPage: 10 }
+      )
+
+      expect(result.totalItems).toBe(0)
+      expect(result.auditRecords).toEqual([])
+    })
+
+    it('should pass filter and pagination to repository', async () => {
+      jest
+        .mocked(auditRecord.getConsolidatedAuditRecords)
+        .mockResolvedValueOnce({
+          documents: [],
+          totalItems: 0
+        })
+
+      await readConsolidatedAuditEvents({ entityId }, { page: 2, perPage: 5 })
+
+      expect(auditRecord.getConsolidatedAuditRecords).toHaveBeenCalledWith(
+        { entityId },
+        { page: 2, perPage: 5 }
+      )
+    })
+  })
+
   describe('createAuditEvents', () => {
     const messageId1 = '01267dd5-8cc7-4749-9802-40190f6429eb'
     const messageId2 = '5dd16f40-6118-4797-97c9-60a298c9a898'
@@ -311,9 +424,28 @@ describe('events', () => {
         failed: [new Error('error in create'), new Error('error in delete')]
       })
     })
+
+    it('should invalidate cache after successful transaction', async () => {
+      await createAuditEvents([message1])
+
+      expect(invalidateCache).toHaveBeenCalledWith(auditMessage.entityId)
+    })
+
+    it('should not invalidate cache when transaction fails', async () => {
+      jest
+        .mocked(auditRecord.createAuditRecord)
+        .mockRejectedValueOnce(new Error('Transaction failed'))
+
+      await createAuditEvents([message1])
+
+      expect(invalidateCache).not.toHaveBeenCalled()
+    })
   })
 })
 
 /**
- * @import {Message} from '@aws-sdk/client-sqs'
+ * @import { Message } from '@aws-sdk/client-sqs'
+ * @import { AuditRecordInput } from '@defra/forms-model'
+ * @import { WithId } from 'mongodb'
+ * @import { ConsolidatedAuditResult } from '~/src/repositories/aggregation/types.js'
  */
