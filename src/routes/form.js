@@ -6,6 +6,7 @@ import {
 import Joi from 'joi'
 
 import {
+  DEFAULT_PAGE,
   DEFAULT_PER_PAGE,
   MAX_RESULTS
 } from '~/src/plugins/query-handler/config.js'
@@ -49,7 +50,7 @@ export default {
         id: idSchema
       }),
       query: Joi.object().keys({
-        page: paginationOptionFields.page,
+        page: paginationOptionFields.page.default(DEFAULT_PAGE),
         perPage: paginationOptionFields.perPage
           .default(DEFAULT_PER_PAGE)
           .max(MAX_RESULTS),

@@ -27,17 +27,13 @@ export function mapConsolidatedAuditRecord(document) {
     id: _id.toString()
   }
 
-  if (
-    consolidatedCount &&
-    consolidatedCount > 1 &&
-    consolidatedFrom &&
-    consolidatedTo
-  ) {
+  // Only add consolidation fields when count > 1
+  if (consolidatedCount !== undefined && consolidatedCount > 1) {
     return {
       ...baseRecord,
       consolidatedCount,
-      consolidatedFrom: new Date(consolidatedFrom),
-      consolidatedTo: new Date(consolidatedTo)
+      consolidatedFrom,
+      consolidatedTo
     }
   }
 

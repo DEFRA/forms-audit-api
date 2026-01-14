@@ -1,4 +1,5 @@
 export const MAX_RESULTS = 100
+export const DEFAULT_PAGE = 1
 export const DEFAULT_PER_PAGE = 25
 
 /** @satisfies {QueryHandlerOptions} */
