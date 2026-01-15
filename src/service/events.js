@@ -57,7 +57,7 @@ export async function readAuditEvents(filter, pagination) {
 
   return {
     auditRecords: result.documents.map(mapAuditRecord),
-    totalItems: /** @type {number} */ (result.totalItems)
+    totalItems: result.totalItems
   }
 }
 

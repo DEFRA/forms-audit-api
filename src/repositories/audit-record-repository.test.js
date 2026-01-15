@@ -199,7 +199,7 @@ describe('audit-record-repository', () => {
       ).rejects.toThrow(new Error('an error'))
     })
 
-    it('should return all records without pagination when not provided', async () => {
+    it('should return all records with totalItems when pagination not provided', async () => {
       const toArrayStub = jest.fn().mockResolvedValueOnce([auditDocument])
       const sortStub = jest.fn().mockReturnValue({
         toArray: toArrayStub
@@ -207,6 +207,7 @@ describe('audit-record-repository', () => {
       mockCollection.find.mockReturnValueOnce({
         sort: sortStub
       })
+      mockCollection.countDocuments.mockResolvedValueOnce(1)
 
       const result = await getAuditRecords({ entityId: STUB_AUDIT_RECORD_ID })
 
@@ -214,9 +215,12 @@ describe('audit-record-repository', () => {
       expect(filter).toEqual({ entityId: STUB_AUDIT_RECORD_ID })
       expect(sortStub).toHaveBeenCalledWith({ createdAt: -1 })
       expect(result).toEqual({
-        documents: [auditDocument]
+        documents: [auditDocument],
+        totalItems: 1
       })
-      expect(mockCollection.countDocuments).not.toHaveBeenCalled()
+      expect(mockCollection.countDocuments).toHaveBeenCalledWith({
+        entityId: STUB_AUDIT_RECORD_ID
+      })
     })
   })
 

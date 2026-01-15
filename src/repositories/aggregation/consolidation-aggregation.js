@@ -1,3 +1,9 @@
+/**
+ * MongoDB aggregation pipeline for consolidating audit records.
+ * See README.md in this directory for detailed documentation of the
+ * consolidation logic and pipeline stages.
+ */
+
 import {
   AuditEventMessageType,
   alwaysValidEvents,
@@ -81,23 +87,6 @@ export function buildSupportContactCondition() {
 }
 
 /**
- * Builds the $match condition for unknown event types.
- * Unknown types pass through as they may represent valid changes.
- * @returns {object}
- */
-export function buildUnknownTypeCondition() {
-  return {
-    type: {
-      $nin: [
-        ...alwaysValidEvents,
-        ...Object.keys(fieldConfigs),
-        AuditEventMessageType.FORM_SUPPORT_CONTACT_UPDATED
-      ]
-    }
-  }
-}
-
-/**
  * Builds all conditions for the "has actual change" filter.
  * Records pass if they match any of these conditions.
  * @see {@link https://www.mongodb.com/docs/manual/reference/operator/query/or/}
@@ -108,8 +97,7 @@ export function buildHasActualChangeConditions() {
     buildAlwaysValidCondition(),
     buildNoDataCondition(),
     ...buildFieldConfigConditions(),
-    buildSupportContactCondition(),
-    buildUnknownTypeCondition()
+    buildSupportContactCondition()
   ]
 }
 

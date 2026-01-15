@@ -17,7 +17,6 @@ import {
   buildHasActualChangeConditions,
   buildNoDataCondition,
   buildSupportContactCondition,
-  buildUnknownTypeCondition,
   mapConsolidationResults
 } from '~/src/repositories/aggregation/consolidation-aggregation.js'
 
@@ -98,29 +97,12 @@ describe('Consolidation aggregation', () => {
     })
   })
 
-  describe('buildUnknownTypeCondition', () => {
-    it('should exclude known event types', () => {
-      /** @type {*} */
-      const condition = buildUnknownTypeCondition()
-
-      expect(condition.type.$nin).toContain(AuditEventMessageType.FORM_CREATED)
-      expect(condition.type.$nin).toContain(
-        AuditEventMessageType.FORM_TITLE_UPDATED
-      )
-      expect(condition.type.$nin).toContain(
-        AuditEventMessageType.FORM_SUPPORT_CONTACT_UPDATED
-      )
-    })
-  })
-
   describe('buildHasActualChangeConditions', () => {
     it('should return array of all change detection conditions', () => {
       const conditions = buildHasActualChangeConditions()
 
-      // Should have: alwaysValid, noData, fieldConfigs (10), supportContact, unknownType
-      expect(conditions).toHaveLength(
-        2 + Object.keys(fieldConfigs).length + 1 + 1
-      )
+      // Should have: alwaysValid, noData, fieldConfigs (10), supportContact
+      expect(conditions).toHaveLength(2 + Object.keys(fieldConfigs).length + 1)
     })
 
     it('should be usable in $or query', () => {

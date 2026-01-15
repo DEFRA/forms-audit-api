@@ -274,10 +274,10 @@ describe('audit-cache', () => {
       })
     })
 
-    it('should handle index creation errors gracefully', async () => {
+    it('should throw on index creation failure', async () => {
       mockCreateIndex.mockRejectedValue(new Error('Index error'))
 
-      await expect(ensureCacheIndexes()).resolves.toBeUndefined()
+      await expect(ensureCacheIndexes()).rejects.toThrow('Index error')
     })
   })
 })

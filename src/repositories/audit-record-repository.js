@@ -28,7 +28,7 @@ function getCollection() {
  * When pagination is omitted, returns all matching records.
  * @param {Filter<WithId<AuditRecordInput>>} filter
  * @param {PaginationOptions} [pagination] - Optional pagination options
- * @returns {Promise<{ documents: WithId<AuditRecordInput>[], totalItems?: number }>}
+ * @returns {Promise<{ documents: WithId<AuditRecordInput>[], totalItems: number }>}
  */
 export async function getAuditRecords(filter, pagination) {
   const coll = getCollection()
@@ -49,8 +49,11 @@ export async function getAuditRecords(filter, pagination) {
       return { documents, totalItems }
     }
 
-    const allDocuments = await cursor.toArray()
-    return { documents: allDocuments }
+    const [allDocuments, totalItems] = await Promise.all([
+      cursor.toArray(),
+      coll.countDocuments(filter)
+    ])
+    return { documents: allDocuments, totalItems }
   } catch (err) {
     logger.error(err, `Failed to read audit records - ${getErrorMessage(err)}`)
     throw err
