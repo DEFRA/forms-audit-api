@@ -10,6 +10,14 @@ const METADATA_SORT_INDEX = -1
 const CACHE_ENABLED_CONFIG_KEY = 'cache.enabled'
 
 /**
+ * Checks if the cache feature is enabled via config.
+ * @returns {boolean}
+ */
+function isCacheEnabled() {
+  return /** @type {boolean} */ (config.get(CACHE_ENABLED_CONFIG_KEY))
+}
+
+/**
  * Gets the cache collection
  * @returns {Collection<CacheDocument>}
  */
@@ -25,7 +33,7 @@ function getCacheCollection() {
  * @returns {Promise<boolean>}
  */
 export async function isCachePopulated(entityId) {
-  if (!config.get(CACHE_ENABLED_CONFIG_KEY)) {
+  if (!isCacheEnabled()) {
     return false
   }
 
@@ -50,7 +58,7 @@ export async function isCachePopulated(entityId) {
  * @returns {Promise<CacheResult | null>}
  */
 export async function getCachedRecords(entityId, pagination) {
-  if (!config.get(CACHE_ENABLED_CONFIG_KEY)) {
+  if (!isCacheEnabled()) {
     return null
   }
 
@@ -101,7 +109,7 @@ export async function getCachedRecords(entityId, pagination) {
  * @returns {Promise<void>}
  */
 export async function populateCache(entityId, records, totalItems) {
-  if (!config.get(CACHE_ENABLED_CONFIG_KEY)) {
+  if (!isCacheEnabled()) {
     return
   }
 
@@ -109,6 +117,10 @@ export async function populateCache(entityId, records, totalItems) {
   const cachedAt = new Date()
 
   try {
+    // Atomically try to create the metadata document. This acts as a lock:
+    // - If we create it (returns null), we proceed to insert records
+    // - If it exists (returns existing doc), another process won the race
+    // The lock is released when invalidateCache deletes all documents for the entity
     const existingMetadata = await coll.findOneAndUpdate(
       { entityId, sortIndex: METADATA_SORT_INDEX },
       {
@@ -158,7 +170,7 @@ export async function populateCache(entityId, records, totalItems) {
  * @returns {Promise<void>}
  */
 export async function invalidateCache(entityId) {
-  if (!config.get(CACHE_ENABLED_CONFIG_KEY)) {
+  if (!isCacheEnabled()) {
     return
   }
 
@@ -183,17 +195,13 @@ export async function invalidateCache(entityId) {
  * @returns {Promise<void>}
  */
 export async function ensureCacheIndexes() {
-  if (!config.get(CACHE_ENABLED_CONFIG_KEY)) {
+  if (!isCacheEnabled()) {
     return
   }
 
-  try {
-    const coll = getCacheCollection()
-    await coll.createIndex({ entityId: 1, sortIndex: 1 })
-    logger.info('Cache indexes created')
-  } catch (err) {
-    logger.warn(err, 'Failed to create cache indexes')
-  }
+  const coll = getCacheCollection()
+  await coll.createIndex({ entityId: 1, sortIndex: 1 })
+  logger.info('Cache indexes created')
 }
 
 /**
