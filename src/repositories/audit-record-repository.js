@@ -49,11 +49,11 @@ export async function getAuditRecords(filter, pagination) {
       return { documents, totalItems }
     }
 
-    const [allDocuments, totalItems] = await Promise.all([
+    const [allDocuments, totalCount] = await Promise.all([
       cursor.toArray(),
       coll.countDocuments(filter)
     ])
-    return { documents: allDocuments, totalItems }
+    return { documents: allDocuments, totalItems: totalCount }
   } catch (err) {
     logger.error(err, `Failed to read audit records - ${getErrorMessage(err)}`)
     throw err
