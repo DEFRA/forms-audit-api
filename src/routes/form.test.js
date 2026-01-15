@@ -2,7 +2,10 @@ import Boom from '@hapi/boom'
 
 import { buildFormUpdateAuditRecord } from '~/src/api/forms/__stubs__/audit.js'
 import { createServer } from '~/src/api/server.js'
-import { readAuditEvents } from '~/src/service/events.js'
+import {
+  readAuditEvents,
+  readConsolidatedAuditEvents
+} from '~/src/service/events.js'
 
 jest.mock('~/src/mongo.js')
 jest.mock('~/src/service/events.js')
@@ -157,6 +160,104 @@ describe('Forms audit route', () => {
           }
         }
       })
+    })
+
+    test('Testing GET /audit/forms/{id} route with consolidate=true uses consolidated endpoint', async () => {
+      const consolidatedRecord = {
+        ...formUpdateAuditRecord,
+        consolidatedCount: 3,
+        consolidatedFrom: new Date('2025-08-07T08:00:00Z'),
+        consolidatedTo: new Date('2025-08-07T10:52:22.236Z')
+      }
+
+      jest.mocked(readConsolidatedAuditEvents).mockResolvedValueOnce({
+        auditRecords: [consolidatedRecord],
+        totalItems: 1
+      })
+
+      const response = await server.inject({
+        method: 'GET',
+        url: `/audit/forms/${formId}?consolidate=true`
+      })
+
+      expect(response.statusCode).toEqual(okStatusCode)
+      expect(response.headers['content-type']).toContain(jsonContentType)
+      expect(response.result).toEqual({
+        auditRecords: [consolidatedRecord],
+        meta: {
+          pagination: {
+            page: 1,
+            perPage: 25,
+            totalItems: 1,
+            totalPages: 1
+          },
+          sorting: {
+            sortBy: 'createdAt',
+            order: 'desc'
+          }
+        }
+      })
+      expect(readConsolidatedAuditEvents).toHaveBeenCalledWith(
+        {
+          entityId: formId,
+          category: 'FORM'
+        },
+        { page: 1, perPage: 25 }
+      )
+      expect(readAuditEvents).not.toHaveBeenCalled()
+    })
+
+    test('Testing GET /audit/forms/{id} route with consolidate=false uses regular endpoint', async () => {
+      jest.mocked(readAuditEvents).mockResolvedValueOnce({
+        auditRecords: [formUpdateAuditRecord],
+        totalItems: 1
+      })
+
+      const response = await server.inject({
+        method: 'GET',
+        url: `/audit/forms/${formId}?consolidate=false`
+      })
+
+      expect(response.statusCode).toEqual(okStatusCode)
+      expect(readAuditEvents).toHaveBeenCalledWith(
+        {
+          entityId: formId,
+          category: 'FORM'
+        },
+        { page: 1, perPage: 25 }
+      )
+      expect(readConsolidatedAuditEvents).not.toHaveBeenCalled()
+    })
+
+    test('Testing GET /audit/forms/{id} route with consolidate=true and pagination', async () => {
+      jest.mocked(readConsolidatedAuditEvents).mockResolvedValueOnce({
+        auditRecords: [],
+        totalItems: 15
+      })
+
+      const response = await server.inject({
+        method: 'GET',
+        url: `/audit/forms/${formId}?consolidate=true&page=2&perPage=5`
+      })
+
+      expect(response.statusCode).toEqual(okStatusCode)
+      expect(response.result).toMatchObject({
+        meta: {
+          pagination: {
+            page: 2,
+            perPage: 5,
+            totalItems: 15,
+            totalPages: 3
+          }
+        }
+      })
+      expect(readConsolidatedAuditEvents).toHaveBeenCalledWith(
+        {
+          entityId: formId,
+          category: 'FORM'
+        },
+        { page: 2, perPage: 5 }
+      )
     })
   })
 
