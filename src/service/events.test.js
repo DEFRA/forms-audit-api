@@ -446,6 +446,5 @@ describe('events', () => {
 /**
  * @import { Message } from '@aws-sdk/client-sqs'
  * @import { AuditRecordInput } from '@defra/forms-model'
- * @import { WithId } from 'mongodb'
  * @import { ConsolidatedAuditResult } from '~/src/repositories/aggregation/types.js'
  */
