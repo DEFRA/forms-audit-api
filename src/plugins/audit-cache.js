@@ -117,7 +117,7 @@ export async function populateCache(entityId, records, totalItems) {
   const cachedAt = new Date()
 
   try {
-    // Automically try to create the metadata document. This acts as a lock:
+    // Atomically try to create the metadata document. This acts as a lock:
     // - If we create it (returns null), we proceed to insert records
     // - If it exists (returns existing doc), another process won the race
     // The lock is released when invalidateCache deletes all documents for the entity
