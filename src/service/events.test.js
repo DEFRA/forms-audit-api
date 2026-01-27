@@ -1,3 +1,5 @@
+// @ts-expect-error - no types available for '@defra/cdp-auditing'
+import { audit } from '@defra/cdp-auditing'
 import {
   AuditEventMessageCategory,
   AuditEventMessageSource,
@@ -33,6 +35,7 @@ import {
 jest.mock('~/src/messaging/event.js')
 jest.mock('~/src/repositories/audit-record-repository.js')
 jest.mock('~/src/plugins/audit-cache.js')
+jest.mock('@defra/cdp-auditing')
 
 jest.mock('~/src/mongo.js', () => {
   let isPrepared = false
@@ -400,6 +403,8 @@ describe('events', () => {
         saved: messages,
         failed: []
       })
+
+      expect(audit).toHaveBeenCalledTimes(3)
     })
 
     it('should handle failures', async () => {
@@ -423,12 +428,16 @@ describe('events', () => {
         saved: [message1],
         failed: [new Error('error in create'), new Error('error in delete')]
       })
+
+      expect(audit).toHaveBeenCalledTimes(1)
     })
 
     it('should invalidate cache after successful transaction', async () => {
       await createAuditEvents([message1])
 
       expect(invalidateCache).toHaveBeenCalledWith(auditMessage.entityId)
+
+      expect(audit).toHaveBeenCalledTimes(1)
     })
 
     it('should not invalidate cache when transaction fails', async () => {
@@ -439,13 +448,13 @@ describe('events', () => {
       await createAuditEvents([message1])
 
       expect(invalidateCache).not.toHaveBeenCalled()
+
+      expect(audit).toHaveBeenCalledTimes(0)
     })
   })
 })
 
 /**
  * @import { Message } from '@aws-sdk/client-sqs'
- * @import { AuditRecordInput } from '@defra/forms-model'
- * @import { WithId } from 'mongodb'
  * @import { ConsolidatedAuditResult } from '~/src/repositories/aggregation/types.js'
  */

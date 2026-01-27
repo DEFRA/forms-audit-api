@@ -1,3 +1,5 @@
+// @ts-expect-error - no types available for '@defra/cdp-auditing'
+import { audit } from '@defra/cdp-auditing'
 import { messageSchema } from '@defra/forms-model'
 import Joi from 'joi'
 
@@ -107,6 +109,8 @@ export async function createAuditEvents(messages) {
         await deleteEventMessage(message)
 
         logger.info(`Deleted ${message.MessageId}`)
+
+        audit(document)
       })
 
       await invalidateCache(document.entityId)
