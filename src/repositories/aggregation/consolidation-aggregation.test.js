@@ -15,8 +15,8 @@ import {
   buildConsolidationPipeline,
   buildFieldConfigConditions,
   buildHasActualChangeConditions,
+  buildMultiFieldCondition,
   buildNoDataCondition,
-  buildSupportContactCondition,
   mapConsolidationResults
 } from '~/src/repositories/aggregation/consolidation-aggregation.js'
 
@@ -74,10 +74,13 @@ describe('Consolidation aggregation', () => {
     })
   })
 
-  describe('buildSupportContactCondition', () => {
+  describe('buildMultiFieldCondition', () => {
     it('should return condition for FORM_SUPPORT_CONTACT_UPDATED', () => {
       /** @type {*} */
-      const condition = buildSupportContactCondition()
+      const condition = buildMultiFieldCondition(
+        AuditEventMessageType.FORM_SUPPORT_CONTACT_UPDATED,
+        supportContactFields
+      )
 
       expect(condition.$and[0].type).toBe(
         AuditEventMessageType.FORM_SUPPORT_CONTACT_UPDATED
@@ -87,7 +90,10 @@ describe('Consolidation aggregation', () => {
 
     it('should check each support contact field for changes', () => {
       /** @type {*} */
-      const condition = buildSupportContactCondition()
+      const condition = buildMultiFieldCondition(
+        AuditEventMessageType.FORM_SUPPORT_CONTACT_UPDATED,
+        supportContactFields
+      )
       const fieldConditions = condition.$and[1].$or
 
       // The first field condition checks phone field exists and is not null/empty
@@ -102,7 +108,7 @@ describe('Consolidation aggregation', () => {
       const conditions = buildHasActualChangeConditions()
 
       // Should have: alwaysValid, noData, fieldConfigs (10), supportContact
-      expect(conditions).toHaveLength(2 + Object.keys(fieldConfigs).length + 1)
+      expect(conditions).toHaveLength(2 + Object.keys(fieldConfigs).length + 2)
     })
 
     it('should be usable in $or query', () => {
