@@ -1,3 +1,5 @@
+// @ts-expect-error - no types available for '@defra/cdp-auditing'
+import { audit } from '@defra/cdp-auditing'
 import { messageSchema } from '@defra/forms-model'
 import Joi from 'joi'
 
@@ -5,8 +7,12 @@ import { getErrorMessage } from '~/src/helpers/error-message.js'
 import { createLogger } from '~/src/helpers/logging/logger.js'
 import { deleteEventMessage } from '~/src/messaging/event.js'
 import { client } from '~/src/mongo.js'
+import { invalidateCache } from '~/src/plugins/audit-cache.js'
 import * as auditRecord from '~/src/repositories/audit-record-repository.js'
-import { mapAuditRecord } from '~/src/routes/shared.js'
+import {
+  mapAuditRecord,
+  mapConsolidatedAuditRecord
+} from '~/src/routes/shared.js'
 
 const logger = createLogger()
 
@@ -45,12 +51,37 @@ export function mapAuditEvent(message) {
 /**
  * Query audit records
  * @param {{ entityId: string; category?: AuditEventMessageCategory }} filter
- * @param {number} skip
+ * @param {PaginationOptions} pagination
+ * @returns {Promise<{ auditRecords: AuditRecord[], totalItems: number }>}
  */
-export async function readAuditEvents(filter, skip) {
-  const results = await auditRecord.getAuditRecords(filter, skip)
+export async function readAuditEvents(filter, pagination) {
+  const result = await auditRecord.getAuditRecords(filter, pagination)
 
-  return results.map(mapAuditRecord)
+  return {
+    auditRecords: result.documents.map(mapAuditRecord),
+    totalItems: result.totalItems
+  }
+}
+
+/**
+ * Query and consolidate audit records using MongoDB aggregation.
+ * Consolidation groups consecutive FORM_UPDATED events by the same user,
+ * and filters out events where there's no actual change.
+ * Pagination is applied at the database level for efficiency.
+ * @param {{ entityId: string; category?: AuditEventMessageCategory }} filter
+ * @param {PaginationOptions} pagination
+ * @returns {Promise<{ auditRecords: (AuditRecord | ConsolidatedAuditRecord)[], totalItems: number }>}
+ */
+export async function readConsolidatedAuditEvents(filter, pagination) {
+  const result = await auditRecord.getConsolidatedAuditRecords(
+    filter,
+    pagination
+  )
+
+  return {
+    auditRecords: result.documents.map(mapConsolidatedAuditRecord),
+    totalItems: result.totalItems
+  }
 }
 
 /**
@@ -68,9 +99,9 @@ export async function createAuditEvents(messages) {
     const session = client.startSession()
 
     try {
-      return await session.withTransaction(async () => {
-        const document = mapAuditEvent(message)
+      const document = mapAuditEvent(message)
 
+      await session.withTransaction(async () => {
         await auditRecord.createAuditRecord(document, session)
 
         logger.info(`Deleting ${message.MessageId}`)
@@ -79,8 +110,12 @@ export async function createAuditEvents(messages) {
 
         logger.info(`Deleted ${message.MessageId}`)
 
-        return message
+        audit(document)
       })
+
+      await invalidateCache(document.entityId)
+
+      return message
     } catch (err) {
       logger.error(
         err,
@@ -116,5 +151,5 @@ export async function createAuditEvents(messages) {
 
 /**
  * @import { Message } from '@aws-sdk/client-sqs'
- * @import { AuditRecordInput, AuditMessage, AuditEventMessageCategory } from '@defra/forms-model'
+ * @import { AuditRecordInput, AuditMessage, AuditEventMessageCategory, AuditRecord, ConsolidatedAuditRecord, PaginationOptions } from '@defra/forms-model'
  */

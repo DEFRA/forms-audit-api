@@ -42,6 +42,7 @@ export async function prepareDb(logger) {
   const coll = db.collection(AUDIT_RECORDS_COLLECTION_NAME)
 
   await coll.createIndex({ messageId: 1 }, { unique: true })
+  await coll.createIndex({ entityId: 1, createdAt: -1 })
 
   logger.info(`Mongodb connected to ${databaseName}`)
 

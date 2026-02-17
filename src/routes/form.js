@@ -1,7 +1,19 @@
-import { AuditEventMessageCategory, idSchema } from '@defra/forms-model'
+import {
+  AuditEventMessageCategory,
+  idSchema,
+  paginationOptionFields
+} from '@defra/forms-model'
 import Joi from 'joi'
 
-import { readAuditEvents } from '~/src/service/events.js'
+import {
+  DEFAULT_PAGE,
+  DEFAULT_PER_PAGE,
+  MAX_RESULTS
+} from '~/src/plugins/query-handler/config.js'
+import {
+  readAuditEvents,
+  readConsolidatedAuditEvents
+} from '~/src/service/events.js'
 
 /**
  * @type {ServerRoute}
@@ -9,21 +21,27 @@ import { readAuditEvents } from '~/src/service/events.js'
 export default {
   method: 'GET',
   path: '/audit/forms/{id}',
-  async handler(request) {
+  /**
+   * @param {RequestAuditById} request
+   * @param {ExtendedResponseToolkit<AuditRecord | ConsolidatedAuditRecord>} h
+   */
+  async handler(request, h) {
     const { params, query } = request
     const { id } = params
-    const { skip } = query
-    const auditRecords = await readAuditEvents(
-      {
-        category: AuditEventMessageCategory.FORM,
-        entityId: id
-      },
-      skip
-    )
-    return {
-      auditRecords,
-      skip
+    const { consolidate, page, perPage } = query
+
+    const filter = {
+      category: AuditEventMessageCategory.FORM,
+      entityId: id
     }
+
+    const pagination = { page, perPage }
+
+    const { auditRecords, totalItems } = consolidate
+      ? await readConsolidatedAuditEvents(filter, pagination)
+      : await readAuditEvents(filter, pagination)
+
+    return h.queryResponse(auditRecords, totalItems, pagination)
   },
   options: {
     auth: false,
@@ -32,12 +50,31 @@ export default {
         id: idSchema
       }),
       query: Joi.object().keys({
-        skip: Joi.number().min(0).default(0).optional()
+        page: paginationOptionFields.page.default(DEFAULT_PAGE),
+        perPage: paginationOptionFields.perPage
+          .default(DEFAULT_PER_PAGE)
+          .max(MAX_RESULTS),
+        consolidate: Joi.boolean().default(false)
       })
     }
   }
 }
 
 /**
- * @import { ServerRoute } from '@hapi/hapi'
+ * @typedef {object} RequestAuditParams
+ * @property {string} id - The form ID
+ */
+
+/**
+ * @typedef {PaginationOptions & { consolidate?: boolean }} AuditQueryOptions
+ */
+
+/**
+ * @typedef {Request<{ Params: RequestAuditParams; Query: AuditQueryOptions }>} RequestAuditById
+ */
+
+/**
+ * @import { Request, ServerRoute } from '@hapi/hapi'
+ * @import { AuditRecord, ConsolidatedAuditRecord, PaginationOptions } from '@defra/forms-model'
+ * @import { ExtendedResponseToolkit } from '~/src/plugins/query-handler/types.js'
  */

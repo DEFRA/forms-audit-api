@@ -13,6 +13,35 @@ export function mapAuditRecord(document) {
 }
 
 /**
+ * Maps a consolidated audit result from MongoDB aggregation to AuditRecord or ConsolidatedAuditRecord
+ * @param {ConsolidatedAuditResult} document - consolidated audit document
+ * @returns {AuditRecord | ConsolidatedAuditRecord}
+ */
+export function mapConsolidatedAuditRecord(document) {
+  const { _id, consolidatedCount, consolidatedFrom, consolidatedTo, ...rest } =
+    document
+
+  /** @type {AuditRecord} */
+  const baseRecord = {
+    ...rest,
+    id: _id.toString()
+  }
+
+  // Only add consolidation fields when count > 1
+  if (consolidatedCount !== undefined && consolidatedCount > 1) {
+    return {
+      ...baseRecord,
+      consolidatedCount,
+      consolidatedFrom,
+      consolidatedTo
+    }
+  }
+
+  return baseRecord
+}
+
+/**
  * @import { WithId } from 'mongodb'
- * @import { AuditRecord, AuditRecordInput } from '@defra/forms-model'
+ * @import { AuditRecord, AuditRecordInput, ConsolidatedAuditRecord } from '@defra/forms-model'
+ * @import { ConsolidatedAuditResult } from '~/src/repositories/aggregation/types.js'
  */

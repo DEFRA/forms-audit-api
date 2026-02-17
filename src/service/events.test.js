@@ -1,3 +1,5 @@
+// @ts-expect-error - no types available for '@defra/cdp-auditing'
+import { audit } from '@defra/cdp-auditing'
 import {
   AuditEventMessageCategory,
   AuditEventMessageSource,
@@ -21,16 +23,19 @@ import {
 } from '~/src/api/forms/__stubs__/audit.js'
 import { deleteEventMessage } from '~/src/messaging/event.js'
 import { prepareDb } from '~/src/mongo.js'
+import { invalidateCache } from '~/src/plugins/audit-cache.js'
 import * as auditRecord from '~/src/repositories/audit-record-repository.js'
 import {
   createAuditEvents,
   mapAuditEvent,
-  readAuditEvents
+  readAuditEvents,
+  readConsolidatedAuditEvents
 } from '~/src/service/events.js'
 
 jest.mock('~/src/messaging/event.js')
 jest.mock('~/src/repositories/audit-record-repository.js')
-jest.mock('~/src/messaging/event.js')
+jest.mock('~/src/plugins/audit-cache.js')
+jest.mock('@defra/cdp-auditing')
 
 jest.mock('~/src/mongo.js', () => {
   let isPrepared = false
@@ -178,17 +183,161 @@ describe('events', () => {
   })
 
   describe('readAuditEvents', () => {
-    it('should read the audit events', async () => {
+    it('should read the audit events with pagination', async () => {
       const expectedAuditRecord = buildAuditRecord(auditMessage, {
         id: STUB_AUDIT_RECORD_ID,
         ...recordInput
       })
-      jest
-        .mocked(auditRecord.getAuditRecords)
-        .mockResolvedValueOnce([auditDocument])
+      jest.mocked(auditRecord.getAuditRecords).mockResolvedValueOnce({
+        documents: [auditDocument],
+        totalItems: 1
+      })
 
-      const auditRecords = await readAuditEvents({ entityId }, 0)
-      expect(auditRecords).toEqual([expectedAuditRecord])
+      const result = await readAuditEvents(
+        { entityId },
+        { page: 1, perPage: 100 }
+      )
+
+      expect(result).toEqual({
+        auditRecords: [expectedAuditRecord],
+        totalItems: 1
+      })
+      expect(auditRecord.getAuditRecords).toHaveBeenCalledWith(
+        { entityId },
+        { page: 1, perPage: 100 }
+      )
+    })
+
+    it('should pass custom pagination parameters', async () => {
+      jest.mocked(auditRecord.getAuditRecords).mockResolvedValueOnce({
+        documents: [],
+        totalItems: 50
+      })
+
+      const result = await readAuditEvents(
+        { entityId },
+        { page: 3, perPage: 10 }
+      )
+
+      expect(result).toEqual({
+        auditRecords: [],
+        totalItems: 50
+      })
+      expect(auditRecord.getAuditRecords).toHaveBeenCalledWith(
+        { entityId },
+        { page: 3, perPage: 10 }
+      )
+    })
+  })
+
+  describe('readConsolidatedAuditEvents', () => {
+    const user1 = { id: 'user-1', displayName: 'User One' }
+
+    /**
+     * Creates a mock consolidated result for testing
+     * @param {object} overrides
+     * @returns {ConsolidatedAuditResult}
+     */
+    function createMockConsolidatedResult(overrides = {}) {
+      return /** @type {ConsolidatedAuditResult} */ ({
+        ...auditDocument,
+        _id: new ObjectId(),
+        ...overrides
+      })
+    }
+
+    it('should return consolidated results from aggregation', async () => {
+      const consolidatedDoc = createMockConsolidatedResult({
+        type: AuditEventMessageType.FORM_UPDATED,
+        createdAt: new Date('2025-08-07T12:00:00Z'),
+        createdBy: user1,
+        consolidatedCount: 3,
+        consolidatedFrom: new Date('2025-08-07T10:00:00Z'),
+        consolidatedTo: new Date('2025-08-07T12:00:00Z')
+      })
+
+      jest
+        .mocked(auditRecord.getConsolidatedAuditRecords)
+        .mockResolvedValueOnce({
+          documents: [consolidatedDoc],
+          totalItems: 1
+        })
+
+      const result = await readConsolidatedAuditEvents(
+        { entityId },
+        { page: 1, perPage: 10 }
+      )
+
+      expect(result.totalItems).toBe(1)
+      expect(result.auditRecords).toHaveLength(1)
+      expect(result.auditRecords[0]).toMatchObject({
+        consolidatedCount: 3,
+        consolidatedFrom: new Date('2025-08-07T10:00:00Z'),
+        consolidatedTo: new Date('2025-08-07T12:00:00Z')
+      })
+    })
+
+    it('should return non-consolidated records unchanged', async () => {
+      const doc1 = createMockConsolidatedResult({
+        type: AuditEventMessageType.FORM_UPDATED,
+        createdAt: new Date('2025-08-07T12:00:00Z'),
+        createdBy: user1
+      })
+      const doc2 = createMockConsolidatedResult({
+        type: AuditEventMessageType.FORM_CREATED,
+        createdAt: new Date('2025-08-07T11:00:00Z'),
+        createdBy: user1
+      })
+
+      jest
+        .mocked(auditRecord.getConsolidatedAuditRecords)
+        .mockResolvedValueOnce({
+          documents: [doc1, doc2],
+          totalItems: 2
+        })
+
+      const result = await readConsolidatedAuditEvents(
+        { entityId },
+        { page: 1, perPage: 10 }
+      )
+
+      expect(result.totalItems).toBe(2)
+      expect(result.auditRecords).toHaveLength(2)
+      expect(result.auditRecords[0]).not.toHaveProperty('consolidatedCount')
+      expect(result.auditRecords[1]).not.toHaveProperty('consolidatedCount')
+    })
+
+    it('should return empty array when no results', async () => {
+      jest
+        .mocked(auditRecord.getConsolidatedAuditRecords)
+        .mockResolvedValueOnce({
+          documents: [],
+          totalItems: 0
+        })
+
+      const result = await readConsolidatedAuditEvents(
+        { entityId },
+        { page: 1, perPage: 10 }
+      )
+
+      expect(result.totalItems).toBe(0)
+      expect(result.auditRecords).toEqual([])
+    })
+
+    it('should pass filter and pagination to repository', async () => {
+      jest
+        .mocked(auditRecord.getConsolidatedAuditRecords)
+        .mockResolvedValueOnce({
+          documents: [],
+          totalItems: 0
+        })
+
+      await readConsolidatedAuditEvents({ entityId }, { page: 2, perPage: 5 })
+
+      expect(auditRecord.getConsolidatedAuditRecords).toHaveBeenCalledWith(
+        { entityId },
+        { page: 2, perPage: 5 }
+      )
     })
   })
 
@@ -254,6 +403,8 @@ describe('events', () => {
         saved: messages,
         failed: []
       })
+
+      expect(audit).toHaveBeenCalledTimes(3)
     })
 
     it('should handle failures', async () => {
@@ -277,10 +428,33 @@ describe('events', () => {
         saved: [message1],
         failed: [new Error('error in create'), new Error('error in delete')]
       })
+
+      expect(audit).toHaveBeenCalledTimes(1)
+    })
+
+    it('should invalidate cache after successful transaction', async () => {
+      await createAuditEvents([message1])
+
+      expect(invalidateCache).toHaveBeenCalledWith(auditMessage.entityId)
+
+      expect(audit).toHaveBeenCalledTimes(1)
+    })
+
+    it('should not invalidate cache when transaction fails', async () => {
+      jest
+        .mocked(auditRecord.createAuditRecord)
+        .mockRejectedValueOnce(new Error('Transaction failed'))
+
+      await createAuditEvents([message1])
+
+      expect(invalidateCache).not.toHaveBeenCalled()
+
+      expect(audit).toHaveBeenCalledTimes(0)
     })
   })
 })
 
 /**
- * @import {Message} from '@aws-sdk/client-sqs'
+ * @import { Message } from '@aws-sdk/client-sqs'
+ * @import { ConsolidatedAuditResult } from '~/src/repositories/aggregation/types.js'
  */
