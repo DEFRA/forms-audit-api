@@ -7,7 +7,7 @@
 import {
   AuditEventMessageType,
   alwaysValidEvents,
-  fieldConfigs,
+  fieldConfigs as simpleFieldConfigs,
   privacyNoticeFields,
   supportContactFields
 } from '@defra/forms-model'
@@ -48,7 +48,7 @@ export function buildNoDataCondition() {
  * @returns {object[]}
  */
 export function buildFieldConfigConditions() {
-  return Object.entries(fieldConfigs).map(([eventType, config]) => ({
+  return Object.entries(simpleFieldConfigs).map(([eventType, config]) => ({
     $and: [
       { type: eventType },
       {
