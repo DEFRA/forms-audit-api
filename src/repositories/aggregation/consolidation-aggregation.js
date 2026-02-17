@@ -7,7 +7,8 @@
 import {
   AuditEventMessageType,
   alwaysValidEvents,
-  fieldConfigs,
+  fieldConfigs as simpleFieldConfigs,
+  privacyNoticeFields,
   supportContactFields
 } from '@defra/forms-model'
 
@@ -47,7 +48,7 @@ export function buildNoDataCondition() {
  * @returns {object[]}
  */
 export function buildFieldConfigConditions() {
-  return Object.entries(fieldConfigs).map(([eventType, config]) => ({
+  return Object.entries(simpleFieldConfigs).map(([eventType, config]) => ({
     $and: [
       { type: eventType },
       {
@@ -60,16 +61,18 @@ export function buildFieldConfigConditions() {
 }
 
 /**
- * Builds the $match condition for FORM_SUPPORT_CONTACT_UPDATED events.
- * Checks if any support contact field has changed.
+ * Builds the $match condition for events that are made up of multiple fields.
+ * Checks if any of the supplied fields have changed.
+ * @param {AuditEventMessageType} eventType
+ * @param {MultiAuditFieldConfig[]} fieldConfigs
  * @returns {object}
  */
-export function buildSupportContactCondition() {
+export function buildMultiFieldCondition(eventType, fieldConfigs) {
   return {
     $and: [
-      { type: AuditEventMessageType.FORM_SUPPORT_CONTACT_UPDATED },
+      { type: eventType },
       {
-        $or: supportContactFields.map((field) => ({
+        $or: fieldConfigs.map((field) => ({
           $and: [
             {
               [`data.${field.newPath}`]: { $exists: true, $nin: [null, ''] }
@@ -97,7 +100,14 @@ export function buildHasActualChangeConditions() {
     buildAlwaysValidCondition(),
     buildNoDataCondition(),
     ...buildFieldConfigConditions(),
-    buildSupportContactCondition()
+    buildMultiFieldCondition(
+      AuditEventMessageType.FORM_SUPPORT_CONTACT_UPDATED,
+      supportContactFields
+    ),
+    buildMultiFieldCondition(
+      AuditEventMessageType.FORM_PRIVACY_NOTICE_UPDATED,
+      privacyNoticeFields
+    )
   ]
 }
 
@@ -304,7 +314,7 @@ export function mapConsolidationResults(results) {
 }
 
 /**
- * @import { AuditRecordInput, PaginationOptions } from '@defra/forms-model'
+ * @import { AuditRecordInput, MultiAuditFieldConfig, PaginationOptions } from '@defra/forms-model'
  * @import { WithId } from 'mongodb'
  * @import { AggregationRecord, ConsolidatedAggregationResult, ConsolidatedAuditResult, PipelineStage } from '~/src/repositories/aggregation/types.js'
  */
