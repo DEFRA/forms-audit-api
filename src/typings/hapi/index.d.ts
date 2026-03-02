@@ -1,3 +1,5 @@
+export {}
+
 declare module '@hapi/hapi' {
   interface UserCredentials {
     /**
