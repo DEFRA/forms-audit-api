@@ -5,6 +5,7 @@
     "module": "NodeNext",
     "noEmit": true,
     "resolveJsonModule": true,
+    "skipLibCheck": true,
     "strict": true,
     "target": "es2023",
     "baseUrl": "./",
@@ -17,7 +18,7 @@
     "**/*.cjs",
     "**/*.js",
     "**/*.mjs",
-    ".eslintrc.*",
+    "eslint.config.*",
     ".prettierrc.*",
     ".lintstagedrc.*"
   ],
