@@ -1,4 +1,4 @@
-import { UserCredentials } from '@hapi/hapi'
+export {}
 
 declare module '@hapi/hapi' {
   interface UserCredentials {

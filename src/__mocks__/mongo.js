@@ -1,5 +1,4 @@
 /* istanbul ignore file */
-/* eslint-env jest */
 /**
  * @type {Mocked<MongoClient>}
  */
