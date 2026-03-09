@@ -58,10 +58,10 @@
     "proxy-agent": "^6.5.0"
   },
   "devDependencies": {
-    "@babel/cli": "^7.27.2",
-    "@babel/core": "^7.27.4",
-    "@babel/plugin-syntax-import-attributes": "^7.27.1",
-    "@babel/preset-env": "^7.27.2",
+    "@babel/cli": "^7.28.6",
+    "@babel/core": "^7.29.0",
+    "@babel/plugin-syntax-import-attributes": "^7.28.6",
+    "@babel/preset-env": "^7.29.0",
     "@types/convict": "^6.1.6",
     "@types/eslint": "^9.6.1",
     "@types/jest": "^30.0.0",
@@ -84,7 +84,7 @@
     "lint-staged": "^16.1.2",
     "prettier": "^3.5.3",
     "tsx": "^4.21.0",
-    "typescript": "^5.8.3",
+    "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1"
   },
   "overrides": {
