@@ -205,7 +205,7 @@ export const config = convict({
     default: 30,
     env: 'SQS_VISIBILITY_TIMEOUT'
   },
-  sqsEventsDlqUrl: {
+  sqsEventsDlqArn: {
     doc: 'SQS deadletter queue ARN',
     format: String,
     default: '',

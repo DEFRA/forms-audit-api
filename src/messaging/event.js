@@ -10,7 +10,7 @@ import { sqsClient } from '~/src/messaging/sqs.js'
 export const receiveMessageTimeout = config.get('receiveMessageTimeout')
 const queueUrl = config.get('sqsEventsQueueUrl')
 const deadLetterQueueUrl = `${queueUrl}-deadletter`
-const deadLetterQueueArn = config.get('sqsEventsDlqUrl')
+const deadLetterQueueArn = config.get('sqsEventsDlqArn')
 const maxNumberOfMessages = config.get('maxNumberOfMessages')
 const visibilityTimeout = config.get('visibilityTimeout')
 
