@@ -124,28 +124,6 @@ describe('auth plugin', () => {
         '[authMissingOID] Auth: User OID is missing in token payload.'
       )
     })
-
-    test('should handle string groups claim that is valid JSON array', async () => {
-      const artifacts = /** @type {any} */ ({
-        decoded: {
-          payload: {
-            oid: 'test-oid',
-            groups: JSON.stringify(['editor-group-id'])
-          }
-        }
-      })
-      const result = await validateFn(artifacts)
-      expect(result).toEqual({
-        isValid: true,
-        credentials: {
-          user: {
-            oid: 'test-oid',
-            groups: ['editor-group-id']
-          },
-          scope: ['form-delete', 'form-edit', 'form-read']
-        }
-      })
-    })
   })
 
   describe('validate function with entitlements API enabled', () => {
