@@ -1,5 +1,6 @@
 import { createServer } from '~/src/api/server.js'
 import {
+  deleteDlqMessage,
   receiveDlqMessages,
   redriveDlqMessages
 } from '~/src/messaging/event.js'
@@ -55,6 +56,21 @@ describe('Admin routes', () => {
       expect(response.headers['content-type']).toContain(jsonContentType)
       expect(response.result).toEqual({ message: 'success' })
       expect(redriveDlqMessages).toHaveBeenCalled()
+    })
+  })
+
+  describe('DELETE', () => {
+    test('/admin/dead-letter/receiptHandle route returns 200', async () => {
+      const response = await server.inject({
+        method: 'DELETE',
+        url: '/admin/deadletter/receipt-handle',
+        auth
+      })
+
+      expect(response.statusCode).toEqual(okStatusCode)
+      expect(response.headers['content-type']).toContain(jsonContentType)
+      expect(response.result).toEqual({ message: 'success' })
+      expect(deleteDlqMessage).toHaveBeenCalled()
     })
   })
 })

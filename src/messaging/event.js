@@ -40,7 +40,8 @@ export function receiveDlqMessages() {
   const command = new ReceiveMessageCommand({
     QueueUrl: deadLetterQueueUrl,
     MaxNumberOfMessages: 10,
-    VisibilityTimeout: 5
+    VisibilityTimeout: 1,
+    WaitTimeSeconds: 0
   })
   return sqsClient.send(command)
 }
@@ -53,6 +54,20 @@ export function redriveDlqMessages() {
   const command = new StartMessageMoveTaskCommand({
     SourceArn: deadLetterQueueArn
   })
+  return sqsClient.send(command)
+}
+
+/**
+ * Delete DLQ message
+ * @param {string} receiptHandle
+ * @returns {Promise<DeleteMessageCommandOutput>}
+ */
+export function deleteDlqMessage(receiptHandle) {
+  const command = new DeleteMessageCommand({
+    QueueUrl: deadLetterQueueUrl,
+    ReceiptHandle: receiptHandle
+  })
+
   return sqsClient.send(command)
 }
 
