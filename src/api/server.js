@@ -10,6 +10,7 @@ import { requestLogger } from '~/src/helpers/logging/request-logger.js'
 import { requestTracing } from '~/src/helpers/request-tracing.js'
 import { prepareDb } from '~/src/mongo.js'
 import { ensureCacheIndexes } from '~/src/plugins/audit-cache.js'
+import { auth } from '~/src/plugins/auth/index.js'
 import { queryHandler } from '~/src/plugins/query-handler/index.js'
 import { router } from '~/src/plugins/router.js'
 import { transformErrors } from '~/src/plugins/transform-errors.js'
@@ -33,6 +34,9 @@ export async function createServer() {
   const server = hapi.server({
     port: config.get('port'),
     routes: {
+      auth: {
+        mode: 'required'
+      },
       validate: {
         options: {
           abortEarly: false
@@ -69,6 +73,7 @@ export async function createServer() {
   await ensureCacheIndexes()
   await server.register(queryHandler)
   await server.register(transformErrors)
+  await server.register(auth)
   await server.register(router)
 
   await runTask()

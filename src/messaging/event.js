@@ -1,13 +1,16 @@
 import {
   DeleteMessageCommand,
-  ReceiveMessageCommand
+  ReceiveMessageCommand,
+  StartMessageMoveTaskCommand
 } from '@aws-sdk/client-sqs'
 
 import { config } from '~/src/config/index.js'
-import { sqsClient } from '~/src/tasks/sqs.js'
+import { sqsClient } from '~/src/messaging/sqs.js'
 
 export const receiveMessageTimeout = config.get('receiveMessageTimeout')
 const queueUrl = config.get('sqsEventsQueueUrl')
+const deadLetterQueueUrl = `${queueUrl}-deadletter`
+const deadLetterQueueArn = config.get('sqsEventsDlqArn')
 const maxNumberOfMessages = config.get('maxNumberOfMessages')
 const visibilityTimeout = config.get('visibilityTimeout')
 
@@ -30,6 +33,45 @@ export function receiveEventMessages() {
 }
 
 /**
+ * Receive dead-letter queue messages
+ * @returns {Promise<ReceiveMessageResult>}
+ */
+export function receiveDlqMessages() {
+  const command = new ReceiveMessageCommand({
+    QueueUrl: deadLetterQueueUrl,
+    MaxNumberOfMessages: 10,
+    VisibilityTimeout: 1,
+    WaitTimeSeconds: 0
+  })
+  return sqsClient.send(command)
+}
+
+/**
+ * Redrive the specified message from the dead-letter queue to the main queue
+ * @returns {Promise<StartMessageMoveTaskResult>}
+ */
+export function redriveDlqMessages() {
+  const command = new StartMessageMoveTaskCommand({
+    SourceArn: deadLetterQueueArn
+  })
+  return sqsClient.send(command)
+}
+
+/**
+ * Delete DLQ message
+ * @param {string} receiptHandle
+ * @returns {Promise<DeleteMessageCommandOutput>}
+ */
+export function deleteDlqMessage(receiptHandle) {
+  const command = new DeleteMessageCommand({
+    QueueUrl: deadLetterQueueUrl,
+    ReceiptHandle: receiptHandle
+  })
+
+  return sqsClient.send(command)
+}
+
+/**
  * Delete event message
  * @param {Message} message
  * @returns {Promise<DeleteMessageCommandOutput>}
@@ -44,5 +86,5 @@ export function deleteEventMessage(message) {
 }
 
 /**
- * @import { ReceiveMessageCommandInput, ReceiveMessageResult, DeleteMessageCommandOutput, Message } from '@aws-sdk/client-sqs'
+ * @import { ReceiveMessageCommandInput, ReceiveMessageResult, DeleteMessageCommandOutput, Message, StartMessageMoveTaskResult } from '@aws-sdk/client-sqs'
  */
