@@ -7,6 +7,8 @@ import {
 import { authSuperAdmin as auth } from '~/test/fixtures/auth.js'
 
 jest.mock('~/src/messaging/event.js')
+jest.mock('~/src/mongo.js')
+jest.mock('~/src/plugins/audit-cache.js')
 
 describe('Admin routes', () => {
   /** @type {Server} */
