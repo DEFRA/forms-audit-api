@@ -6,8 +6,6 @@ import {
 } from '~/src/messaging/event.js'
 import { authSuperAdmin as auth } from '~/test/fixtures/auth.js'
 
-jest.mock('~/src/mongo.js')
-jest.mock('~/src/plugins/audit-cache.js')
 jest.mock('~/src/messaging/event.js')
 
 describe('Admin routes', () => {
@@ -60,17 +58,20 @@ describe('Admin routes', () => {
   })
 
   describe('DELETE', () => {
-    test('/admin/dead-letter/receiptHandle route returns 200', async () => {
+    test('/admin/dead-letter/message-id route returns 200', async () => {
       const response = await server.inject({
         method: 'DELETE',
-        url: '/admin/deadletter/receipt-handle',
-        auth
+        url: '/admin/deadletter/message-id',
+        auth,
+        payload: {
+          receiptHandle: 'receipt-handle'
+        }
       })
 
       expect(response.statusCode).toEqual(okStatusCode)
       expect(response.headers['content-type']).toContain(jsonContentType)
       expect(response.result).toEqual({ message: 'success' })
-      expect(deleteDlqMessage).toHaveBeenCalled()
+      expect(deleteDlqMessage).toHaveBeenCalledWith('receipt-handle')
     })
   })
 })
