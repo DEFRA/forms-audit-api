@@ -10,7 +10,6 @@ const serviceVersion = config.get('serviceVersion')
 const formatters = {
   ecs: {
     ...ecsFormat({
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- serviceVersion can be null from config
       serviceVersion: serviceVersion ?? '1.0.0',
       serviceName
     })
