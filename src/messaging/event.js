@@ -40,7 +40,7 @@ export function receiveDlqMessages() {
   const command = new ReceiveMessageCommand({
     QueueUrl: deadLetterQueueUrl,
     MaxNumberOfMessages: 10,
-    VisibilityTimeout: 1,
+    VisibilityTimeout: 0,
     WaitTimeSeconds: 0
   })
   return sqsClient.send(command)
