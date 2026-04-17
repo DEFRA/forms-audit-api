@@ -37,7 +37,7 @@
     "setup:husky": "node -e \"try { (await import('husky')).default() } catch (e) { if (e.code !== 'ERR_MODULE_NOT_FOUND') throw e }\" --input-type module"
   },
   "dependencies": {
-    "@aws-sdk/client-sqs": "3.1002.0",
+    "@aws-sdk/client-sqs": "3.1031.0",
     "@defra/cdp-auditing": "0.6.0",
     "@defra/forms-model": "3.0.641",
     "@defra/hapi-tracing": "^1.26.0",
