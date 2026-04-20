@@ -31,10 +31,10 @@ function getOverviewCollection() {
 
 /**
  * Gets the metric snapshot collection
- * @returns {Collection<FormSnapshotMetric>}
+ * @returns {Collection<FormTimelineMetric>}
  */
-function getSnapshotCollection() {
-  return /** @type {Collection<FormSnapshotMetric>} */ (
+function getTimelineCollection() {
+  return /** @type {Collection<FormTimelineMetric>} */ (
     db.collection(METRICS_COLLECTION_NAME)
   )
 }
@@ -124,20 +124,20 @@ export async function saveFormOverviewMetrics(
  * Gets overview metric records for a form.
  * @param {string} formId
  * @param {ClientSession} session
- * @returns {Promise<WithId<FormSnapshotMetric>[]>}
+ * @returns {Promise<WithId<FormTimelineMetric>[]>}
  */
-export async function getFormSnapshotMetrics(formId, session) {
-  const coll = getSnapshotCollection()
+export async function getFormTimelineMetrics(formId, session) {
+  const coll = getTimelineCollection()
 
   try {
-    const snapshots = coll
-      .find({ formId, type: FormMetricType.SnapshotMetric }, { session })
+    const timelineRecords = coll
+      .find({ formId, type: FormMetricType.TimelineMetric }, { session })
       .sort({ updatedAt: -1 })
-    return await snapshots.toArray()
+    return await timelineRecords.toArray()
   } catch (err) {
     logger.error(
       err,
-      `Failed to read snapshot metrics for form id ${formId} - ${getErrorMessage(err)}`
+      `Failed to read timeline metrics for form id ${formId} - ${getErrorMessage(err)}`
     )
     throw err
   }
@@ -146,25 +146,25 @@ export async function getFormSnapshotMetrics(formId, session) {
 /**
  * Saves snapshot metric records for a form.
  * @param {string} formId
- * @param {FormSnapshotMetric} metricData
+ * @param {FormTimelineMetric} metricData
  * @param {ClientSession} session
  */
-export async function saveFormSnapshotMetrics(formId, metricData, session) {
-  const coll = getSnapshotCollection()
+export async function saveFormTimelineMetrics(formId, metricData, session) {
+  const coll = getTimelineCollection()
 
   try {
     await coll.insertOne(
       {
         ...metricData,
         formId,
-        type: FormMetricType.SnapshotMetric
+        type: FormMetricType.TimelineMetric
       },
       { session }
     )
   } catch (err) {
     logger.error(
       err,
-      `Failed to save overview metrics for form id ${formId} - ${getErrorMessage(err)}`
+      `Failed to save tineline metrics for form id ${formId} - ${getErrorMessage(err)}`
     )
     throw err
   }
@@ -173,7 +173,7 @@ export async function saveFormSnapshotMetrics(formId, metricData, session) {
 /**
  * Gets metric lock record and sets the lock if not already locked.
  * @param {ClientSession} session
- * @returns {Promise<boolean>}
+ * @returns {Promise<{ lockSuccess: boolean, lastSuccessfulRun: Date | undefined }>}
  */
 export async function grabLock(session) {
   const coll = getControlCollection()
@@ -198,12 +198,18 @@ export async function grabLock(session) {
         updatedAt: now
       }
       await coll.insertOne(firstLock, { session })
-      return true
+      return {
+        lockSuccess: true,
+        lastSuccessfulRun: undefined
+      }
     }
 
     // Another container already has the lock
     if (controlRecord.locked) {
-      return false
+      return {
+        lockSuccess: false,
+        lastSuccessfulRun: controlRecord.lastSuccessfulRunDate
+      }
     }
 
     await coll.updateOne(
@@ -222,7 +228,10 @@ export async function grabLock(session) {
         session
       }
     )
-    return true
+    return {
+      lockSuccess: true,
+      lastSuccessfulRun: controlRecord.lastSuccessfulRunDate
+    }
   } catch (err) {
     logger.error(
       err,
@@ -273,5 +282,5 @@ export async function releaseLock(success, message, session) {
 
 /**
  * @import { ClientSession, Collection, WithId } from 'mongodb'
- * @import { FormOverviewMetric, FormSnapshotMetric } from '@defra/forms-model'
+ * @import { FormOverviewMetric, FormTimelineMetric } from '@defra/forms-model'
  */

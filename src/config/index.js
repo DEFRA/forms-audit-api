@@ -181,6 +181,20 @@ export const config = convict({
     default: null,
     env: 'ENTITLEMENT_URL'
   },
+  /**@type {SchemaObj<string>} */
+  managerUrl: {
+    doc: 'Forms manager API URL',
+    format: String,
+    default: null,
+    env: 'MANAGER_URL'
+  },
+  /**@type {SchemaObj<string>} */
+  submissionUrl: {
+    doc: 'Forms submission API URL',
+    format: String,
+    default: null,
+    env: 'SUBMISSION_URL'
+  },
   tracing: {
     /**@type {SchemaObj<string>} */
     header: {
@@ -248,12 +262,7 @@ export const config = convict({
       env: 'CACHE_ENABLED'
     }
   },
-  managerUrl: {
-    doc: 'URL for forms-manager',
-    format: String,
-    default: '',
-    env: 'MANAGER_URL'
-  },
+  /**@type {SchemaObj<string>} */
   metricsCrontab: {
     doc: 'Crontab entry for triggering the metrics collation job ',
     format: String,
