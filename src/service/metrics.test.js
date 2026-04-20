@@ -45,7 +45,7 @@ describe('runMetricsCollectionJob', () => {
   it('should ignore when job already locked', async () => {
     jest.mocked(grabLock).mockResolvedValueOnce({
       lockSuccess: false,
-      lastSuccessfulRun: undefined
+      lastSuccessfulRun: null
     })
 
     const mockNewSession = /** @type {any} */ ({

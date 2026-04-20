@@ -228,7 +228,7 @@ describe('metrics-repository', () => {
 
       expect(result).toEqual({
         lockSuccess: true,
-        lastSuccessfulRun: undefined
+        lastSuccessfulRun: null
       })
     })
 

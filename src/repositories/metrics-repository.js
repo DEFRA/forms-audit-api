@@ -13,8 +13,8 @@ const FORM_METRIC_CONTROL = 'form-metric-control'
  * @property {string} type - type of record
  * @property {boolean} locked - true if locked i.e. a container is already running the job
  * @property {Date} jobStart - timestamp for when the job started
- * @property { Date | undefined } jobEnd - timestamp for when the job ended
- * @property { Date | undefined } lastSuccessfulRunDate - timestamp for when the last successful run started
+ * @property { Date | null } jobEnd - timestamp for when the job ended
+ * @property { Date | null } lastSuccessfulRunDate - timestamp for when the last successful run started
  * @property {string} lastRunResult - outcome of last run
  * @property {Date} updatedAt - last updated timestamp
  */
@@ -160,7 +160,7 @@ export async function saveFormTimelineMetrics(formId, metricData, session) {
 /**
  * Gets metric lock record and sets the lock if not already locked.
  * @param {ClientSession} session
- * @returns {Promise<{ lockSuccess: boolean, lastSuccessfulRun: Date | undefined }>}
+ * @returns {Promise<{ lockSuccess: boolean, lastSuccessfulRun: Date | null }>}
  */
 export async function grabLock(session) {
   const coll = getMetricCollection()
@@ -178,15 +178,15 @@ export async function grabLock(session) {
         type: FORM_METRIC_CONTROL,
         locked: true,
         jobStart: now,
-        jobEnd: undefined,
-        lastSuccessfulRunDate: undefined,
+        jobEnd: null,
+        lastSuccessfulRunDate: null,
         lastRunResult: '',
         updatedAt: now
       }
       await coll.insertOne(firstLock, { session })
       return {
         lockSuccess: true,
-        lastSuccessfulRun: undefined
+        lastSuccessfulRun: null
       }
     }
 
@@ -206,7 +206,7 @@ export async function grabLock(session) {
         $set: {
           locked: true,
           jobStart: now,
-          jobEnd: undefined,
+          jobEnd: null,
           updatedAt: now
         }
       },

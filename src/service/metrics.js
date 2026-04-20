@@ -58,7 +58,7 @@ export async function runMetricsCollectionJob() {
 /**
  * Collect a full set of metrics - both overview and snapshot
  * @param {Date} jobStart
- * @param { Date | undefined } lastSuccessfulRunDate
+ * @param { Date | null } lastSuccessfulRunDate
  * @param {ClientSession} session
  */
 export async function collectMetrics(jobStart, lastSuccessfulRunDate, session) {
@@ -68,7 +68,7 @@ export async function collectMetrics(jobStart, lastSuccessfulRunDate, session) {
   // Make a call for each day since last job run
   // (Normally only one day but also handles full historical data population on first run)
   const yesterday = startOfDay(sub(jobStart, { days: 1 }))
-  let reportDate = lastSuccessfulRunDate ?? new Date('2025-01-01T00:00:00.000Z') // TODO - which start date?
+  let reportDate = lastSuccessfulRunDate ?? new Date('2025-01-01T00:00:00.000Z')
   do {
     logger.info(
       `[metrics] getting timeline metrics for ${reportDate.toDateString()}`
