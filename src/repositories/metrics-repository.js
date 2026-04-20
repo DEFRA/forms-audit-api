@@ -20,31 +20,11 @@ const FORM_METRIC_CONTROL = 'form-metric-control'
  */
 
 /**
- * Gets the metric overview collection
- * @returns {Collection<FormOverviewMetric>}
+ * Gets the metric collection
+ * @returns {Collection<FormOverviewMetric | FormTimelineMetric | FormMetricControl>}
  */
-function getOverviewCollection() {
-  return /** @type {Collection<FormOverviewMetric>} */ (
-    db.collection(METRICS_COLLECTION_NAME)
-  )
-}
-
-/**
- * Gets the metric snapshot collection
- * @returns {Collection<FormTimelineMetric>}
- */
-function getTimelineCollection() {
-  return /** @type {Collection<FormTimelineMetric>} */ (
-    db.collection(METRICS_COLLECTION_NAME)
-  )
-}
-
-/**
- * Gets the lock collection
- * @returns {Collection<FormMetricControl>}
- */
-function getControlCollection() {
-  return /** @type {Collection<FormMetricControl>} */ (
+function getMetricCollection() {
+  return /** @type {Collection<FormOverviewMetric | FormTimelineMetric | FormMetricControl>} */ (
     db.collection(METRICS_COLLECTION_NAME)
   )
 }
@@ -56,25 +36,29 @@ function getControlCollection() {
  * @returns {Promise<{ live: FormOverviewMetric | null, draft: FormOverviewMetric | null }>}
  */
 export async function getFormOverviewMetrics(formId, session) {
-  const coll = getOverviewCollection()
+  const coll = getMetricCollection()
 
   try {
-    const draft = await coll.findOne(
-      {
-        type: FormMetricType.OverviewMetric,
-        formId,
-        formStatus: FormStatus.Draft
-      },
-      { session }
+    const draft = /** @type { WithId<FormOverviewMetric> | null } */ (
+      await coll.findOne(
+        {
+          type: FormMetricType.OverviewMetric,
+          formId,
+          formStatus: FormStatus.Draft
+        },
+        { session }
+      )
     )
 
-    const live = await coll.findOne(
-      {
-        type: FormMetricType.OverviewMetric,
-        formId,
-        formStatus: FormStatus.Live
-      },
-      { session }
+    const live = /** @type { WithId<FormOverviewMetric> | null } */ (
+      await coll.findOne(
+        {
+          type: FormMetricType.OverviewMetric,
+          formId,
+          formStatus: FormStatus.Live
+        },
+        { session }
+      )
     )
 
     return {
@@ -103,7 +87,7 @@ export async function saveFormOverviewMetrics(
   metricData,
   session
 ) {
-  const coll = getOverviewCollection()
+  const coll = getMetricCollection()
 
   try {
     await coll.updateOne(
@@ -127,12 +111,15 @@ export async function saveFormOverviewMetrics(
  * @returns {Promise<WithId<FormTimelineMetric>[]>}
  */
 export async function getFormTimelineMetrics(formId, session) {
-  const coll = getTimelineCollection()
+  const coll = getMetricCollection()
 
   try {
-    const timelineRecords = coll
-      .find({ formId, type: FormMetricType.TimelineMetric }, { session })
-      .sort({ updatedAt: -1 })
+    const timelineRecords =
+      /** @type {FindCursor<WithId<FormTimelineMetric>>} */ (
+        coll
+          .find({ formId, type: FormMetricType.TimelineMetric }, { session })
+          .sort({ updatedAt: -1 })
+      )
     return await timelineRecords.toArray()
   } catch (err) {
     logger.error(
@@ -150,7 +137,7 @@ export async function getFormTimelineMetrics(formId, session) {
  * @param {ClientSession} session
  */
 export async function saveFormTimelineMetrics(formId, metricData, session) {
-  const coll = getTimelineCollection()
+  const coll = getMetricCollection()
 
   try {
     await coll.insertOne(
@@ -176,14 +163,13 @@ export async function saveFormTimelineMetrics(formId, metricData, session) {
  * @returns {Promise<{ lockSuccess: boolean, lastSuccessfulRun: Date | undefined }>}
  */
 export async function grabLock(session) {
-  const coll = getControlCollection()
+  const coll = getMetricCollection()
 
   const now = new Date()
 
   try {
-    const controlRecord = await coll.findOne(
-      { type: FORM_METRIC_CONTROL },
-      { session }
+    const controlRecord = /** @type { WithId<FormMetricControl> | null } */ (
+      await coll.findOne({ type: FORM_METRIC_CONTROL }, { session })
     )
 
     // Insert if the first time
@@ -248,7 +234,7 @@ export async function grabLock(session) {
  * @param {ClientSession} session
  */
 export async function releaseLock(success, message, session) {
-  const coll = getControlCollection()
+  const coll = getMetricCollection()
 
   const now = new Date()
 
@@ -281,6 +267,6 @@ export async function releaseLock(success, message, session) {
 }
 
 /**
- * @import { ClientSession, Collection, WithId } from 'mongodb'
+ * @import { ClientSession, Collection, FindCursor, WithId } from 'mongodb'
  * @import { FormOverviewMetric, FormTimelineMetric } from '@defra/forms-model'
  */
