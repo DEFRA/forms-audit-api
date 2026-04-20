@@ -43,12 +43,10 @@ describe('runMetricsCollectionJob', () => {
   })
 
   it('should ignore when job already locked', async () => {
-    jest
-      .mocked(grabLock)
-      .mockResolvedValueOnce({
-        lockSuccess: false,
-        lastSuccessfulRun: undefined
-      })
+    jest.mocked(grabLock).mockResolvedValueOnce({
+      lockSuccess: false,
+      lastSuccessfulRun: undefined
+    })
 
     const mockNewSession = /** @type {any} */ ({
       withTransaction: jest.fn().mockImplementation(async (callback) => {

@@ -23,6 +23,8 @@ process.env.OIDC_JWKS_URI =
 process.env.OIDC_VERIFY_AUD = 'local-test-client'
 process.env.OIDC_VERIFY_ISS = 'http://oidc:80'
 process.env.ENTITLEMENT_URL = 'http://localhost:3004'
+process.env.MANAGER_URL = 'http://localhost:3001'
+process.env.SUBMISSION_URL = 'http://localhost:3002'
 process.env.TRACING_HEADER = 'x-cdp-request-id'
 
 process.env.AWS_REGION = 'eu-west-2'
