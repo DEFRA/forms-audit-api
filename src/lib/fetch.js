@@ -4,6 +4,8 @@ import Wreck from '@hapi/wreck'
 const MIN_OK_STATUS = 200
 const MAX_OK_STATUS = 299
 
+const NOT_FOUND = 404
+
 /**
  * Base request function using @hapi/wreck
  * @param {string} method - HTTP method
@@ -60,6 +62,24 @@ export function post(url, options) {
  */
 export function getJson(url, options = {}) {
   return get(url, { json: true, ...options })
+}
+
+/**
+ * GET request with JSON parsing
+ * @param {URL} url - URL object
+ * @param {object} options - Request options
+ * @returns {Promise<{response: object, body: any}>}
+ */
+export async function getJsonIgnoreMissing(url, options = {}) {
+  try {
+    return await get(url, { json: true, ...options })
+  } catch (err) {
+    const error = /** @type {{ data?: { statusCode: number }}} */ (err)
+    if (error.data?.statusCode !== NOT_FOUND) {
+      throw err
+    }
+  }
+  return { body: undefined, response: { statusCode: NOT_FOUND } }
 }
 
 /**

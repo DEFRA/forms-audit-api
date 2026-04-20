@@ -85,6 +85,7 @@
     "jest": "^30.2.0",
     "lint-staged": "^16.1.2",
     "luxon": "^3.6.1",
+    "node-cron": "^4.2.1",
     "oidc-client-ts": "^3.2.1",
     "prettier": "^3.5.3",
     "tsx": "^4.21.0",

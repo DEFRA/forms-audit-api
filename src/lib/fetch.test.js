@@ -1,7 +1,16 @@
 import Boom from '@hapi/boom'
 import Wreck from '@hapi/wreck'
 
-import { get, getJson, post, postJson, request } from '~/src/lib/fetch.js'
+import {
+  get,
+  getJson,
+  getJsonIgnoreMissing,
+  post,
+  postJson,
+  request
+} from '~/src/lib/fetch.js'
+
+const NOT_FOUND = 404
 
 jest.mock('@hapi/wreck')
 
@@ -172,6 +181,39 @@ describe('fetch utilities', () => {
           json: true
         }
       )
+    })
+
+    it('getJsonIgnoreMissing should read from url', async () => {
+      await getJsonIgnoreMissing(url, {})
+
+      expect(jest.mocked(Wreck.request)).toHaveBeenCalledWith('get', url.href, {
+        json: true
+      })
+    })
+
+    it('getJsonIgnoreMissing should handle NOT_FOUND', async () => {
+      jest.mocked(Wreck.request).mockImplementationOnce(() => {
+        const err = new Error('not found')
+        // @ts-expect-error - dynamic error property
+        err.data = { statusCode: NOT_FOUND }
+        throw err
+      })
+      const res = await getJsonIgnoreMissing(url, {})
+      expect(res).toEqual({
+        body: undefined,
+        response: { statusCode: NOT_FOUND }
+      })
+    })
+
+    it('getJsonIgnoreMissing should throw if error is something different from NOT_FOUND', async () => {
+      jest.mocked(Wreck.request).mockImplementationOnce(() => {
+        const err = new Error('not found')
+        // @ts-expect-error - dynamic error property
+        err.data = { statusCode: 403 }
+        throw err
+      })
+
+      await expect(getJsonIgnoreMissing(url, {})).rejects.toThrow('not found')
     })
   })
 })

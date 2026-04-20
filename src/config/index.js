@@ -218,6 +218,18 @@ export const config = convict({
       default: true,
       env: 'CACHE_ENABLED'
     }
+  },
+  managerUrl: {
+    doc: 'URL for forms-manager',
+    format: String,
+    default: '',
+    env: 'MANAGER_URL'
+  },
+  metricsCrontab: {
+    doc: 'Crontab entry for triggering the metrics collation job ',
+    format: String,
+    default: '0 3 * * *',
+    env: 'METRICS_CRONTAB'
   }
 })
 

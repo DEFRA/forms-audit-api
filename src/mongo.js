@@ -14,6 +14,7 @@ export let db
 export let client
 
 export const AUDIT_RECORDS_COLLECTION_NAME = 'audit-records'
+export const METRICS_COLLECTION_NAME = 'metrics'
 
 /**
  * Connects to mongo database
@@ -43,6 +44,10 @@ export async function prepareDb(logger) {
 
   await coll.createIndex({ messageId: 1 }, { unique: true })
   await coll.createIndex({ entityId: 1, createdAt: -1 })
+
+  const coll2 = db.collection(METRICS_COLLECTION_NAME)
+
+  await coll2.createIndex({ type: 1, formId: 1, formStatus: 1 })
 
   logger.info(`Mongodb connected to ${databaseName}`)
 
