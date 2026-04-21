@@ -64,16 +64,13 @@ describe('Admin routes', () => {
       const response = await server.inject({
         method: 'DELETE',
         url: '/admin/deadletter/message-id',
-        auth,
-        payload: {
-          receiptHandle: 'receipt-handle'
-        }
+        auth
       })
 
       expect(response.statusCode).toEqual(okStatusCode)
       expect(response.headers['content-type']).toContain(jsonContentType)
       expect(response.result).toEqual({ message: 'success' })
-      expect(deleteDlqMessage).toHaveBeenCalledWith('receipt-handle')
+      expect(deleteDlqMessage).toHaveBeenCalledWith('message-id')
     })
   })
 })
