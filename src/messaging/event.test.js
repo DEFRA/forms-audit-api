@@ -94,19 +94,35 @@ describe('event', () => {
 
   describe('deleteDlqMessage', () => {
     it('should delete event message', async () => {
-      /**
-       * @type {DeleteMessageCommandOutput}
-       */
-      const deleteResult = {
-        $metadata: {}
+      const receivedMessage = {
+        Messages: [messageStub, messageStub, messageStub]
       }
 
-      snsMock.on(DeleteMessageCommand).resolves(deleteResult)
-      await deleteDlqMessage(messageStub.ReceiptHandle)
+      snsMock.on(ReceiveMessageCommand).resolves(receivedMessage)
+      await deleteDlqMessage(messageStub.MessageId)
+      expect(snsMock).toHaveReceivedCommandWith(ReceiveMessageCommand, {
+        QueueUrl: expect.any(String),
+        MaxNumberOfMessages: 10,
+        VisibilityTimeout: 2,
+        WaitTimeSeconds: 0
+      })
       expect(snsMock).toHaveReceivedCommandWith(DeleteMessageCommand, {
         QueueUrl: expect.any(String),
         ReceiptHandle: receiptHandle
       })
+    })
+
+    it('should throw if message not found', async () => {
+      const receivedMessage = {
+        Messages: []
+      }
+
+      snsMock.on(ReceiveMessageCommand).resolves(receivedMessage)
+      await expect(() =>
+        deleteDlqMessage(messageStub.MessageId)
+      ).rejects.toThrow(
+        'Message with id 31cb6fff-8317-412e-8488-308d099034c4 not found in audit-api DLQ'
+      )
     })
   })
 })
