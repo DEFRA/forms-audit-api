@@ -1,5 +1,5 @@
 import { FormStatus } from '@defra/forms-model'
-import { add, startOfDay, sub } from 'date-fns'
+import { add, startOfDay, sub, subDays, subYears } from 'date-fns'
 
 import { config } from '~/src/config/index.js'
 import { getErrorMessage } from '~/src/helpers/error-message.js'
@@ -7,10 +7,14 @@ import { createLogger } from '~/src/helpers/logging/logger.js'
 import { getJson } from '~/src/lib/fetch.js'
 import { client } from '~/src/mongo.js'
 import {
+  getAllOverviewMetrics,
+  getAllTimelineMetrics,
+  getMetricTotals,
   grabLock,
   releaseLock,
   saveFormOverviewMetrics,
-  saveFormTimelineMetrics
+  saveFormTimelineMetrics,
+  updateMetricTotals
 } from '~/src/repositories/metrics-repository.js'
 
 const logger = createLogger()
@@ -77,6 +81,9 @@ export async function collectMetrics(jobStart, lastSuccessfulRunDate, session) {
     await collectTimelineMetrics(submissionUrl, reportDate, session)
     reportDate = add(reportDate, { days: 1 })
   } while (reportDate < yesterday)
+
+  const totals = await recalcMetricTotals(reportDate, session)
+  await updateMetricTotals(reportDate, totals, session)
 }
 
 /**
@@ -124,6 +131,103 @@ export async function collectTimelineMetrics(baseUrl, reportingDate, session) {
 }
 
 /**
+ * @param {FormTimelineMetric} metric
+ * @param { Record<string, { count?: number }> | undefined } period
+ */
+export function updateMetricTotal(metric, period) {
+  const metricName = metric.metricName
+  if (!period) {
+    return
+  }
+  if (metricName in period && 'count' in period[metricName]) {
+    const currentTotal = period[metricName].count ?? 0
+    period[metricName].count = currentTotal + metric.metricValue
+  } else {
+    period[metricName] = { count: metric.metricValue }
+  }
+}
+
+/**
+ * Update metric totals
+ * @param {Date} reportingDate
+ * @param {ClientSession} session
+ * @returns {Promise<FormTotalsMetric>}
+ */
+export async function recalcMetricTotals(reportingDate, session) {
+  const reportMorning = startOfDay(reportingDate)
+  const sevenDaysAgo = subDays(reportMorning, 7)
+  const fourteenDaysAgo = subDays(reportMorning, 14)
+  const thirtyDaysAgo = subDays(reportMorning, 30)
+  const sixtyDaysAgo = subDays(reportMorning, 60)
+  const oneYearAgo = subYears(reportMorning, 1)
+  const twoYearsAgo = subYears(reportMorning, 2)
+
+  const formSubmissionsMap = /** @type {Map<string, number>} */ (new Map())
+  const totals = /** @type {FormTotalsMetric} */ ({
+    last7Days: {},
+    prev7Days: {},
+    last30Days: {},
+    prev30Days: {},
+    lastYear: {},
+    prevYear: {},
+    allTime: {}
+  })
+  for await (const metric of getAllTimelineMetrics(session)) {
+    if (metric.metricName === 'Submissions') {
+      const formTotalSoFar = formSubmissionsMap.get(metric.formId) ?? 0
+      formSubmissionsMap.set(metric.formId, formTotalSoFar + metric.metricValue)
+    }
+    // Update windowed totals
+    const createdAt = new Date(metric.createdAt)
+    // Last 7 days
+    if (createdAt >= sevenDaysAgo && createdAt < reportMorning) {
+      updateMetricTotal(metric, totals.last7Days)
+    }
+    // Previous 7 days
+    if (createdAt >= fourteenDaysAgo && createdAt < sevenDaysAgo) {
+      updateMetricTotal(metric, totals.prev7Days)
+    }
+    // Last 30 days
+    if (createdAt >= thirtyDaysAgo && createdAt < reportMorning) {
+      updateMetricTotal(metric, totals.last30Days)
+    }
+    // Previous 30 days
+    if (createdAt >= sixtyDaysAgo && createdAt < thirtyDaysAgo) {
+      updateMetricTotal(metric, totals.prev30Days)
+    }
+    // Last year
+    if (createdAt >= oneYearAgo && createdAt < reportMorning) {
+      updateMetricTotal(metric, totals.lastYear)
+    }
+    // Previous year
+    if (createdAt >= twoYearsAgo && createdAt < oneYearAgo) {
+      updateMetricTotal(metric, totals.prevYear)
+    }
+    // All time
+    updateMetricTotal(metric, totals.allTime)
+  }
+  totals.submissions = Object.fromEntries(formSubmissionsMap)
+  return totals
+}
+
+/**
+ * Generates a report based on the stored metrics
+ */
+export async function generateReport() {
+  const session = client.startSession()
+
+  // Overview
+  const overview = await getAllOverviewMetrics(session).toArray()
+
+  const totals = await getMetricTotals(session)
+
+  return {
+    overview,
+    totals
+  }
+}
+
+/**
  * @import { ClientSession } from 'mongodb'
- * @import { FormOverviewMetric, FormTimelineMetric } from '@defra/forms-model'
+ * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
  */

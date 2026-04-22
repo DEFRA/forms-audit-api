@@ -1,4 +1,4 @@
-import { FormMetricType, FormStatus } from '@defra/forms-model'
+import { FormMetricName, FormMetricType, FormStatus } from '@defra/forms-model'
 
 import { buildMockCollection } from '~/src/api/forms/__stubs__/mongo.js'
 import { db } from '~/src/mongo.js'
@@ -8,7 +8,8 @@ import {
   grabLock,
   releaseLock,
   saveFormOverviewMetrics,
-  saveFormTimelineMetrics
+  saveFormTimelineMetrics,
+  updateMetricTotals
 } from '~/src/repositories/metrics-repository.js'
 
 const mockCollection = buildMockCollection()
@@ -121,15 +122,13 @@ describe('metrics-repository', () => {
         },
         {
           $set: {
-            metricData: {
-              featureCounts: {},
-              formId: '3d29fb0b-c1bd-4ec8-a0d3-4c024347f1ef',
-              formStatus: 'draft',
-              submissionsCount: 0,
-              summaryMetrics: {},
-              type: 'overview-metric',
-              updatedAt: new Date('2026-02-01T00:00:00.000Z')
-            }
+            featureCounts: {},
+            formId: '3d29fb0b-c1bd-4ec8-a0d3-4c024347f1ef',
+            formStatus: 'draft',
+            submissionsCount: 0,
+            summaryMetrics: {},
+            type: 'overview-metric',
+            updatedAt: new Date('2026-02-01T00:00:00.000Z')
           }
         },
         {
@@ -214,6 +213,51 @@ describe('metrics-repository', () => {
 
       await expect(() =>
         saveFormTimelineMetrics(formId, doc, mockSession)
+      ).rejects.toThrow('db error')
+    })
+  })
+
+  describe('updateMetricTotals', () => {
+    const totals = {
+      submissions: { 'form-id-1': 5 },
+      type: FormMetricType.TotalsMetric,
+      last7Days: { [FormMetricName.Submissions]: { count: 5 } },
+      updatedAt: new Date()
+    }
+
+    it('should save totals', async () => {
+      mockCollection.insertOne.mockResolvedValueOnce({})
+
+      // @ts-expect-error - partial data mocked
+      await updateMetricTotals(new Date(), totals, mockSession)
+
+      expect(mockCollection.insertOne).toHaveBeenCalledWith(
+        {
+          last7Days: {
+            Submissions: {
+              count: 5
+            }
+          },
+          type: 'totals-metric',
+          updatedAt: expect.any(Date),
+          submissions: {
+            'form-id-1': 5
+          }
+        },
+        {
+          session: {}
+        }
+      )
+    })
+
+    it('should throw if error', async () => {
+      mockCollection.insertOne.mockImplementationOnce(() => {
+        throw new Error('db error')
+      })
+
+      await expect(() =>
+        // @ts-expect-error - partial data mocked
+        updateMetricTotals(new Date(), totals, mockSession)
       ).rejects.toThrow('db error')
     })
   })
@@ -331,5 +375,5 @@ describe('metrics-repository', () => {
 })
 
 /**
- * @import { FormOverviewMetric, FormTimelineMetric } from '@defra/forms-model'
+ * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
  */

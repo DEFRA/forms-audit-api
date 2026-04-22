@@ -21,10 +21,10 @@ const FORM_METRIC_CONTROL = 'form-metric-control'
 
 /**
  * Gets the metric collection
- * @returns {Collection<FormOverviewMetric | FormTimelineMetric | FormMetricControl>}
+ * @returns {Collection<FormOverviewMetric | FormTimelineMetric | FormTotalsMetric | FormMetricControl>}
  */
 function getMetricCollection() {
-  return /** @type {Collection<FormOverviewMetric | FormTimelineMetric | FormMetricControl>} */ (
+  return /** @type {Collection<FormOverviewMetric | FormTimelineMetric | FormTotalsMetric | FormMetricControl>} */ (
     db.collection(METRICS_COLLECTION_NAME)
   )
 }
@@ -92,7 +92,7 @@ export async function saveFormOverviewMetrics(
   try {
     await coll.updateOne(
       { type: FormMetricType.OverviewMetric, formId, formStatus },
-      { $set: { metricData } },
+      { $set: { ...metricData } },
       { upsert: true, session }
     )
   } catch (err) {
@@ -131,6 +131,49 @@ export async function getFormTimelineMetrics(formId, session) {
 }
 
 /**
+ * Get all overview metrics
+ * @param {ClientSession} session
+ * @returns {FindCursor<WithId<FormOverviewMetric>>}
+ */
+export function getAllOverviewMetrics(session) {
+  return /** @type {FindCursor<WithId<FormOverviewMetric>>} */ (
+    getAllMetricsOfType(FormMetricType.OverviewMetric, session)
+  )
+}
+
+/**
+ * Get all timeline metrics
+ * @param {ClientSession} session
+ * @returns {FindCursor<WithId<FormTimelineMetric>>}
+ */
+export function getAllTimelineMetrics(session) {
+  return /** @type {FindCursor<WithId<FormTimelineMetric>>} */ (
+    getAllMetricsOfType(FormMetricType.TimelineMetric, session)
+  )
+}
+
+/**
+ * Gets all metric records of the specified type.
+ * @param {FormMetricType} metricType
+ * @param {ClientSession} session
+ * @returns {FindCursor<WithId<FormOverviewMetric | FormTimelineMetric>>}
+ */
+export function getAllMetricsOfType(metricType, session) {
+  const coll = getMetricCollection()
+
+  try {
+    const cursor =
+      /** @type {FindCursor<WithId<FormOverviewMetric | FormTimelineMetric>>} */ (
+        coll.find({ type: metricType }, { session }).sort({ updatedAt: -1 })
+      )
+    return cursor
+  } catch (err) {
+    logger.error(err, `Failed to read all metrics - ${getErrorMessage(err)}`)
+    throw err
+  }
+}
+
+/**
  * Saves snapshot metric records for a form.
  * @param {string} formId
  * @param {FormTimelineMetric} metricData
@@ -153,6 +196,46 @@ export async function saveFormTimelineMetrics(formId, metricData, session) {
       err,
       `Failed to save tineline metrics for form id ${formId} - ${getErrorMessage(err)}`
     )
+    throw err
+  }
+}
+
+/**
+ * Gets metric totals record.
+ * @param {ClientSession} session
+ */
+export function getMetricTotals(session) {
+  const coll = getMetricCollection()
+
+  try {
+    return coll.findOne({ type: FormMetricType.TotalsMetric }, { session })
+  } catch (err) {
+    logger.error(err, `Failed to get totals metric - ${getErrorMessage(err)}`)
+    throw err
+  }
+}
+
+/**
+ * Saves snapshot metric records for a form.
+ * @param {Date} reportDate
+ * @param {FormTotalsMetric} totals
+ * @param {ClientSession} session
+ */
+export async function updateMetricTotals(reportDate, totals, session) {
+  const coll = getMetricCollection()
+
+  try {
+    totals.updatedAt = reportDate
+    await coll.deleteMany({ type: FormMetricType.TotalsMetric }, { session })
+    await coll.insertOne(
+      {
+        ...totals,
+        type: FormMetricType.TotalsMetric
+      },
+      { session }
+    )
+  } catch (err) {
+    logger.error(err, `Failed to save totals metric - ${getErrorMessage(err)}`)
     throw err
   }
 }
@@ -268,5 +351,5 @@ export async function releaseLock(success, message, session) {
 
 /**
  * @import { ClientSession, Collection, FindCursor, WithId } from 'mongodb'
- * @import { FormOverviewMetric, FormTimelineMetric } from '@defra/forms-model'
+ * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
  */
