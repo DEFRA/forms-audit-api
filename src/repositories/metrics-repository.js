@@ -90,15 +90,40 @@ export async function saveFormOverviewMetrics(
   const coll = getMetricCollection()
 
   try {
-    await coll.updateOne(
-      { type: FormMetricType.OverviewMetric, formId, formStatus },
-      { $set: { ...metricData } },
-      { upsert: true, session }
+    await coll.insertOne(
+      {
+        ...metricData,
+        formStatus
+      },
+      { session }
     )
   } catch (err) {
     logger.error(
       err,
-      `Failed to save overview metrics for form id ${formId} - ${getErrorMessage(err)}`
+      `Failed to save overview metrics for form id ${formId} status ${formStatus} - ${getErrorMessage(err)}`
+    )
+    throw err
+  }
+}
+
+/**
+ * Deletes overview metric records for all forms.
+ * @param {ClientSession} session
+ */
+export async function deleteFormOverviewMetrics(session) {
+  const coll = getMetricCollection()
+
+  try {
+    await coll.deleteMany(
+      {
+        type: FormMetricType.OverviewMetric
+      },
+      { session }
+    )
+  } catch (err) {
+    logger.error(
+      err,
+      `Failed to delete overview metrics for all forms - ${getErrorMessage(err)}`
     )
     throw err
   }

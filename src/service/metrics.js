@@ -7,6 +7,7 @@ import { createLogger } from '~/src/helpers/logging/logger.js'
 import { getJson } from '~/src/lib/fetch.js'
 import { client } from '~/src/mongo.js'
 import {
+  deleteFormOverviewMetrics,
   getAllOverviewMetrics,
   getAllTimelineMetrics,
   getMetricTotals,
@@ -102,6 +103,8 @@ export async function collectManagerOverviewMetrics(reportingDate, session) {
     /** @type {{ draft: Record<string, FormOverviewMetric>, live: Record<string, FormOverviewMetric>}} */ (
       body
     )
+
+  await deleteFormOverviewMetrics(session)
 
   for (const [formId, metrics] of Object.entries(metricsMap.draft)) {
     await saveFormOverviewMetrics(formId, FormStatus.Draft, metrics, session)

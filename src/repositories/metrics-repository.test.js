@@ -3,6 +3,7 @@ import { FormMetricName, FormMetricType, FormStatus } from '@defra/forms-model'
 import { buildMockCollection } from '~/src/api/forms/__stubs__/mongo.js'
 import { db } from '~/src/mongo.js'
 import {
+  deleteFormOverviewMetrics,
   getFormOverviewMetrics,
   getFormTimelineMetrics,
   grabLock,
@@ -105,6 +106,33 @@ describe('metrics-repository', () => {
     })
   })
 
+  describe('deleteFormOverviewMetrics', () => {
+    it('should delete docs', async () => {
+      mockCollection.deleteMany.mockResolvedValueOnce({})
+
+      await deleteFormOverviewMetrics(mockSession)
+
+      expect(mockCollection.deleteMany).toHaveBeenCalledWith(
+        {
+          type: 'overview-metric'
+        },
+        {
+          session: {}
+        }
+      )
+    })
+
+    it('should throw if error', async () => {
+      mockCollection.deleteMany.mockImplementationOnce(() => {
+        throw new Error('db error')
+      })
+
+      await expect(() =>
+        deleteFormOverviewMetrics(mockSession)
+      ).rejects.toThrow('db error')
+    })
+  })
+
   describe('saveFormOverviewMetrics', () => {
     const doc = /** @type {FormOverviewMetric} */ ({
       ...baseOverviewDoc
@@ -114,32 +142,24 @@ describe('metrics-repository', () => {
 
       await saveFormOverviewMetrics(formId, FormStatus.Draft, doc, mockSession)
 
-      expect(mockCollection.updateOne).toHaveBeenCalledWith(
+      expect(mockCollection.insertOne).toHaveBeenCalledWith(
         {
+          featureCounts: {},
           formId: '3d29fb0b-c1bd-4ec8-a0d3-4c024347f1ef',
           formStatus: 'draft',
-          type: 'overview-metric'
+          submissionsCount: 0,
+          summaryMetrics: {},
+          type: 'overview-metric',
+          updatedAt: new Date('2026-02-01T00:00:00.000Z')
         },
         {
-          $set: {
-            featureCounts: {},
-            formId: '3d29fb0b-c1bd-4ec8-a0d3-4c024347f1ef',
-            formStatus: 'draft',
-            submissionsCount: 0,
-            summaryMetrics: {},
-            type: 'overview-metric',
-            updatedAt: new Date('2026-02-01T00:00:00.000Z')
-          }
-        },
-        {
-          session: {},
-          upsert: true
+          session: {}
         }
       )
     })
 
     it('should throw if error', async () => {
-      mockCollection.updateOne.mockImplementationOnce(() => {
+      mockCollection.insertOne.mockImplementationOnce(() => {
         throw new Error('db error')
       })
 
