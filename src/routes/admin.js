@@ -16,10 +16,6 @@ const messageIdSchema = Joi.object({
   messageId: Joi.string().required()
 })
 
-const receiptHandleSchema = Joi.object({
-  receiptHandle: Joi.string().required()
-})
-
 export default [
   /**
    * @satisfies {ServerRoute}
@@ -58,16 +54,17 @@ export default [
   }),
 
   /**
-   * @satisfies {ServerRoute<{ Params: { messageId: string }, Payload: { receiptHandle: string } }>}
+   * @satisfies {ServerRoute<{ Params: { messageId: string } }>}
    */
   ({
     method: 'DELETE',
     path: '/admin/deadletter/{messageId}',
     async handler(request, h) {
-      const { params, payload } = request
-      logger.info(`Deleting DLQ message ${params.messageId}`)
-      await deleteDlqMessage(payload.receiptHandle)
-      logger.info(`Deleted DLQ message ${params.messageId}`)
+      const { params } = request
+      const { messageId } = params
+      logger.info(`Deleting DLQ message ${messageId}`)
+      await deleteDlqMessage(messageId)
+      logger.info(`Deleted DLQ message ${messageId}`)
       return h.response({ message: 'success' }).code(OK_RESPONSE)
     },
     options: {
@@ -75,8 +72,7 @@ export default [
         scope: [`+${Scopes.DeadLetterQueues}`]
       },
       validate: {
-        params: messageIdSchema,
-        payload: receiptHandleSchema
+        params: messageIdSchema
       }
     }
   })
