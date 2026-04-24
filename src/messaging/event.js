@@ -5,6 +5,7 @@ import {
 } from '@aws-sdk/client-sqs'
 
 import { config } from '~/src/config/index.js'
+import { createLogger } from '~/src/helpers/logging/logger.js'
 import { sqsClient } from '~/src/messaging/sqs.js'
 
 export const receiveMessageTimeout = config.get('receiveMessageTimeout')
@@ -13,6 +14,8 @@ const deadLetterQueueUrl = `${queueUrl}-deadletter`
 const deadLetterQueueArn = config.get('sqsEventsDlqArn')
 const maxNumberOfMessages = config.get('maxNumberOfMessages')
 const visibilityTimeout = config.get('visibilityTimeout')
+
+const logger = createLogger()
 
 /**
  * @type {ReceiveMessageCommandInput}
@@ -58,17 +61,41 @@ export function redriveDlqMessages() {
 }
 
 /**
- * Delete DLQ message
- * @param {string} receiptHandle
- * @returns {Promise<DeleteMessageCommandOutput>}
+ * Delete DLQ message by messageId
+ * This has to be done as a combined 'read then delete' (while using a visibility timeout of non-zero)
+ * otherwise the receipt handles become stale and the delete operation doesn't work.
+ * @param {string} messageId
  */
-export function deleteDlqMessage(receiptHandle) {
-  const command = new DeleteMessageCommand({
+export async function deleteDlqMessage(messageId) {
+  const receiveCommand = new ReceiveMessageCommand({
     QueueUrl: deadLetterQueueUrl,
-    ReceiptHandle: receiptHandle
+    MaxNumberOfMessages: 10,
+    VisibilityTimeout: 2,
+    WaitTimeSeconds: 0
   })
+  const messageResponse = await sqsClient.send(receiveCommand)
 
-  return sqsClient.send(command)
+  const messages = messageResponse.Messages
+    ? messageResponse.Messages.filter((m) => m.MessageId === messageId)
+    : undefined
+  if (!messages?.length) {
+    const errorText = `Message with id ${messageId} not found in audit-api DLQ`
+    logger.info(errorText)
+    throw new Error(errorText)
+  }
+
+  logger.info(
+    `[DLQ] Number of messages found with id ${messageId}: ${messages.length}`
+  )
+  for (const message of messages) {
+    const deleteCommand = new DeleteMessageCommand({
+      QueueUrl: deadLetterQueueUrl,
+      ReceiptHandle: message.ReceiptHandle
+    })
+    logger.info(`[DLQ] Deleting message with id ${messageId}`)
+    await sqsClient.send(deleteCommand)
+    logger.info(`[DLQ] Deleted message with id ${messageId}`)
+  }
 }
 
 /**
