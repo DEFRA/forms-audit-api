@@ -264,7 +264,7 @@ export const config = convict({
   },
   /**@type {SchemaObj<string>} */
   metricsCrontab: {
-    doc: 'Crontab entry for triggering the metrics collation job ',
+    doc: 'Crontab entry for triggering the metrics collation job',
     format: String,
     default: '0 3 * * *',
     env: 'METRICS_CRONTAB'

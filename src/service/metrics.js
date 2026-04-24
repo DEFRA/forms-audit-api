@@ -49,12 +49,21 @@ export async function runMetricsCollectionJob() {
       result.success = true
       result.message = 'Completed ok'
     })
+    await releaseLock(result.success, result.message, session)
   } catch (err) {
     const message = getErrorMessage(err)
     logger.error(err, `[metrics] metrics job failed - ${message}`)
     result.message = message
+    try {
+      await releaseLock(result.success, result.message, session)
+    } catch (err2) {
+      logger.error(
+        err2,
+        `[metrics] release lock failed - ${getErrorMessage(err2)}`
+      )
+    }
   } finally {
-    await releaseLock(result.success, result.message, session)
+    await session.endSession()
   }
 
   logger.info('[metrics] metrics job finished')
@@ -73,18 +82,20 @@ export async function collectMetrics(jobStart, lastSuccessfulRunDate, session) {
   // Make a call for each day since last job run
   // (Normally only one day but also handles full historical data population on first run)
   const yesterday = startOfDay(sub(jobStart, { days: 1 }))
-  let reportDate = lastSuccessfulRunDate ?? new Date('2025-01-01T00:00:00.000Z')
-  do {
+  let reportDate = startOfDay(
+    lastSuccessfulRunDate ?? new Date('2025-01-01T00:00:00.000Z')
+  )
+  while (reportDate <= yesterday) {
     logger.info(
       `[metrics] getting timeline metrics for ${reportDate.toDateString()}`
     )
     await collectTimelineMetrics(managerUrl, reportDate, session)
     await collectTimelineMetrics(submissionUrl, reportDate, session)
     reportDate = add(reportDate, { days: 1 })
-  } while (reportDate < yesterday)
+  }
 
-  const totals = await recalcMetricTotals(reportDate, session)
-  await updateMetricTotals(reportDate, totals, session)
+  const totals = await recalcMetricTotals(yesterday, session)
+  await updateMetricTotals(yesterday, totals, session)
 }
 
 /**
@@ -219,14 +230,16 @@ export async function recalcMetricTotals(reportingDate, session) {
 export async function generateReport() {
   const session = client.startSession()
 
-  // Overview
-  const overview = await getAllOverviewMetrics(session).toArray()
-
-  const totals = await getMetricTotals(session)
-
-  return {
-    overview,
-    totals
+  try {
+    // Overview
+    const overview = await getAllOverviewMetrics(session).toArray()
+    const totals = await getMetricTotals(session)
+    return {
+      overview,
+      totals
+    }
+  } finally {
+    await session.endSession()
   }
 }
 

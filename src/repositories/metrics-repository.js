@@ -143,7 +143,7 @@ export async function getFormTimelineMetrics(formId, session) {
       /** @type {FindCursor<WithId<FormTimelineMetric>>} */ (
         coll
           .find({ formId, type: FormMetricType.TimelineMetric }, { session })
-          .sort({ updatedAt: -1 })
+          .sort({ createdAt: -1 })
       )
     return await timelineRecords.toArray()
   } catch (err) {
@@ -219,7 +219,7 @@ export async function saveFormTimelineMetrics(formId, metricData, session) {
   } catch (err) {
     logger.error(
       err,
-      `Failed to save tineline metrics for form id ${formId} - ${getErrorMessage(err)}`
+      `Failed to save timeline metrics for form id ${formId} - ${getErrorMessage(err)}`
     )
     throw err
   }
