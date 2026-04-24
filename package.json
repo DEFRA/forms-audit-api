@@ -37,9 +37,9 @@
     "setup:husky": "node -e \"try { (await import('husky')).default() } catch (e) { if (e.code !== 'ERR_MODULE_NOT_FOUND') throw e }\" --input-type module"
   },
   "dependencies": {
-    "@aws-sdk/client-sqs": "3.1002.0",
+    "@aws-sdk/client-sqs": "3.1031.0",
     "@defra/cdp-auditing": "0.6.0",
-    "@defra/forms-model": "3.0.647",
+    "@defra/forms-model": "3.0.649",
     "@defra/hapi-tracing": "^1.26.0",
     "@elastic/ecs-pino-format": "^1.5.0",
     "@hapi/hapi": "^21.4.6",
@@ -68,7 +68,7 @@
     "@types/eslint": "^9.6.1",
     "@types/jest": "^30.0.0",
     "@types/luxon": "^3.6.2",
-    "@types/node": "^25.5.0",
+    "@types/node": "^25.6.0",
     "@types/slug": "^5.0.9",
     "aws-sdk-client-mock": "4.1.0",
     "aws-sdk-client-mock-jest": "4.1.0",
