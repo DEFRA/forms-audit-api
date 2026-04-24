@@ -313,7 +313,8 @@ describe('metrics-repository', () => {
     })
 
     it('should succeed and update lock', async () => {
-      mockCollection.findOne.mockResolvedValueOnce({
+      // findOneAndUpdate returns the document BEFORE the update when lock was false
+      mockCollection.findOneAndUpdate.mockResolvedValueOnce({
         locked: false,
         lastSuccessfulRunDate: new Date('2026-05-10T00:00:00.000Z')
       })
@@ -321,7 +322,8 @@ describe('metrics-repository', () => {
       const result = await grabLock(mockSession)
 
       expect(mockCollection.insertOne).not.toHaveBeenCalled()
-      expect(mockCollection.updateOne).toHaveBeenCalled()
+      expect(mockCollection.findOneAndUpdate).toHaveBeenCalled()
+      expect(mockCollection.findOne).not.toHaveBeenCalled()
 
       expect(result).toEqual({
         lockSuccess: true,

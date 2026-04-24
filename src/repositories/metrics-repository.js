@@ -272,56 +272,59 @@ export async function updateMetricTotals(reportDate, totals, session) {
  */
 export async function grabLock(session) {
   const coll = getMetricCollection()
-
   const now = new Date()
 
   try {
+    // Atomically try to grab the lock on existing record
+    // Returns the document BEFORE update (or null if no match)
     const controlRecord = /** @type { WithId<FormMetricControl> | null } */ (
-      await coll.findOne({ type: FORM_METRIC_CONTROL }, { session })
+      await coll.findOneAndUpdate(
+        { type: FORM_METRIC_CONTROL, locked: false },
+        {
+          $set: {
+            locked: true,
+            jobStart: now,
+            jobEnd: null,
+            updatedAt: now
+          }
+        },
+        { returnDocument: 'before', session }
+      )
     )
 
-    // Insert if the first time
+    // No record found - could be first deploy or record is locked
     if (!controlRecord) {
-      const firstLock = {
-        type: FORM_METRIC_CONTROL,
-        locked: true,
-        jobStart: now,
-        jobEnd: null,
-        lastSuccessfulRunDate: null,
-        lastRunResult: '',
-        updatedAt: now
-      }
-      await coll.insertOne(firstLock, { session })
-      return {
-        lockSuccess: true,
-        lastSuccessfulRun: null
-      }
-    }
+      // Check if record exists at all
+      const existing = /** @type { WithId<FormMetricControl> | null } */ (
+        await coll.findOne({ type: FORM_METRIC_CONTROL }, { session })
+      )
 
-    // Another container already has the lock
-    if (controlRecord.locked) {
-      return {
-        lockSuccess: false,
-        lastSuccessfulRun: controlRecord.lastSuccessfulRunDate
-      }
-    }
-
-    await coll.updateOne(
-      {
-        type: FORM_METRIC_CONTROL
-      },
-      {
-        $set: {
+      // First deploy - record doesn't exist, create it with lock
+      if (!existing) {
+        const firstLock = {
+          type: FORM_METRIC_CONTROL,
           locked: true,
           jobStart: now,
           jobEnd: null,
+          lastSuccessfulRunDate: null,
+          lastRunResult: '',
           updatedAt: now
         }
-      },
-      {
-        session
+        await coll.insertOne(firstLock, { session })
+        return {
+          lockSuccess: true,
+          lastSuccessfulRun: null
+        }
       }
-    )
+
+      // Record exists but is already locked by another container
+      return {
+        lockSuccess: false,
+        lastSuccessfulRun: existing.lastSuccessfulRunDate
+      }
+    }
+
+    // Successfully grabbed the lock (record existed and was unlocked)
     return {
       lockSuccess: true,
       lastSuccessfulRun: controlRecord.lastSuccessfulRunDate
