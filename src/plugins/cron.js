@@ -6,26 +6,63 @@ import { createLogger } from '~/src/helpers/logging/logger.js'
 import { runMetricsCollectionJob } from '~/src/service/metrics.js'
 
 const logger = createLogger()
+
 /**
+ * Cron plugin for collecting metrics
+ * @satisfies {ServerRegisterPluginObject<void>}
+ */
+export const cronPlugin = {
+  plugin: {
+    name: 'cron-metrics',
+    version: '1.0.0',
+    register(server) {
+      const scheduledTask = cron.schedule(
+        config.get('metricsCrontab'),
+        async () => {
+          try {
+            logger.info('[Cron] Starting metircs collection')
+            await runMetricsCollectionJob()
+            logger.info('[Cron] Finished metircs collection')
+          } catch (err) {
+            logger.error(
+              err,
+              `[Cron] Error running metrics collection - ${getErrorMessage(err)}`
+            )
+          }
+        },
+        {
+          timezone: 'Europe/London'
+        }
+      )
+
+      // Stop the cron job when the server stops
+      server.ext('onPreStop', () => {
+        logger.info('[Cron] Stopping metrics cron job')
+        const stopResult = scheduledTask.stop()
+        // Handle both Promise and void return types
+        if (stopResult && typeof stopResult.then === 'function') {
+          stopResult.catch(() => {
+            // Ignore errors during shutdown
+          })
+        }
+        logger.info('[Cron] Metrics cron job stopped')
+      })
+    }
+  }
+}
+
+/**
+ * @import { ServerRegisterPluginObject } from '@hapi/hapi'
+ * @import { ScheduledTask } from 'node-cron'
+ */
+
+/**
+ * @deprecated Use cronPlugin instead
  * Configure the regular job that collects metrics
  */
 export function setupCron() {
-  cron.schedule(
-    config.get('metricsCrontab'),
-    async () => {
-      try {
-        logger.info('[Cron] Starting metircs collection')
-        await runMetricsCollectionJob()
-        logger.info('[Cron] Finished metircs collection')
-      } catch (err) {
-        logger.error(
-          err,
-          `[Cron] Error running metrics collection - ${getErrorMessage(err)}`
-        )
-      }
-    },
-    {
-      timezone: 'Europe/London'
-    }
+  // eslint-disable-next-line no-console
+  console.warn(
+    'setupCron() is deprecated. Use server.register(cronPlugin) instead.'
   )
 }

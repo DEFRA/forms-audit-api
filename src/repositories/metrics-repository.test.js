@@ -68,7 +68,7 @@ describe('metrics-repository', () => {
     formId,
     formStatus: FormStatus.Draft,
     summaryMetrics: {},
-    featureCounts: {},
+    featureMetrics: {},
     submissionsCount: 0,
     updatedAt: new Date('2026-02-01T00:00:00.000Z')
   }
@@ -144,7 +144,7 @@ describe('metrics-repository', () => {
 
       expect(mockCollection.insertOne).toHaveBeenCalledWith(
         {
-          featureCounts: {},
+          featureMetrics: {},
           formId: '3d29fb0b-c1bd-4ec8-a0d3-4c024347f1ef',
           formStatus: 'draft',
           submissionsCount: 0,
