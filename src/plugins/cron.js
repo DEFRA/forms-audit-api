@@ -20,9 +20,9 @@ export const cronPlugin = {
         config.get('metricsCrontab'),
         async () => {
           try {
-            logger.info('[Cron] Starting metircs collection')
+            logger.info('[Cron] Starting metrics collection')
             await runMetricsCollectionJob()
-            logger.info('[Cron] Finished metircs collection')
+            logger.info('[Cron] Finished metrics collection')
           } catch (err) {
             logger.error(
               err,
