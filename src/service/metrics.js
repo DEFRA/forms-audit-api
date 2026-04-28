@@ -154,6 +154,15 @@ export function updateMetricTotal(metric, period) {
 }
 
 /**
+ * @param {Date} date
+ * @param {Date} startOfRange
+ * @param {Date} endOfRange
+ */
+function dateFallsInsideTimeslot(date, startOfRange, endOfRange) {
+  return date >= startOfRange && date < endOfRange
+}
+
+/**
  * Update metric totals
  * @param {Date} reportingDate
  * @param {ClientSession} session
@@ -186,27 +195,27 @@ export async function recalcMetricTotals(reportingDate, session) {
     // Update windowed totals
     const createdAt = new Date(metric.createdAt)
     // Last 7 days
-    if (createdAt >= sevenDaysAgo && createdAt < reportMorning) {
+    if (dateFallsInsideTimeslot(createdAt, sevenDaysAgo, reportMorning)) {
       updateMetricTotal(metric, totals.last7Days)
     }
     // Previous 7 days
-    if (createdAt >= fourteenDaysAgo && createdAt < sevenDaysAgo) {
+    if (dateFallsInsideTimeslot(createdAt, fourteenDaysAgo, sevenDaysAgo)) {
       updateMetricTotal(metric, totals.prev7Days)
     }
     // Last 30 days
-    if (createdAt >= thirtyDaysAgo && createdAt < reportMorning) {
+    if (dateFallsInsideTimeslot(createdAt, thirtyDaysAgo, reportMorning)) {
       updateMetricTotal(metric, totals.last30Days)
     }
     // Previous 30 days
-    if (createdAt >= sixtyDaysAgo && createdAt < thirtyDaysAgo) {
+    if (dateFallsInsideTimeslot(createdAt, sixtyDaysAgo, thirtyDaysAgo)) {
       updateMetricTotal(metric, totals.prev30Days)
     }
     // Last year
-    if (createdAt >= oneYearAgo && createdAt < reportMorning) {
+    if (dateFallsInsideTimeslot(createdAt, oneYearAgo, reportMorning)) {
       updateMetricTotal(metric, totals.lastYear)
     }
     // Previous year
-    if (createdAt >= twoYearsAgo && createdAt < oneYearAgo) {
+    if (dateFallsInsideTimeslot(createdAt, twoYearsAgo, oneYearAgo)) {
       updateMetricTotal(metric, totals.prevYear)
     }
     // All time
