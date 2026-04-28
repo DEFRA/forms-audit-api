@@ -4,8 +4,12 @@ import { buildMockCollection } from '~/src/api/forms/__stubs__/mongo.js'
 import { db } from '~/src/mongo.js'
 import {
   deleteFormOverviewMetrics,
+  getAllMetricsOfType,
+  getAllOverviewMetrics,
+  getAllTimelineMetrics,
   getFormOverviewMetrics,
   getFormTimelineMetrics,
+  getMetricTotals,
   grabLock,
   releaseLock,
   saveFormOverviewMetrics,
@@ -392,6 +396,65 @@ describe('metrics-repository', () => {
       await expect(() => releaseLock(true, 'ok', mockSession)).rejects.toThrow(
         'db error'
       )
+    })
+  })
+
+  describe('getAllxxxxMetrics', () => {
+    it('should get all overview metrics', () => {
+      mockCollection.find.mockReturnValueOnce({
+        sort: jest.fn(() => {
+          return { cursor: {} }
+        })
+      })
+      const res = getAllOverviewMetrics(mockSession)
+      expect(res).toEqual({ cursor: {} })
+    })
+
+    it('should get all timeline metrics', () => {
+      mockCollection.find.mockReturnValueOnce({
+        sort: jest.fn(() => {
+          return { cursor: {} }
+        })
+      })
+      const res = getAllTimelineMetrics(mockSession)
+      expect(res).toEqual({ cursor: {} })
+    })
+
+    it('should get metrics of type', () => {
+      mockCollection.find.mockReturnValueOnce({
+        sort: jest.fn(() => {
+          return { cursor: {} }
+        })
+      })
+      const res = getAllMetricsOfType(
+        FormMetricType.OverviewMetric,
+        mockSession
+      )
+      expect(res).toEqual({ cursor: {} })
+    })
+
+    it('should throw if error when getting metrics of type', () => {
+      mockCollection.find.mockReturnValueOnce({
+        sort: jest.fn().mockImplementationOnce(() => {
+          throw new Error('Bad cursor')
+        })
+      })
+      expect(() =>
+        getAllMetricsOfType(FormMetricType.OverviewMetric, mockSession)
+      ).toThrow('Bad cursor')
+    })
+
+    it('should get metrics totals', () => {
+      mockCollection.findOne.mockReturnValueOnce({ cursor: {} })
+      const res = getMetricTotals(mockSession)
+      expect(res).toEqual({ cursor: {} })
+    })
+
+    it('should throw if error when getting metrics totals', () => {
+      mockCollection.findOne.mockImplementationOnce(() => {
+        throw new Error('Bad cursor')
+      })
+      expect(() => getMetricTotals(mockSession)).toThrow('Bad cursor')
     })
   })
 })

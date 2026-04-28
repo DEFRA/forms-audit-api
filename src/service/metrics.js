@@ -49,20 +49,12 @@ export async function runMetricsCollectionJob() {
       result.success = true
       result.message = 'Completed ok'
     })
-    await releaseLock(result.success, result.message, session)
   } catch (err) {
     const message = getErrorMessage(err)
     logger.error(err, `[metrics] metrics job failed - ${message}`)
     result.message = message
-    try {
-      await releaseLock(result.success, result.message, session)
-    } catch (err2) {
-      logger.error(
-        err2,
-        `[metrics] release lock failed - ${getErrorMessage(err2)}`
-      )
-    }
   } finally {
+    await releaseLock(result.success, result.message, session)
     await session.endSession()
   }
 

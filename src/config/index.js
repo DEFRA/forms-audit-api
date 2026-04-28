@@ -266,7 +266,7 @@ export const config = convict({
   metricsCrontab: {
     doc: 'Crontab entry for triggering the metrics collation job',
     format: String,
-    default: '0 3 * * *',
+    default: null,
     env: 'METRICS_CRONTAB'
   }
 })

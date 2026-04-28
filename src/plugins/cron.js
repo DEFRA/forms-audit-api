@@ -53,16 +53,4 @@ export const cronPlugin = {
 
 /**
  * @import { ServerRegisterPluginObject } from '@hapi/hapi'
- * @import { ScheduledTask } from 'node-cron'
  */
-
-/**
- * @deprecated Use cronPlugin instead
- * Configure the regular job that collects metrics
- */
-export function setupCron() {
-  // eslint-disable-next-line no-console
-  console.warn(
-    'setupCron() is deprecated. Use server.register(cronPlugin) instead.'
-  )
-}

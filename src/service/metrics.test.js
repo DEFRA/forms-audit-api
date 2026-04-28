@@ -1,9 +1,22 @@
+import { FormMetricName, FormMetricType, FormStatus } from '@defra/forms-model'
 import { startOfDay, sub } from 'date-fns'
 
 import { getJson } from '~/src/lib/fetch.js'
 import { client } from '~/src/mongo.js'
-import { grabLock, releaseLock } from '~/src/repositories/metrics-repository.js'
-import { runMetricsCollectionJob } from '~/src/service/metrics.js'
+import {
+  getAllTimelineMetrics,
+  grabLock,
+  releaseLock,
+  saveFormOverviewMetrics,
+  saveFormTimelineMetrics
+} from '~/src/repositories/metrics-repository.js'
+import {
+  collectManagerOverviewMetrics,
+  collectTimelineMetrics,
+  recalcMetricTotals,
+  runMetricsCollectionJob,
+  updateMetricTotal
+} from '~/src/service/metrics.js'
 
 jest.mock('~/src/lib/fetch.js')
 jest.mock('~/src/repositories/metrics-repository.js')
@@ -15,6 +28,23 @@ jest.mock('~/src/mongo.js', () => ({
   db: {},
   METRICS_COLLECTION_NAME: 'metrics'
 }))
+
+/**
+ * @param {string} metricName
+ * @param {FormStatus} formStatus
+ * @param {string} dateStr
+ * @param {number} metricValue
+ */
+function createTimelineMetric(metricName, formStatus, dateStr, metricValue) {
+  /** @type {FormTimelineMetric} */
+  return {
+    type: FormMetricType.TimelineMetric,
+    formStatus,
+    metricName,
+    createdAt: new Date(dateStr),
+    metricValue
+  }
+}
 
 describe('runMetricsCollectionJob', () => {
   /** @type {any} */
@@ -80,6 +110,18 @@ describe('runMetricsCollectionJob', () => {
       .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
       .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
 
+    const timelineMetrics = /** @type {FormTimelineMetric[]} */ ([])
+    const mockAsyncIterator = {
+      [Symbol.asyncIterator]: function* () {
+        for (const metric of timelineMetrics) {
+          yield metric
+        }
+      }
+    }
+
+    // @ts-expect-error - resolves to an async iterator like FindCursor<FormSubmissionDocument>
+    jest.mocked(getAllTimelineMetrics).mockReturnValueOnce(mockAsyncIterator)
+
     await runMetricsCollectionJob()
     expect(getJson).toHaveBeenCalledTimes(3)
     expect(getJson).toHaveBeenNthCalledWith(
@@ -131,8 +173,201 @@ describe('runMetricsCollectionJob', () => {
       expect.anything()
     )
   })
+
+  describe('collectManagerOverviewMetrics', () => {
+    it('should save each metric', async () => {
+      jest.mocked(getJson).mockResolvedValueOnce({
+        response: {},
+        body: {
+          draft: [{ draftProperty: 123 }],
+          live: [{ liveProperty: 123 }]
+        }
+      })
+
+      await collectManagerOverviewMetrics(new Date(), mockSession)
+      expect(saveFormOverviewMetrics).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('collectTimelineMetrics', () => {
+    it('should save each metric', async () => {
+      jest.mocked(getJson).mockResolvedValueOnce({
+        response: {},
+        body: {
+          timeline: [{ timelineProperty1: 123 }, { timelineProperty2: 456 }]
+        }
+      })
+
+      await collectTimelineMetrics(
+        'http://localhost/base-url',
+        new Date(),
+        mockSession
+      )
+      expect(saveFormTimelineMetrics).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('updateMetricTotal', () => {
+    /** @type {FormTimelineMetric} */
+    const metric = {
+      type: FormMetricType.TimelineMetric,
+      formId: 'form-id',
+      formStatus: FormStatus.Draft,
+      metricName: 'metricName',
+      metricValue: 5,
+      createdAt: new Date()
+    }
+
+    it('should ignore if no period', () => {
+      const period = undefined
+      const expectedPeriod = undefined
+      updateMetricTotal(metric, period)
+      expect(period).toEqual(expectedPeriod)
+    })
+
+    it('should set initial count for metric name if not yet set', () => {
+      const period = { unknown: { count: 2 } }
+      const expectedPeriod = { metricName: { count: 5 }, unknown: { count: 2 } }
+      updateMetricTotal(metric, period)
+      expect(period).toEqual(expectedPeriod)
+    })
+
+    it('should add total for metric name', () => {
+      const period = { metricName: { count: 3 } }
+      const expectedPeriod = { metricName: { count: 8 } } // 3 + inital metric value of 5
+      updateMetricTotal(metric, period)
+      expect(period).toEqual(expectedPeriod)
+    })
+  })
+
+  describe('recalcMetricTotals', () => {
+    it('should apportion timeline metrics into appropriate time windows', async () => {
+      const timelineMetrics = /** @type {FormTimelineMetric[]} */ ([
+        {
+          type: FormMetricType.TimelineMetric,
+          formId: 'form-id',
+          metricName: FormMetricName.Submissions,
+          metricValue: 1
+        },
+        // Within last 7 days
+        createTimelineMetric(
+          FormMetricName.NewFormsCreated,
+          FormStatus.Draft,
+          '2025-12-27',
+          1
+        ),
+        createTimelineMetric(
+          FormMetricName.NewFormsCreated,
+          FormStatus.Draft,
+          '2025-12-28',
+          3
+        ),
+        createTimelineMetric(
+          FormMetricName.NewFormsCreated,
+          FormStatus.Draft,
+          '2025-12-29',
+          2
+        ),
+        // Previous 7 days i.e. days 7 - 14 ago
+        createTimelineMetric(
+          FormMetricName.NewFormsCreated,
+          FormStatus.Draft,
+          '2025-12-20',
+          7
+        ),
+        createTimelineMetric(
+          FormMetricName.NewFormsCreated,
+          FormStatus.Draft,
+          '2025-12-21',
+          2
+        ),
+        // Prev 30 days
+        createTimelineMetric(
+          FormMetricName.NewFormsCreated,
+          FormStatus.Draft,
+          '2025-11-15',
+          1
+        ),
+        createTimelineMetric(
+          FormMetricName.NewFormsCreated,
+          FormStatus.Draft,
+          '2025-11-25',
+          3
+        ),
+        // Previous year
+        createTimelineMetric(
+          FormMetricName.FormsPublished,
+          FormStatus.Draft,
+          '2024-05-03',
+          3
+        )
+      ])
+      const mockAsyncIterator = {
+        [Symbol.asyncIterator]: function* () {
+          for (const metric of timelineMetrics) {
+            yield metric
+          }
+        }
+      }
+
+      // @ts-expect-error - resolves to an async iterator like FindCursor<FormSubmissionDocument>
+      jest.mocked(getAllTimelineMetrics).mockReturnValueOnce(mockAsyncIterator)
+
+      const totals = await recalcMetricTotals(
+        new Date('2026-01-01'),
+        mockSession
+      )
+
+      expect(totals).toEqual({
+        last7Days: {
+          NewFormsCreated: {
+            count: 6
+          }
+        },
+        prev7Days: {
+          NewFormsCreated: {
+            count: 9
+          }
+        },
+        last30Days: {
+          NewFormsCreated: {
+            count: 15
+          }
+        },
+        prev30Days: {
+          NewFormsCreated: {
+            count: 4
+          }
+        },
+        lastYear: {
+          NewFormsCreated: {
+            count: 19
+          }
+        },
+        prevYear: {
+          FormsPublished: {
+            count: 3
+          }
+        },
+        allTime: {
+          Submissions: {
+            count: 1
+          },
+          FormsPublished: {
+            count: 3
+          },
+          NewFormsCreated: {
+            count: 19
+          }
+        },
+        submissions: {
+          'form-id': 1
+        }
+      })
+    })
+  })
 })
 
 /**
- * @import { MongoClient } from 'mongodb'
+ * @import { FormTimelineMetric } from '@defra/forms-model'
  */

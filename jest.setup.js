@@ -38,3 +38,4 @@ process.env.SQS_MAX_NUMBER_OF_MESSAGES = '10'
 process.env.SQS_VISIBILITY_TIMEOUT = '30'
 
 process.env.CACHE_ENABLED = 'true'
+process.env.METRICS_CRONTAB = '* 3 * * *'
