@@ -167,6 +167,16 @@ function dateFallsInsideTimeslot(date, startOfRange, endOfRange) {
 }
 
 /**
+ * @param {FormTimelineMetric} metric
+ */
+function isLiveSubmission(metric) {
+  return (
+    metric.metricName === FormMetricName.Submissions.toString() &&
+    metric.formStatus === FormStatus.Live
+  )
+}
+
+/**
  * Update metric totals
  * @param {Date} reportingDate
  * @param {ClientSession} session
@@ -192,11 +202,8 @@ export async function recalcMetricTotals(reportingDate, session) {
     allTime: {}
   })
   for await (const metric of getAllTimelineMetrics(session)) {
-    // Live submissions
-    if (
-      metric.metricName === FormMetricName.Submissions.toString() &&
-      metric.formStatus === FormStatus.Live
-    ) {
+    // Live submissions only
+    if (isLiveSubmission(metric)) {
       const formTotalSoFar = formSubmissionsMap.get(metric.formId) ?? 0
       formSubmissionsMap.set(metric.formId, formTotalSoFar + metric.metricValue)
     }
