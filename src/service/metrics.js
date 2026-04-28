@@ -1,4 +1,4 @@
-import { FormStatus } from '@defra/forms-model'
+import { FormMetricName, FormStatus } from '@defra/forms-model'
 import { add, startOfDay, sub, subDays, subYears } from 'date-fns'
 
 import { config } from '~/src/config/index.js'
@@ -142,7 +142,11 @@ export async function collectTimelineMetrics(baseUrl, reportingDate, session) {
  */
 export function updateMetricTotal(metric, period) {
   const metricName = metric.metricName
-  if (!period) {
+  if (
+    !period ||
+    (metric.metricName === FormMetricName.Submissions.toString() &&
+      metric.formStatus !== FormStatus.Live)
+  ) {
     return
   }
   if (metricName in period && 'count' in period[metricName]) {
@@ -188,7 +192,11 @@ export async function recalcMetricTotals(reportingDate, session) {
     allTime: {}
   })
   for await (const metric of getAllTimelineMetrics(session)) {
-    if (metric.metricName === 'Submissions') {
+    // Live submissions
+    if (
+      metric.metricName === FormMetricName.Submissions.toString() &&
+      metric.formStatus === FormStatus.Live
+    ) {
       const formTotalSoFar = formSubmissionsMap.get(metric.formId) ?? 0
       formSubmissionsMap.set(metric.formId, formTotalSoFar + metric.metricValue)
     }

@@ -246,8 +246,26 @@ describe('runMetricsCollectionJob', () => {
         {
           type: FormMetricType.TimelineMetric,
           formId: 'form-id',
+          formStatus: FormStatus.Draft,
           metricName: FormMetricName.Submissions,
-          metricValue: 1
+          metricValue: 1,
+          createdAt: new Date('2025-12-28')
+        },
+        {
+          type: FormMetricType.TimelineMetric,
+          formId: 'form-id',
+          formStatus: FormStatus.Live,
+          metricName: FormMetricName.Submissions,
+          metricValue: 6,
+          createdAt: new Date('2025-12-29')
+        },
+        {
+          type: FormMetricType.TimelineMetric,
+          formId: 'form-id',
+          formStatus: FormStatus.Live,
+          metricName: FormMetricName.Submissions,
+          metricValue: 1,
+          createdAt: new Date('2025-11-20')
         },
         // Within last 7 days
         createTimelineMetric(
@@ -322,6 +340,9 @@ describe('runMetricsCollectionJob', () => {
         last7Days: {
           NewFormsCreated: {
             count: 6
+          },
+          Submissions: {
+            count: 6
           }
         },
         prev7Days: {
@@ -332,16 +353,25 @@ describe('runMetricsCollectionJob', () => {
         last30Days: {
           NewFormsCreated: {
             count: 15
+          },
+          Submissions: {
+            count: 6
           }
         },
         prev30Days: {
           NewFormsCreated: {
             count: 4
+          },
+          Submissions: {
+            count: 1
           }
         },
         lastYear: {
           NewFormsCreated: {
             count: 19
+          },
+          Submissions: {
+            count: 7
           }
         },
         prevYear: {
@@ -351,7 +381,7 @@ describe('runMetricsCollectionJob', () => {
         },
         allTime: {
           Submissions: {
-            count: 1
+            count: 7
           },
           FormsPublished: {
             count: 3
@@ -361,7 +391,7 @@ describe('runMetricsCollectionJob', () => {
           }
         },
         submissions: {
-          'form-id': 1
+          'form-id': 7
         }
       })
     })
