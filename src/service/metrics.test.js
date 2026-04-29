@@ -267,6 +267,14 @@ describe('runMetricsCollectionJob', () => {
           metricValue: 1,
           createdAt: new Date('2025-11-20')
         },
+        {
+          type: FormMetricType.TimelineMetric,
+          formId: 'form-id',
+          formStatus: FormStatus.Draft,
+          metricName: FormMetricName.Submissions,
+          metricValue: 2,
+          createdAt: new Date('2025-11-02')
+        },
         // Within last 7 days
         createTimelineMetric(
           FormMetricName.NewFormsCreated,
@@ -390,7 +398,10 @@ describe('runMetricsCollectionJob', () => {
             count: 19
           }
         },
-        submissions: {
+        draftSubmissions: {
+          'form-id': 3
+        },
+        liveSubmissions: {
           'form-id': 7
         }
       })

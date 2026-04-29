@@ -1,5 +1,5 @@
 import { FormMetricName, FormStatus } from '@defra/forms-model'
-import { add, startOfDay, sub, subDays, subYears } from 'date-fns'
+import { add, format, startOfDay, sub, subDays, subYears } from 'date-fns'
 
 import { config } from '~/src/config/index.js'
 import { getErrorMessage } from '~/src/helpers/error-message.js'
@@ -22,6 +22,13 @@ const logger = createLogger()
 
 const managerUrl = config.get('managerUrl')
 const submissionUrl = config.get('submissionUrl')
+
+/**
+ * @param {Date} date
+ */
+export function formatDateOnly(date) {
+  return format(date, 'yyyy-MM-dd')
+}
 
 /**
  * Collect metrics
@@ -73,13 +80,12 @@ export async function collectMetrics(jobStart, lastSuccessfulRunDate, session) {
 
   // Make a call for each day since last job run
   // (Normally only one day but also handles full historical data population on first run)
-  const yesterday = startOfDay(sub(jobStart, { days: 1 }))
-  let reportDate = startOfDay(
-    lastSuccessfulRunDate ?? new Date('2025-01-01T00:00:00.000Z')
-  )
-  while (reportDate <= yesterday) {
+  const yesterday = sub(jobStart, { days: 1 })
+  let reportDate = lastSuccessfulRunDate ?? sub(jobStart, { days: 480 })
+
+  while (formatDateOnly(reportDate) <= formatDateOnly(yesterday)) {
     logger.info(
-      `[metrics] getting timeline metrics for ${reportDate.toDateString()}`
+      `[metrics] getting timeline metrics for ${reportDate.toISOString()}`
     )
     await collectTimelineMetrics(managerUrl, reportDate, session)
     await collectTimelineMetrics(submissionUrl, reportDate, session)
@@ -169,6 +175,16 @@ function dateFallsInsideTimeslot(date, startOfRange, endOfRange) {
 /**
  * @param {FormTimelineMetric} metric
  */
+function isDraftSubmission(metric) {
+  return (
+    metric.metricName === FormMetricName.Submissions.toString() &&
+    metric.formStatus === FormStatus.Draft
+  )
+}
+
+/**
+ * @param {FormTimelineMetric} metric
+ */
 function isLiveSubmission(metric) {
   return (
     metric.metricName === FormMetricName.Submissions.toString() &&
@@ -191,7 +207,8 @@ export async function recalcMetricTotals(reportingDate, session) {
   const oneYearAgo = subYears(reportMorning, 1)
   const twoYearsAgo = subYears(reportMorning, 2)
 
-  const formSubmissionsMap = /** @type {Map<string, number>} */ (new Map())
+  const formSubmissionsMapDraft = /** @type {Map<string, number>} */ (new Map())
+  const formSubmissionsMapLive = /** @type {Map<string, number>} */ (new Map())
   const totals = /** @type {FormTotalsMetric} */ ({
     last7Days: {},
     prev7Days: {},
@@ -202,10 +219,21 @@ export async function recalcMetricTotals(reportingDate, session) {
     allTime: {}
   })
   for await (const metric of getAllTimelineMetrics(session)) {
-    // Live submissions only
+    // Live submissions
     if (isLiveSubmission(metric)) {
-      const formTotalSoFar = formSubmissionsMap.get(metric.formId) ?? 0
-      formSubmissionsMap.set(metric.formId, formTotalSoFar + metric.metricValue)
+      const formTotalSoFar = formSubmissionsMapLive.get(metric.formId) ?? 0
+      formSubmissionsMapLive.set(
+        metric.formId,
+        formTotalSoFar + metric.metricValue
+      )
+    }
+    // Draft submissions
+    if (isDraftSubmission(metric)) {
+      const formTotalSoFar = formSubmissionsMapDraft.get(metric.formId) ?? 0
+      formSubmissionsMapDraft.set(
+        metric.formId,
+        formTotalSoFar + metric.metricValue
+      )
     }
     // Update windowed totals
     const createdAt = new Date(metric.createdAt)
@@ -236,7 +264,8 @@ export async function recalcMetricTotals(reportingDate, session) {
     // All time
     updateMetricTotal(metric, totals.allTime)
   }
-  totals.submissions = Object.fromEntries(formSubmissionsMap)
+  totals.liveSubmissions = Object.fromEntries(formSubmissionsMapLive)
+  totals.draftSubmissions = Object.fromEntries(formSubmissionsMapDraft)
   return totals
 }
 
