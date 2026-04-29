@@ -1,7 +1,7 @@
 import Boom from '@hapi/boom'
 
 import { getErrorMessage } from '~/src/helpers/error-message.js'
-import { createLogger } from '~/src/helpers/logging/logger.js'
+import { logger } from '~/src/helpers/logging/logger.js'
 import { AUDIT_RECORDS_COLLECTION_NAME, db } from '~/src/mongo.js'
 import { getCachedRecords, populateCache } from '~/src/plugins/audit-cache.js'
 import { MAX_RESULTS } from '~/src/plugins/query-handler/config.js'
@@ -9,8 +9,6 @@ import {
   buildConsolidationPipeline,
   mapConsolidationResults
 } from '~/src/repositories/aggregation/consolidation-aggregation.js'
-
-const logger = createLogger()
 
 /**
  * Gets the audit records collection

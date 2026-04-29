@@ -1,10 +1,8 @@
 import { FormMetricType, FormStatus } from '@defra/forms-model'
 
 import { getErrorMessage } from '~/src/helpers/error-message.js'
-import { createLogger } from '~/src/helpers/logging/logger.js'
+import { logger } from '~/src/helpers/logging/logger.js'
 import { METRICS_COLLECTION_NAME, db } from '~/src/mongo.js'
-
-const logger = createLogger()
 
 const FORM_METRIC_CONTROL = 'form-metric-control'
 

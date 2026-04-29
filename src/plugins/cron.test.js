@@ -11,10 +11,10 @@ jest.mock('~/src/service/metrics.js')
 const mockInfo = jest.fn()
 const mockError = jest.fn()
 jest.mock('~/src/helpers/logging/logger.js', () => ({
-  createLogger: jest.fn(() => ({
+  logger: {
     info: () => mockInfo(),
     error: () => mockError()
-  }))
+  }
 }))
 
 describe('cronPlugin', () => {
