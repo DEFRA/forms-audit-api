@@ -16,11 +16,11 @@ jest.mock('~/src/config/index.js', () => ({
 }))
 
 jest.mock('~/src/helpers/logging/logger.js', () => ({
-  createLogger: () => ({
+  logger: {
     info: jest.fn(),
     warn: jest.fn(),
     debug: jest.fn()
-  })
+  }
 }))
 
 jest.mock('~/src/mongo.js', () => ({

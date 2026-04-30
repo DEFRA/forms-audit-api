@@ -1,9 +1,7 @@
 import { chdir } from 'node:process'
 
 import { getErrorMessage } from '~/src/helpers/error-message.js'
-import { createLogger } from '~/src/helpers/logging/logger.js'
-
-const logger = createLogger()
+import { logger } from '~/src/helpers/logging/logger.js'
 
 // Move working directory to build output
 chdir(import.meta.dirname)

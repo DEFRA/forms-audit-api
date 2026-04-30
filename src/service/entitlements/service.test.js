@@ -37,7 +37,7 @@ describe('entitlements service', () => {
       }
     }))
     jest.doMock('~/src/helpers/logging/logger.js', () => ({
-      createLogger: jest.fn().mockReturnValue(mockLogger)
+      logger: mockLogger
     }))
 
     const fetchModule = await import('~/src/lib/fetch.js')

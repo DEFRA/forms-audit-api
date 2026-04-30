@@ -3,7 +3,7 @@ import { add, format, startOfDay, sub, subDays, subYears } from 'date-fns'
 
 import { config } from '~/src/config/index.js'
 import { getErrorMessage } from '~/src/helpers/error-message.js'
-import { createLogger } from '~/src/helpers/logging/logger.js'
+import { logger } from '~/src/helpers/logging/logger.js'
 import { getJson } from '~/src/lib/fetch.js'
 import { client } from '~/src/mongo.js'
 import {
@@ -17,8 +17,6 @@ import {
   saveFormTimelineMetrics,
   updateMetricTotals
 } from '~/src/repositories/metrics-repository.js'
-
-const logger = createLogger()
 
 const managerUrl = config.get('managerUrl')
 const submissionUrl = config.get('submissionUrl')

@@ -1,9 +1,7 @@
 import { config } from '~/src/config/index.js'
-import { createLogger } from '~/src/helpers/logging/logger.js'
+import { logger } from '~/src/helpers/logging/logger.js'
 import { db } from '~/src/mongo.js'
 import { MAX_RESULTS } from '~/src/plugins/query-handler/config.js'
-
-const logger = createLogger()
 
 export const CONSOLIDATED_CACHE_COLLECTION_NAME = 'consolidated-audit-cache'
 const METADATA_SORT_INDEX = -1

@@ -1,12 +1,10 @@
 import { getErrorMessage } from '~/src/helpers/error-message.js'
-import { createLogger } from '~/src/helpers/logging/logger.js'
+import { logger } from '~/src/helpers/logging/logger.js'
 import {
   receiveEventMessages,
   receiveMessageTimeout
 } from '~/src/messaging/event.js'
 import { createAuditEvents } from '~/src/service/events.js'
-
-const logger = createLogger()
 
 /**
  * @returns {Promise<void>}

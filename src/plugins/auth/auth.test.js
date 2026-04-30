@@ -3,11 +3,11 @@ const mockActualTestWarnFn = jest.fn()
 const mockActualTestInfoFn = jest.fn()
 
 jest.mock('~/src/helpers/logging/logger.js', () => ({
-  createLogger: jest.fn().mockReturnValue({
+  logger: {
     error: mockActualTestErrorFn,
     warn: mockActualTestWarnFn,
     info: mockActualTestInfoFn
-  })
+  }
 }))
 
 jest.mock('~/src/config/index.js', () => ({

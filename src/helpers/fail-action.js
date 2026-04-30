@@ -1,7 +1,5 @@
 import { getErrorMessage } from '~/src/helpers/error-message.js'
-import { createLogger } from '~/src/helpers/logging/logger.js'
-
-const logger = createLogger()
+import { logger } from '~/src/helpers/logging/logger.js'
 
 /**
  * Log and throw an error

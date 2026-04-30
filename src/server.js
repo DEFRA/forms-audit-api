@@ -1,9 +1,7 @@
 import { createServer } from '~/src/api/server.js'
 import { config } from '~/src/config/index.js'
 import { getErrorMessage } from '~/src/helpers/error-message.js'
-import { createLogger } from '~/src/helpers/logging/logger.js'
-
-const logger = createLogger()
+import { logger } from '~/src/helpers/logging/logger.js'
 
 process.on('unhandledRejection', (err) => {
   logger.error(

@@ -4,7 +4,7 @@ import { messageSchema } from '@defra/forms-model'
 import Joi from 'joi'
 
 import { getErrorMessage } from '~/src/helpers/error-message.js'
-import { createLogger } from '~/src/helpers/logging/logger.js'
+import { logger } from '~/src/helpers/logging/logger.js'
 import { deleteEventMessage } from '~/src/messaging/event.js'
 import { client } from '~/src/mongo.js'
 import { invalidateCache } from '~/src/plugins/audit-cache.js'
@@ -13,8 +13,6 @@ import {
   mapAuditRecord,
   mapConsolidatedAuditRecord
 } from '~/src/routes/shared.js'
-
-const logger = createLogger()
 
 /**
  * @param {Message} message
