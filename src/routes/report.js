@@ -5,6 +5,8 @@ import {
   runMetricsCollectionJob
 } from '~/src/service/metrics.js'
 
+const HTTP_OK = 200
+
 export default [
   /**
    * @satisfies {ServerRoute}
@@ -15,7 +17,7 @@ export default [
     async handler(_request, h) {
       const metrics = await generateReport()
 
-      return h.response(metrics).code(200)
+      return h.response(metrics).code(HTTP_OK)
     },
     options: {
       auth: false
@@ -31,7 +33,7 @@ export default [
     handler(_request, h) {
       // eslint-disable-next-line no-void
       void runMetricsCollectionJob(true)
-      return h.response({ message: 'success' }).code(200)
+      return h.response({ message: 'success' }).code(HTTP_OK)
     },
     options: {
       auth: {
