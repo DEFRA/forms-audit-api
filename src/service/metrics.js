@@ -137,10 +137,7 @@ export async function collectMetrics(jobStart, lastSuccessfulRunDate, session) {
     reportDate = add(reportDate, { days: 1 })
   }
 
-  const accumulations = await recalcMetricAccumulations(yesterday, session)
-  const snapshots = await recalcMetricSnapshots(yesterday, session)
-  const totals = combineTotals(accumulations, snapshots)
-
+  const totals = await recalcMetrics(yesterday, session)
   await updateMetricTotals(yesterday, totals, session)
 }
 
@@ -288,6 +285,23 @@ export async function collectTimelineMetricsFromAudit(reportingDate, session) {
 /**
  * @param {FormTimelineMetric} metric
  * @param { Record<string, { count?: number }> | undefined } period
+ * @param {string} calculationType
+ */
+export function handleMetricValue(metric, period, calculationType) {
+  if (calculationType === CalculationTypes.Accumulation) {
+    updateMetricTotal(metric, period)
+  }
+  if (calculationType === CalculationTypes.Snapshot) {
+    setMetricTotal(metric, period)
+  }
+  if (calculationType === CalculationTypes.Average) {
+    updateMetricAverage(metric, period)
+  }
+}
+
+/**
+ * @param {FormTimelineMetric} metric
+ * @param { Record<string, { count?: number }> | undefined } period
  */
 export function updateMetricTotal(metric, period) {
   const metricName = metric.metricName
@@ -316,6 +330,29 @@ export function setMetricTotal(metric, period) {
   }
   const metricName = metric.metricName
   period[metricName] = { count: metric.metricValue }
+}
+
+/**
+ * @param {FormTimelineMetric} metric
+ * @param { Record<string, { count?: number, avgTotal?: number, avgCount?: number }> | undefined } period
+ */
+export function updateMetricAverage(metric, period) {
+  const metricName = metric.metricName
+  if (!period) {
+    return
+  }
+  if (
+    metricName in period &&
+    'avgTotal' in period[metricName] &&
+    'avgCount' in period[metricName]
+  ) {
+    const currentAvgTotal = period[metricName].avgTotal ?? 0
+    const currentAvgCount = period[metricName].avgCount ?? 0
+    period[metricName].avgTotal = currentAvgTotal + metric.metricValue
+    period[metricName].avgCount = currentAvgCount + 1
+  } else {
+    period[metricName] = { avgTotal: metric.metricValue, avgCount: 1 }
+  }
 }
 
 /**
@@ -348,12 +385,20 @@ function isLiveSubmission(metric) {
 }
 
 /**
+ * @param {FormTimelineMetric} metric
+ */
+function getMetricCalcType(metric) {
+  const metricName = /** @type {FormMetricName} */ (metric.metricName)
+  return metricConfig[metricName].calculationType
+}
+
+/**
  * Update metric totals by summing metrics within given windows
  * @param {Date} reportingDate
  * @param {ClientSession} session
  * @returns {Promise<FormTotalsMetric>}
  */
-export async function recalcMetricAccumulations(reportingDate, session) {
+export async function recalcMetrics(reportingDate, session) {
   const reportMorning = startOfDay(reportingDate)
   const sevenDaysAgo = subDays(reportMorning, 7)
   const fourteenDaysAgo = subDays(reportMorning, 14)
@@ -362,8 +407,13 @@ export async function recalcMetricAccumulations(reportingDate, session) {
   const oneYearAgo = subYears(reportMorning, 1)
   const twoYearsAgo = subYears(reportMorning, 2)
 
-  const formSubmissionsMapDraft = /** @type {Map<string, number>} */ (new Map())
-  const formSubmissionsMapLive = /** @type {Map<string, number>} */ (new Map())
+  const maps = {
+    formSubmissionsMapDraft: /** @type {Map<string, number>} */ (new Map()),
+    formSubmissionsMapLive: /** @type {Map<string, number>} */ (new Map()),
+    formDaysToPublishMap: /** @type {Map<string, number>} */ (new Map()),
+    formRepublishedMap: /** @type {Map<string, number>} */ (new Map())
+  }
+
   const totals = /** @type {FormTotalsMetric} */ ({
     last7Days: {},
     prev7Days: {},
@@ -374,205 +424,112 @@ export async function recalcMetricAccumulations(reportingDate, session) {
     allTime: {}
   })
   for await (const metric of getAllTimelineMetrics(session)) {
-    const metricName = /** @type {FormMetricName} */ (metric.metricName)
-    if (
-      metricConfig[metricName].calculationType !== CalculationTypes.Accumulation
-    ) {
-      continue
+    const metricCalcType = getMetricCalcType(metric)
+    if (metricCalcType === CalculationTypes.Accumulation) {
+      // Live submissions
+      if (isLiveSubmission(metric)) {
+        const formTotalSoFar =
+          maps.formSubmissionsMapLive.get(metric.formId) ?? 0
+        maps.formSubmissionsMapLive.set(
+          metric.formId,
+          formTotalSoFar + metric.metricValue
+        )
+      }
+      // Draft submissions
+      if (isDraftSubmission(metric)) {
+        const formTotalSoFar =
+          maps.formSubmissionsMapDraft.get(metric.formId) ?? 0
+        maps.formSubmissionsMapDraft.set(
+          metric.formId,
+          formTotalSoFar + metric.metricValue
+        )
+      }
     }
 
-    // Live submissions
-    if (isLiveSubmission(metric)) {
-      const formTotalSoFar = formSubmissionsMapLive.get(metric.formId) ?? 0
-      formSubmissionsMapLive.set(
+    if (metric.metricName === FormMetricName.TimeToPublish.toString()) {
+      maps.formDaysToPublishMap.set(metric.formId, metric.metricValue)
+    }
+    if (metric.metricName === FormMetricName.FormsPublished.toString()) {
+      const formTotalSoFar = maps.formRepublishedMap.get(metric.formId) ?? 0
+      maps.formRepublishedMap.set(
         metric.formId,
         formTotalSoFar + metric.metricValue
       )
     }
-    // Draft submissions
-    if (isDraftSubmission(metric)) {
-      const formTotalSoFar = formSubmissionsMapDraft.get(metric.formId) ?? 0
-      formSubmissionsMapDraft.set(
-        metric.formId,
-        formTotalSoFar + metric.metricValue
-      )
-    }
-    // Update windowed totals
+
+    // Update windowed metrics
     const createdAt = new Date(metric.createdAt)
     // Last 7 days
     if (dateFallsInsideTimeslot(createdAt, sevenDaysAgo, reportMorning)) {
-      updateMetricTotal(metric, totals.last7Days)
+      handleMetricValue(metric, totals.last7Days, metricCalcType)
     }
     // Previous 7 days
     if (dateFallsInsideTimeslot(createdAt, fourteenDaysAgo, sevenDaysAgo)) {
-      updateMetricTotal(metric, totals.prev7Days)
+      handleMetricValue(metric, totals.prev7Days, metricCalcType)
     }
     // Last 30 days
     if (dateFallsInsideTimeslot(createdAt, thirtyDaysAgo, reportMorning)) {
-      updateMetricTotal(metric, totals.last30Days)
+      handleMetricValue(metric, totals.last30Days, metricCalcType)
     }
     // Previous 30 days
     if (dateFallsInsideTimeslot(createdAt, sixtyDaysAgo, thirtyDaysAgo)) {
-      updateMetricTotal(metric, totals.prev30Days)
+      handleMetricValue(metric, totals.prev30Days, metricCalcType)
     }
     // Last year
     if (dateFallsInsideTimeslot(createdAt, oneYearAgo, reportMorning)) {
-      updateMetricTotal(metric, totals.lastYear)
+      handleMetricValue(metric, totals.lastYear, metricCalcType)
     }
     // Previous year
     if (dateFallsInsideTimeslot(createdAt, twoYearsAgo, oneYearAgo)) {
-      updateMetricTotal(metric, totals.prevYear)
+      handleMetricValue(metric, totals.prevYear, metricCalcType)
     }
     // All time
-    updateMetricTotal(metric, totals.allTime)
+    handleMetricValue(metric, totals.allTime, metricCalcType)
   }
-  totals.liveSubmissions = Object.fromEntries(formSubmissionsMapLive)
-  totals.draftSubmissions = Object.fromEntries(formSubmissionsMapDraft)
-  return totals
+  totals.liveSubmissions = Object.fromEntries(maps.formSubmissionsMapLive)
+  totals.draftSubmissions = Object.fromEntries(maps.formSubmissionsMapDraft)
+  totals.daysToPublish = Object.fromEntries(maps.formDaysToPublishMap)
+  totals.republished = Object.fromEntries(
+    decrementCountsForRepublish(maps.formRepublishedMap)
+  )
+  const finalTotals = calcAverages(totals)
+  return finalTotals
 }
 
 /**
- * Populate snapshot values within windows rather than summing metrics
- * @param {Date} reportingDate
- * @param {ClientSession} session
- * @returns {Promise<FormTotalsMetric>}
+ * @param {any} totals
  */
-export async function recalcMetricSnapshots(reportingDate, session) {
-  const reportMorning = startOfDay(reportingDate)
-  const sevenDaysAgo = subDays(reportMorning, 7)
-  const fourteenDaysAgo = subDays(reportMorning, 14)
-  const thirtyDaysAgo = subDays(reportMorning, 30)
-  const sixtyDaysAgo = subDays(reportMorning, 60)
-  const oneYearAgo = subYears(reportMorning, 1)
-  const twoYearsAgo = subYears(reportMorning, 2)
-
-  const totals = /** @type {FormTotalsMetric} */ ({
-    last7Days: {},
-    prev7Days: {},
-    last30Days: {},
-    prev30Days: {},
-    lastYear: {},
-    prevYear: {},
-    allTime: {}
-  })
-  for await (const metric of getAllTimelineMetrics(session)) {
-    const metricName = /** @type {FormMetricName} */ (metric.metricName)
-    if (
-      metricConfig[metricName].calculationType !== CalculationTypes.Snapshot
-    ) {
-      continue
-    }
-
-    // Update windowed values
-    const createdAt = new Date(metric.createdAt)
-
-    // Last 7 days
-    if (dateFallsInsideTimeslot(createdAt, sevenDaysAgo, reportMorning)) {
-      setMetricTotal(metric, totals.last7Days)
-    }
-    // Previous 7 days
-    if (dateFallsInsideTimeslot(createdAt, fourteenDaysAgo, sevenDaysAgo)) {
-      setMetricTotal(metric, totals.prev7Days)
-    }
-    // Last 30 days
-    if (dateFallsInsideTimeslot(createdAt, thirtyDaysAgo, reportMorning)) {
-      setMetricTotal(metric, totals.last30Days)
-    }
-    // Previous 30 days
-    if (dateFallsInsideTimeslot(createdAt, sixtyDaysAgo, thirtyDaysAgo)) {
-      setMetricTotal(metric, totals.prev30Days)
-    }
-    // Last year
-    if (dateFallsInsideTimeslot(createdAt, oneYearAgo, reportMorning)) {
-      setMetricTotal(metric, totals.lastYear)
-    }
-    // Previous year
-    if (dateFallsInsideTimeslot(createdAt, twoYearsAgo, oneYearAgo)) {
-      setMetricTotal(metric, totals.prevYear)
-    }
-    // All time
-    setMetricTotal(metric, totals.allTime)
+export function calcAverages(totals) {
+  const totalsCopy = {
+    ...totals
   }
-  return totals
+  for (const periodName of Object.keys(totals)) {
+    for (const metricName of Object.keys(totals[periodName])) {
+      for (const metricPropertyName of Object.keys(
+        totals[periodName][metricName]
+      )) {
+        if (metricPropertyName === 'avgTotal') {
+          const total = totals[periodName][metricName].avgTotal
+          const count = totals[periodName][metricName].avgCount
+          totalsCopy[periodName][metricName].count = (total / count).toFixed(1)
+          delete totalsCopy[periodName][metricName].avgTotal
+          delete totalsCopy[periodName][metricName].avgCount
+        }
+      }
+    }
+  }
+  return totalsCopy
 }
 
 /**
- * Populate average values within windows rather than summing metrics
- * @param {Date} reportingDate
- * @param {ClientSession} session
- * @returns {Promise<FormTotalsMetric>}
+ * @param {Map<string, number>} map
  */
-export async function recalcMetricAverages(reportingDate, session) {
-  const reportMorning = startOfDay(reportingDate)
-  const sevenDaysAgo = subDays(reportMorning, 7)
-  const fourteenDaysAgo = subDays(reportMorning, 14)
-  const thirtyDaysAgo = subDays(reportMorning, 30)
-  const sixtyDaysAgo = subDays(reportMorning, 60)
-  const oneYearAgo = subYears(reportMorning, 1)
-  const twoYearsAgo = subYears(reportMorning, 2)
-
-  const totals = /** @type {FormTotalsMetric} */ ({
-    last7Days: {},
-    prev7Days: {},
-    last30Days: {},
-    prev30Days: {},
-    lastYear: {},
-    prevYear: {},
-    allTime: {}
-  })
-  for await (const metric of getAllTimelineMetrics(session)) {
-    const metricName = /** @type {FormMetricName} */ (metric.metricName)
-    if (metricConfig[metricName].calculationType !== CalculationTypes.Average) {
-      continue
-    }
-
-    // Update windowed values
-    const createdAt = new Date(metric.createdAt)
-
-    // Last 7 days
-    if (dateFallsInsideTimeslot(createdAt, sevenDaysAgo, reportMorning)) {
-      setMetricTotal(metric, totals.last7Days)
-    }
-    // Previous 7 days
-    if (dateFallsInsideTimeslot(createdAt, fourteenDaysAgo, sevenDaysAgo)) {
-      setMetricTotal(metric, totals.prev7Days)
-    }
-    // Last 30 days
-    if (dateFallsInsideTimeslot(createdAt, thirtyDaysAgo, reportMorning)) {
-      setMetricTotal(metric, totals.last30Days)
-    }
-    // Previous 30 days
-    if (dateFallsInsideTimeslot(createdAt, sixtyDaysAgo, thirtyDaysAgo)) {
-      setMetricTotal(metric, totals.prev30Days)
-    }
-    // Last year
-    if (dateFallsInsideTimeslot(createdAt, oneYearAgo, reportMorning)) {
-      setMetricTotal(metric, totals.lastYear)
-    }
-    // Previous year
-    if (dateFallsInsideTimeslot(createdAt, twoYearsAgo, oneYearAgo)) {
-      setMetricTotal(metric, totals.prevYear)
-    }
-    // All time
-    setMetricTotal(metric, totals.allTime)
+export function decrementCountsForRepublish(map) {
+  const mapWithDecrementedValues = new Map()
+  for (const [key, value] of map) {
+    mapWithDecrementedValues.set(key, value - 1)
   }
-  return totals
-}
-
-/**
- * @param {any} totals1
- * @param {any} totals2
- */
-export function combineTotals(totals1, totals2) {
-  const combined = {
-    ...totals1
-  }
-  for (const key of Object.keys(totals2)) {
-    for (const subKey of Object.keys(totals2[key])) {
-      combined[key][subKey] = totals2[key][subKey]
-    }
-  }
-  return combined
+  return mapWithDecrementedValues
 }
 
 /**

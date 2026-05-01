@@ -13,7 +13,7 @@ import {
 import {
   collectManagerOverviewMetrics,
   collectTimelineMetrics,
-  recalcMetricTotals,
+  recalcMetrics,
   runMetricsCollectionJob,
   updateMetricTotal
 } from '~/src/service/metrics.js'
@@ -34,11 +34,19 @@ jest.mock('~/src/mongo.js', () => ({
  * @param {FormStatus} formStatus
  * @param {string} dateStr
  * @param {number} metricValue
+ * @param {string} [formId]
  */
-function createTimelineMetric(metricName, formStatus, dateStr, metricValue) {
+function createTimelineMetric(
+  metricName,
+  formStatus,
+  dateStr,
+  metricValue,
+  formId
+) {
   /** @type {FormTimelineMetric} */
   return {
     type: FormMetricType.TimelineMetric,
+    formId,
     formStatus,
     metricName,
     createdAt: new Date(dateStr),
@@ -123,7 +131,7 @@ describe('runMetricsCollectionJob', () => {
     jest.mocked(getAllTimelineMetrics).mockReturnValueOnce(mockAsyncIterator)
 
     await runMetricsCollectionJob()
-    expect(getJson).toHaveBeenCalledTimes(3)
+    expect(getJson).toHaveBeenCalledTimes(2)
     expect(getJson).toHaveBeenNthCalledWith(
       1,
       new URL(
@@ -133,13 +141,6 @@ describe('runMetricsCollectionJob', () => {
     )
     expect(getJson).toHaveBeenNthCalledWith(
       2,
-      new URL(
-        'http://localhost:3001/report/timeline?date=' + yesterday.toISOString()
-      ),
-      {}
-    )
-    expect(getJson).toHaveBeenNthCalledWith(
-      3,
       new URL(
         'http://localhost:3002/report/timeline?date=' + yesterday.toISOString()
       ),
@@ -322,10 +323,33 @@ describe('runMetricsCollectionJob', () => {
         ),
         // Previous year
         createTimelineMetric(
-          FormMetricName.FormsPublished,
+          FormMetricName.NewFormsCreated,
           FormStatus.Draft,
+          '2024-04-20',
+          1,
+          'form-id-1'
+        ),
+        createTimelineMetric(
+          FormMetricName.TimeToPublish,
+          FormStatus.Live,
           '2024-05-03',
-          3
+          14,
+          'form-id-1'
+        ),
+        createTimelineMetric(
+          FormMetricName.FormsPublished,
+          FormStatus.Live,
+          '2024-05-03',
+          1,
+          'form-id-1'
+        ),
+        // A re-publish of the form
+        createTimelineMetric(
+          FormMetricName.FormsPublished,
+          FormStatus.Live,
+          '2024-05-05',
+          1,
+          'form-id-1'
         )
       ])
       const mockAsyncIterator = {
@@ -339,10 +363,7 @@ describe('runMetricsCollectionJob', () => {
       // @ts-expect-error - resolves to an async iterator like FindCursor<FormSubmissionDocument>
       jest.mocked(getAllTimelineMetrics).mockReturnValueOnce(mockAsyncIterator)
 
-      const totals = await recalcMetricTotals(
-        new Date('2026-01-01'),
-        mockSession
-      )
+      const totals = await recalcMetrics(new Date('2026-01-01'), mockSession)
 
       expect(totals).toEqual({
         last7Days: {
@@ -384,7 +405,13 @@ describe('runMetricsCollectionJob', () => {
         },
         prevYear: {
           FormsPublished: {
-            count: 3
+            count: 2
+          },
+          NewFormsCreated: {
+            count: 1
+          },
+          TimeToPublish: {
+            count: '14.0'
           }
         },
         allTime: {
@@ -392,10 +419,13 @@ describe('runMetricsCollectionJob', () => {
             count: 7
           },
           FormsPublished: {
-            count: 3
+            count: 2
           },
           NewFormsCreated: {
-            count: 19
+            count: 20
+          },
+          TimeToPublish: {
+            count: '14.0'
           }
         },
         draftSubmissions: {
@@ -403,6 +433,12 @@ describe('runMetricsCollectionJob', () => {
         },
         liveSubmissions: {
           'form-id': 7
+        },
+        republished: {
+          'form-id-1': 1
+        },
+        daysToPublish: {
+          'form-id-1': 14
         }
       })
     })
