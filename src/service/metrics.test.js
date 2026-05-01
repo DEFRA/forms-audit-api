@@ -511,9 +511,9 @@ describe('runMetricsCollectionJob', () => {
         .mockReturnValueOnce(mockAsyncIteratorFirstPublished)
 
       jest.mocked(isFirstPublish).mockResolvedValue(true)
-      // @ts-expect-error - partial mock of record
       jest
         .mocked(getFirstDraft)
+        // @ts-expect-error - partial mock of record
         .mockResolvedValue({ createdAt: new Date('2026-03-30') })
 
       await collectTimelineMetricsFromAudit(testDate, mockSession)
