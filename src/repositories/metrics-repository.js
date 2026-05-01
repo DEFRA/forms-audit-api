@@ -1,4 +1,4 @@
-import { FormMetricType, FormStatus } from '@defra/forms-model'
+import { FormMetricName, FormMetricType, FormStatus } from '@defra/forms-model'
 
 import { getErrorMessage } from '~/src/helpers/error-message.js'
 import { logger } from '~/src/helpers/logging/logger.js'
@@ -176,6 +176,40 @@ export function getAllTimelineMetrics(session) {
 }
 
 /**
+ * Get all timeline metrics for a particular metric name and formId
+ * @param {string} metricName
+ * @param {string} formId
+ * @param {ClientSession} session
+ * @returns {Promise<WithId<FormTimelineMetric>[]>}
+ */
+export async function getTimelineMetricsForMetricName(
+  metricName,
+  formId,
+  session
+) {
+  const coll = getMetricCollection()
+
+  try {
+    const timelineRecords =
+      /** @type {FindCursor<WithId<FormTimelineMetric>>} */ (
+        coll
+          .find(
+            { type: FormMetricType.TimelineMetric, metricName, formId },
+            { session }
+          )
+          .sort({ createdAt: -1 })
+      )
+    return await timelineRecords.toArray()
+  } catch (err) {
+    logger.error(
+      err,
+      `Failed to read timeline metric for metric ${metricName} and form id ${formId} - ${getErrorMessage(err)}`
+    )
+    throw err
+  }
+}
+
+/**
  * Gets all metric records of the specified type.
  * @param {FormMetricType} metricType
  * @param {ClientSession} session
@@ -259,6 +293,105 @@ export async function updateMetricTotals(reportDate, totals, session) {
     )
   } catch (err) {
     logger.error(err, `Failed to save totals metric - ${getErrorMessage(err)}`)
+    throw err
+  }
+}
+
+/**
+ * Determines if any other publish events exist for this form
+ * @param {string} formId
+ * @param {ClientSession} session
+ * @returns {Promise<boolean>}
+ */
+export async function isFirstPublish(formId, session) {
+  const coll = getMetricCollection()
+
+  try {
+    const numberOfRecords = await coll.countDocuments(
+      {
+        type: FormMetricType.TimelineMetric,
+        metricName: FormMetricName.FormsPublished,
+        formId
+      },
+      { session }
+    )
+    return numberOfRecords < 2
+  } catch (err) {
+    logger.error(
+      err,
+      `Failed to read timeline isFirstPublish for form id ${formId} - ${getErrorMessage(err)}`
+    )
+    throw err
+  }
+}
+
+/**
+ * Gets the earliest 'draft created' record of a form
+ * @param {string} formId
+ * @param {ClientSession} session
+ * @returns {Promise< WithId<FormTimelineMetric> | undefined >}
+ */
+export async function getFirstDraft(formId, session) {
+  const coll = getMetricCollection()
+
+  try {
+    const drafts = /** @type {WithId<FormTimelineMetric>[]} */ (
+      await coll
+        .find(
+          {
+            type: FormMetricType.TimelineMetric,
+            metricName: FormMetricName.NewFormsCreated,
+            formId
+          },
+          { session }
+        )
+        .sort({ createdAt: 1 })
+        .toArray()
+    )
+    return drafts.length > 0 ? drafts[0] : undefined
+  } catch (err) {
+    logger.error(
+      err,
+      `Failed to read timeline getFirstDraft for form id ${formId} - ${getErrorMessage(err)}`
+    )
+    throw err
+  }
+}
+
+/**
+ * Gets the 'forms in draft' metric for the specified date and returns the value
+ * @param {Date} reportingDate
+ * @param {ClientSession} session
+ * @returns {Promise<number>}
+ */
+export async function getNumberOfFormsInDraft(reportingDate, session) {
+  const coll = getMetricCollection()
+
+  const withoutTime = reportingDate.toISOString().substring(0, 10)
+  const startOfDay = `${withoutTime}T00:00:00.000Z`
+  const endOfDay = `${withoutTime}T23:59:59.999Z`
+
+  try {
+    const numberOfDrafts =
+      /** @type {WithId<FormTimelineMetric> | undefined} */ (
+        await coll.findOne(
+          {
+            type: FormMetricType.TimelineMetric,
+            metricName: FormMetricName.FormsInDraft,
+            createdAt: {
+              $gte: new Date(startOfDay),
+              $lte: new Date(endOfDay)
+            }
+          },
+          { session }
+        )
+      )
+    return numberOfDrafts?.metricValue ?? 0
+  } catch (err) {
+    logger.error(
+      err,
+      `Failed to read timeline getNumberOfFormsInDraft for date ${reportingDate.toISOString()} - ${getErrorMessage(err)}`
+    )
     throw err
   }
 }
@@ -371,6 +504,29 @@ export async function releaseLock(success, message, session) {
     )
   } catch (err) {
     logger.error(err, `Failed to remove lock - ${getErrorMessage(err)}`)
+    throw err
+  }
+}
+
+/**
+ * Clears all metrics data (leaves the control record)
+ * @param {ClientSession} session
+ */
+export async function clearMetricsData(session) {
+  const coll = getMetricCollection()
+
+  try {
+    await coll.deleteMany(
+      {
+        type: { $ne: FORM_METRIC_CONTROL }
+      },
+      { session }
+    )
+  } catch (err) {
+    logger.error(
+      err,
+      `Failed to clear all metrics data - ${getErrorMessage(err)}`
+    )
     throw err
   }
 }
