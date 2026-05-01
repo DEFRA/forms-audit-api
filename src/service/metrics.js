@@ -470,64 +470,28 @@ export async function recalcMetrics(reportingDate, session) {
     // Update windowed metrics
     const createdAt = new Date(metric.createdAt)
     // Last 7 days
-    handleTimeslot(
-      metric,
-      totals.last7Days,
-      metricCalcType,
-      createdAt,
-      sevenDaysAgo,
-      reportMorning
-    )
+    // prettier-ignore
+    handleTimeslot(metric, totals.last7Days, metricCalcType, createdAt, sevenDaysAgo, reportMorning)
 
     // Previous 7 days
-    handleTimeslot(
-      metric,
-      totals.prev7Days,
-      metricCalcType,
-      createdAt,
-      fourteenDaysAgo,
-      sevenDaysAgo
-    )
+    // prettier-ignore
+    handleTimeslot(metric, totals.prev7Days, metricCalcType, createdAt, fourteenDaysAgo, sevenDaysAgo)
 
     // Last 30 days
-    handleTimeslot(
-      metric,
-      totals.last30Days,
-      metricCalcType,
-      createdAt,
-      thirtyDaysAgo,
-      reportMorning
-    )
+    // prettier-ignore
+    handleTimeslot(metric, totals.last30Days, metricCalcType, createdAt, thirtyDaysAgo, reportMorning)
 
     // Previous 30 days
-    handleTimeslot(
-      metric,
-      totals.prev30Days,
-      metricCalcType,
-      createdAt,
-      sixtyDaysAgo,
-      thirtyDaysAgo
-    )
+    // prettier-ignore
+    handleTimeslot(metric, totals.prev30Days, metricCalcType, createdAt, sixtyDaysAgo, thirtyDaysAgo)
 
     // Last year
-    handleTimeslot(
-      metric,
-      totals.lastYear,
-      metricCalcType,
-      createdAt,
-      oneYearAgo,
-      reportMorning
-    )
+    // prettier-ignore
+    handleTimeslot(metric, totals.lastYear, metricCalcType, createdAt, oneYearAgo, reportMorning)
 
     // Previous year
-    handleTimeslot(
-      metric,
-      totals.prevYear,
-      metricCalcType,
-      createdAt,
-      twoYearsAgo,
-      oneYearAgo
-    )
+    // prettier-ignore
+    handleTimeslot(metric, totals.prevYear, metricCalcType, createdAt, twoYearsAgo, oneYearAgo)
 
     // All time
     handleMetricValue(metric, totals.allTime, metricCalcType)
@@ -586,6 +550,29 @@ function handleTimeslot(
 }
 
 /**
+ * @param {string} metricPropertyName
+ * @param {any} totals
+ * @param {string} periodName
+ * @param {string} metricName
+ * @param {any} totalsCopy
+ */
+function calcAverage(
+  metricPropertyName,
+  totals,
+  periodName,
+  metricName,
+  totalsCopy
+) {
+  if (metricPropertyName === 'avgTotal') {
+    const total = totals[periodName][metricName].avgTotal
+    const count = totals[periodName][metricName].avgCount
+    totalsCopy[periodName][metricName].count = (total / count).toFixed(1)
+    delete totalsCopy[periodName][metricName].avgTotal
+    delete totalsCopy[periodName][metricName].avgCount
+  }
+}
+
+/**
  * @param {any} totals
  */
 export function calcAverages(totals) {
@@ -597,13 +584,13 @@ export function calcAverages(totals) {
       for (const metricPropertyName of Object.keys(
         totals[periodName][metricName]
       )) {
-        if (metricPropertyName === 'avgTotal') {
-          const total = totals[periodName][metricName].avgTotal
-          const count = totals[periodName][metricName].avgCount
-          totalsCopy[periodName][metricName].count = (total / count).toFixed(1)
-          delete totalsCopy[periodName][metricName].avgTotal
-          delete totalsCopy[periodName][metricName].avgCount
-        }
+        calcAverage(
+          metricPropertyName,
+          totals,
+          periodName,
+          metricName,
+          totalsCopy
+        )
       }
     }
   }
