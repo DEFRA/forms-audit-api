@@ -18,6 +18,7 @@ import { db } from '~/src/mongo.js'
 import {
   createAuditRecord,
   getAuditRecords,
+  getAuditRecordsOfType,
   getConsolidatedAuditRecords
 } from '~/src/repositories/audit-record-repository.js'
 
@@ -491,6 +492,46 @@ describe('audit-record-repository', () => {
       // Should return items 10-19 (page 2 with perPage 10)
       expect(result.documents).toHaveLength(10)
       expect(result.totalItems).toBe(30)
+    })
+  })
+
+  describe('getAuditRecordsOfType', () => {
+    it('should get records for specific date', () => {
+      mockCollection.find.mockReturnValueOnce({
+        sort: () => []
+      })
+      const testDate = new Date('2026-04-01')
+      getAuditRecordsOfType(
+        AuditEventMessageType.FORM_CREATED,
+        testDate,
+        mockSession
+      )
+      expect(mockCollection.find).toHaveBeenCalledWith(
+        {
+          createdAt: {
+            $gte: new Date('2026-04-01T00:00:00.000Z'),
+            $lte: new Date('2026-04-01T23:59:59.999Z')
+          },
+          type: 'FORM_CREATED'
+        },
+        { session: {} }
+      )
+    })
+
+    it('should throw if error', () => {
+      mockCollection.find.mockReturnValueOnce({
+        sort: () => {
+          throw new Error('bad db call')
+        }
+      })
+      const testDate = new Date('2026-04-01')
+      expect(() =>
+        getAuditRecordsOfType(
+          AuditEventMessageType.FORM_CREATED,
+          testDate,
+          mockSession
+        )
+      ).toThrow('bad db call')
     })
   })
 })

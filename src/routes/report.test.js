@@ -1,5 +1,8 @@
 import { createServer } from '~/src/api/server.js'
-import { generateReport } from '~/src/service/metrics.js'
+import {
+  generateReport,
+  runMetricsCollectionJob
+} from '~/src/service/metrics.js'
 import { authSuperAdmin as auth } from '~/test/fixtures/auth.js'
 
 jest.mock('~/src/service/metrics.js')
@@ -37,6 +40,20 @@ describe('Report routes', () => {
       expect(response.statusCode).toEqual(okStatusCode)
       expect(response.headers['content-type']).toContain(jsonContentType)
       expect(response.result).toEqual({ overview: [], totals: null })
+    })
+  })
+
+  describe('POST', () => {
+    test('/report/regenerate route calls metrics job and returns 200', async () => {
+      const response = await server.inject({
+        method: 'POST',
+        url: '/report/regenerate',
+        auth
+      })
+
+      expect(response.statusCode).toEqual(okStatusCode)
+      expect(response.headers['content-type']).toContain(jsonContentType)
+      expect(runMetricsCollectionJob).toHaveBeenCalled()
     })
   })
 })
