@@ -223,15 +223,13 @@ export async function collectTimelineMetricsFromAudit(reportingDate, session) {
     reportingDate,
     session
   )
-  for await (const created of createdFromLiveCursor) {
-    const metric = /** @type {FormTimelineMetric} */ ({
-      formStatus: FormStatus.Draft,
-      metricName: FormMetricName.NewFormsCreated,
-      metricValue: 1,
-      createdAt: created.createdAt
-    })
-    await saveFormTimelineMetrics(created.entityId, metric, session)
-  }
+  await saveBulkTimelineMetrics(
+    createdFromLiveCursor,
+    FormMetricName.NewFormsCreated,
+    FormStatus.Draft,
+    1,
+    session
+  )
 
   // Form published + time to publish
   const publishCursor = getAuditRecordsOfType(
@@ -280,6 +278,31 @@ export async function collectTimelineMetricsFromAudit(reportingDate, session) {
     createdAt: reportingDate
   })
   await saveFormTimelineMetrics('n/a', draftCount, session)
+}
+
+/**
+ * @param {FindCursor<WithId<AuditRecordInput>>} cursor
+ * @param {FormMetricName} metricName
+ * @param {FormStatus} formStatus
+ * @param {number} metricValue
+ * @param {ClientSession} session
+ */
+export async function saveBulkTimelineMetrics(
+  cursor,
+  metricName,
+  formStatus,
+  metricValue,
+  session
+) {
+  for await (const created of cursor) {
+    const metric = /** @type {FormTimelineMetric} */ ({
+      formStatus,
+      metricName,
+      metricValue,
+      createdAt: created.createdAt
+    })
+    await saveFormTimelineMetrics(created.entityId, metric, session)
+  }
 }
 
 /**
@@ -427,23 +450,10 @@ export async function recalcMetrics(reportingDate, session) {
     const metricCalcType = getMetricCalcType(metric)
     if (metricCalcType === CalculationTypes.Accumulation) {
       // Live submissions
-      if (isLiveSubmission(metric)) {
-        const formTotalSoFar =
-          maps.formSubmissionsMapLive.get(metric.formId) ?? 0
-        maps.formSubmissionsMapLive.set(
-          metric.formId,
-          formTotalSoFar + metric.metricValue
-        )
-      }
+      handleLiveSubmissions(metric, maps.formSubmissionsMapLive)
+
       // Draft submissions
-      if (isDraftSubmission(metric)) {
-        const formTotalSoFar =
-          maps.formSubmissionsMapDraft.get(metric.formId) ?? 0
-        maps.formSubmissionsMapDraft.set(
-          metric.formId,
-          formTotalSoFar + metric.metricValue
-        )
-      }
+      handleDraftSubmissions(metric, maps.formSubmissionsMapDraft)
     }
 
     if (metric.metricName === FormMetricName.TimeToPublish.toString()) {
@@ -460,29 +470,65 @@ export async function recalcMetrics(reportingDate, session) {
     // Update windowed metrics
     const createdAt = new Date(metric.createdAt)
     // Last 7 days
-    if (dateFallsInsideTimeslot(createdAt, sevenDaysAgo, reportMorning)) {
-      handleMetricValue(metric, totals.last7Days, metricCalcType)
-    }
+    handleTimeslot(
+      metric,
+      totals.last7Days,
+      metricCalcType,
+      createdAt,
+      sevenDaysAgo,
+      reportMorning
+    )
+
     // Previous 7 days
-    if (dateFallsInsideTimeslot(createdAt, fourteenDaysAgo, sevenDaysAgo)) {
-      handleMetricValue(metric, totals.prev7Days, metricCalcType)
-    }
+    handleTimeslot(
+      metric,
+      totals.prev7Days,
+      metricCalcType,
+      createdAt,
+      fourteenDaysAgo,
+      sevenDaysAgo
+    )
+
     // Last 30 days
-    if (dateFallsInsideTimeslot(createdAt, thirtyDaysAgo, reportMorning)) {
-      handleMetricValue(metric, totals.last30Days, metricCalcType)
-    }
+    handleTimeslot(
+      metric,
+      totals.last30Days,
+      metricCalcType,
+      createdAt,
+      thirtyDaysAgo,
+      reportMorning
+    )
+
     // Previous 30 days
-    if (dateFallsInsideTimeslot(createdAt, sixtyDaysAgo, thirtyDaysAgo)) {
-      handleMetricValue(metric, totals.prev30Days, metricCalcType)
-    }
+    handleTimeslot(
+      metric,
+      totals.prev30Days,
+      metricCalcType,
+      createdAt,
+      sixtyDaysAgo,
+      thirtyDaysAgo
+    )
+
     // Last year
-    if (dateFallsInsideTimeslot(createdAt, oneYearAgo, reportMorning)) {
-      handleMetricValue(metric, totals.lastYear, metricCalcType)
-    }
+    handleTimeslot(
+      metric,
+      totals.lastYear,
+      metricCalcType,
+      createdAt,
+      oneYearAgo,
+      reportMorning
+    )
+
     // Previous year
-    if (dateFallsInsideTimeslot(createdAt, twoYearsAgo, oneYearAgo)) {
-      handleMetricValue(metric, totals.prevYear, metricCalcType)
-    }
+    handleTimeslot(
+      metric,
+      totals.prevYear,
+      metricCalcType,
+      createdAt,
+      twoYearsAgo,
+      oneYearAgo
+    )
+
     // All time
     handleMetricValue(metric, totals.allTime, metricCalcType)
   }
@@ -494,6 +540,49 @@ export async function recalcMetrics(reportingDate, session) {
   )
   const finalTotals = calcAverages(totals)
   return finalTotals
+}
+
+/**
+ * @param {FormTimelineMetric} metric
+ * @param {Map<string, number>} map
+ */
+function handleLiveSubmissions(metric, map) {
+  if (isLiveSubmission(metric)) {
+    const formTotalSoFar = map.get(metric.formId) ?? 0
+    map.set(metric.formId, formTotalSoFar + metric.metricValue)
+  }
+}
+
+/**
+ * @param {FormTimelineMetric} metric
+ * @param {Map<string, number>} map
+ */
+function handleDraftSubmissions(metric, map) {
+  if (isDraftSubmission(metric)) {
+    const formTotalSoFar = map.get(metric.formId) ?? 0
+    map.set(metric.formId, formTotalSoFar + metric.metricValue)
+  }
+}
+
+/**
+ * @param {FormTimelineMetric} metric
+ * @param {Record<string, { count?: number }> | undefined} period
+ * @param {string} metricCalcType
+ * @param {Date} createdAt
+ * @param {Date} startOfSlot
+ * @param {Date} endOfSlot
+ */
+function handleTimeslot(
+  metric,
+  period,
+  metricCalcType,
+  createdAt,
+  startOfSlot,
+  endOfSlot
+) {
+  if (dateFallsInsideTimeslot(createdAt, startOfSlot, endOfSlot)) {
+    handleMetricValue(metric, period, metricCalcType)
+  }
 }
 
 /**
@@ -552,6 +641,6 @@ export async function generateReport() {
 }
 
 /**
- * @import { ClientSession } from 'mongodb'
- * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
+ * @import { ClientSession, FindCursor, WithId } from 'mongodb'
+ * @import { AuditRecordInput, FormMetricType, FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
  */
