@@ -1,14 +1,14 @@
 import { createServer } from '~/src/api/server.js'
 import {
   deleteDlqMessage,
+  getDlqMessage,
   receiveDlqMessages,
-  redriveDlqMessages
+  redriveDlqMessages,
+  resubmitDlqMessage
 } from '~/src/messaging/event.js'
 import { authSuperAdmin as auth } from '~/test/fixtures/auth.js'
 
 jest.mock('~/src/messaging/event.js')
-jest.mock('~/src/mongo.js')
-jest.mock('~/src/plugins/audit-cache.js')
 
 describe('Admin routes', () => {
   /** @type {Server} */
@@ -42,6 +42,20 @@ describe('Admin routes', () => {
       expect(response.headers['content-type']).toContain(jsonContentType)
       expect(response.result).toEqual({ messages: [{ MessageId: 'message1' }] })
     })
+
+    test('/admin/dead-letter/view/message-id route returns 200', async () => {
+      jest.mocked(getDlqMessage).mockResolvedValue({ MessageId: 'message1' })
+
+      const response = await server.inject({
+        method: 'GET',
+        url: '/admin/deadletter/view/message1',
+        auth
+      })
+
+      expect(response.statusCode).toEqual(okStatusCode)
+      expect(response.headers['content-type']).toContain(jsonContentType)
+      expect(response.result).toEqual({ message: { MessageId: 'message1' } })
+    })
   })
 
   describe('POST', () => {
@@ -57,6 +71,22 @@ describe('Admin routes', () => {
       expect(response.result).toEqual({ message: 'success' })
       expect(redriveDlqMessages).toHaveBeenCalled()
     })
+
+    test('/admin/dead-letter/resubmit route returns 200', async () => {
+      const response = await server.inject({
+        method: 'POST',
+        url: '/admin/deadletter/resubmit/12345',
+        auth,
+        payload: {
+          messageJson: {}
+        }
+      })
+
+      expect(response.statusCode).toEqual(okStatusCode)
+      expect(response.headers['content-type']).toContain(jsonContentType)
+      expect(response.result).toEqual({ message: 'success' })
+      expect(resubmitDlqMessage).toHaveBeenCalled()
+    })
   })
 
   describe('DELETE', () => {
@@ -70,7 +100,11 @@ describe('Admin routes', () => {
       expect(response.statusCode).toEqual(okStatusCode)
       expect(response.headers['content-type']).toContain(jsonContentType)
       expect(response.result).toEqual({ message: 'success' })
-      expect(deleteDlqMessage).toHaveBeenCalledWith('message-id')
+      expect(deleteDlqMessage).toHaveBeenCalledWith(
+        'message-id',
+        undefined,
+        undefined
+      )
     })
   })
 })
