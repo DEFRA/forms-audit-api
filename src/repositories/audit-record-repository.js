@@ -114,6 +114,45 @@ export async function getConsolidatedAuditRecords(filter, pagination) {
 }
 
 /**
+ * Retrieve all the audit records of the particular type, from the specified date
+ * @param {AuditEventMessageType} type
+ * @param {Date} reportDate
+ * @param {ClientSession} session
+ * @returns {FindCursor<WithId<AuditRecordInput>>}
+ */
+export function getAuditRecordsOfType(type, reportDate, session) {
+  const coll = getCollection()
+
+  const withoutTime = reportDate.toISOString().substring(0, 10)
+  const startOfDay = `${withoutTime}T00:00:00.000Z`
+  const endOfDay = `${withoutTime}T23:59:59.999Z`
+
+  try {
+    const cursor = /** @type {FindCursor<WithId<AuditRecordInput>>} */ (
+      coll
+        .find(
+          {
+            type,
+            createdAt: {
+              $gte: new Date(startOfDay),
+              $lte: new Date(endOfDay)
+            }
+          },
+          { session }
+        )
+        .sort({ createdAt: -1 })
+    )
+    return cursor
+  } catch (err) {
+    logger.error(
+      err,
+      `Failed to read audit timeline metrics for type ${type} on date ${reportDate.toISOString()} - ${getErrorMessage(err)}`
+    )
+    throw err
+  }
+}
+
+/**
  * Creates an audit record from AuditRecordInput.
  * Note: Cache invalidation should be done after transaction commits.
  * @param {AuditRecordInput} auditRecordInput
@@ -137,7 +176,7 @@ export async function createAuditRecord(auditRecordInput, session) {
 }
 
 /**
- * @import { AuditRecordInput, PaginationOptions } from '@defra/forms-model'
- * @import { ClientSession, Collection, Filter, WithId } from 'mongodb'
+ * @import { AuditEventMessageType, AuditRecordInput, PaginationOptions } from '@defra/forms-model'
+ * @import { ClientSession, Collection, Filter, FindCursor, WithId } from 'mongodb'
  * @import { ConsolidatedAuditResult, FacetResult } from '~/src/repositories/aggregation/types.js'
  */

@@ -3,14 +3,19 @@ import { FormMetricName, FormMetricType, FormStatus } from '@defra/forms-model'
 import { buildMockCollection } from '~/src/api/forms/__stubs__/mongo.js'
 import { db } from '~/src/mongo.js'
 import {
+  clearMetricsData,
   deleteFormOverviewMetrics,
   getAllMetricsOfType,
   getAllOverviewMetrics,
   getAllTimelineMetrics,
+  getFirstDraft,
   getFormOverviewMetrics,
   getFormTimelineMetrics,
   getMetricTotals,
+  getNumberOfFormsInDraft,
+  getTimelineMetricsForMetricName,
   grabLock,
+  isFirstPublish,
   releaseLock,
   saveFormOverviewMetrics,
   saveFormTimelineMetrics,
@@ -457,8 +462,198 @@ describe('metrics-repository', () => {
       expect(() => getMetricTotals(mockSession)).toThrow('Bad cursor')
     })
   })
+
+  describe('getTimelineMetricsForMetricName', () => {
+    it('should get records for specific formId and metric name', async () => {
+      mockCollection.find.mockReturnValueOnce({
+        sort: jest.fn(() => {
+          return { toArray: () => [] }
+        })
+      })
+      await getTimelineMetricsForMetricName(
+        'metric-name',
+        'form-id',
+        mockSession
+      )
+      expect(mockCollection.find).toHaveBeenCalledWith(
+        {
+          type: FormMetricType.TimelineMetric,
+          metricName: 'metric-name',
+          formId: 'form-id'
+        },
+        { session: {} }
+      )
+    })
+
+    it('should throw if error', async () => {
+      mockCollection.find.mockReturnValueOnce({
+        sort: () => {
+          throw new Error('bad db call passing metric name')
+        }
+      })
+      await expect(() =>
+        getTimelineMetricsForMetricName('metric-name', 'form-id', mockSession)
+      ).rejects.toThrow('bad db call passing metric name')
+    })
+  })
+
+  describe('isFirstPublish', () => {
+    it('should return true if one or fewer records', async () => {
+      mockCollection.countDocuments.mockReturnValueOnce(1)
+      const res = await isFirstPublish('form-id', mockSession)
+      expect(res).toBe(true)
+      expect(mockCollection.countDocuments).toHaveBeenCalledWith(
+        {
+          type: FormMetricType.TimelineMetric,
+          metricName: FormMetricName.FormsPublished,
+          formId: 'form-id'
+        },
+        { session: {} }
+      )
+    })
+
+    it('should return false if two or more records', async () => {
+      mockCollection.countDocuments.mockReturnValueOnce(2)
+      const res = await isFirstPublish('form-id', mockSession)
+      expect(res).toBe(false)
+      expect(mockCollection.countDocuments).toHaveBeenCalledWith(
+        {
+          type: FormMetricType.TimelineMetric,
+          metricName: FormMetricName.FormsPublished,
+          formId: 'form-id'
+        },
+        { session: {} }
+      )
+    })
+
+    it('should throw if error', async () => {
+      mockCollection.countDocuments.mockImplementationOnce(() => {
+        throw new Error('bad db call')
+      })
+      await expect(() =>
+        isFirstPublish('form-id', mockSession)
+      ).rejects.toThrow('bad db call')
+    })
+  })
+
+  describe('getFirstDraft', () => {
+    it('should return record if exists', async () => {
+      mockCollection.find.mockReturnValueOnce({
+        sort: jest.fn(() => {
+          return { toArray: () => [{ draft1: 123 }, { draft2: 456 }] }
+        })
+      })
+      const res = await getFirstDraft('form-id', mockSession)
+      expect(res).toEqual({ draft1: 123 })
+      expect(mockCollection.find).toHaveBeenCalledWith(
+        {
+          type: FormMetricType.TimelineMetric,
+          metricName: FormMetricName.NewFormsCreated,
+          formId: 'form-id'
+        },
+        { session: {} }
+      )
+    })
+
+    it('should return undefined if no records', async () => {
+      mockCollection.find.mockReturnValueOnce({
+        sort: jest.fn(() => {
+          return { toArray: () => [] }
+        })
+      })
+      const res = await getFirstDraft('form-id', mockSession)
+      expect(res).toBeUndefined()
+      expect(mockCollection.find).toHaveBeenCalledWith(
+        {
+          type: FormMetricType.TimelineMetric,
+          metricName: FormMetricName.NewFormsCreated,
+          formId: 'form-id'
+        },
+        { session: {} }
+      )
+    })
+
+    it('should throw if error', async () => {
+      mockCollection.find.mockImplementationOnce(() => {
+        throw new Error('bad db call')
+      })
+      await expect(() => getFirstDraft('form-id', mockSession)).rejects.toThrow(
+        'bad db call'
+      )
+    })
+  })
+
+  describe('getNumberOfFormsInDraft', () => {
+    const testDate = new Date('2026-04-01')
+
+    it('should return number from specific date', async () => {
+      mockCollection.findOne.mockResolvedValueOnce({ metricValue: 5 })
+      const res = await getNumberOfFormsInDraft(testDate, mockSession)
+      expect(res).toBe(5)
+      expect(mockCollection.findOne).toHaveBeenCalledWith(
+        {
+          type: FormMetricType.TimelineMetric,
+          metricName: FormMetricName.FormsInDraft,
+          createdAt: {
+            $gte: new Date('2026-04-01T00:00:00.000Z'),
+            $lte: new Date('2026-04-01T23:59:59.999Z')
+          }
+        },
+        { session: {} }
+      )
+    })
+
+    it('should return zero if not found', async () => {
+      mockCollection.findOne.mockResolvedValueOnce({})
+      const res = await getNumberOfFormsInDraft(testDate, mockSession)
+      expect(res).toBe(0)
+      expect(mockCollection.findOne).toHaveBeenCalledWith(
+        {
+          type: FormMetricType.TimelineMetric,
+          metricName: FormMetricName.FormsInDraft,
+          createdAt: {
+            $gte: new Date('2026-04-01T00:00:00.000Z'),
+            $lte: new Date('2026-04-01T23:59:59.999Z')
+          }
+        },
+        { session: {} }
+      )
+    })
+
+    it('should throw if error', async () => {
+      mockCollection.findOne.mockImplementationOnce(() => {
+        throw new Error('bad db call')
+      })
+      await expect(() =>
+        getNumberOfFormsInDraft(testDate, mockSession)
+      ).rejects.toThrow('bad db call')
+    })
+  })
+
+  describe('clearMetricsData', () => {
+    it('should delete records', async () => {
+      await clearMetricsData(mockSession)
+      expect(mockCollection.deleteMany).toHaveBeenCalledWith(
+        {
+          type: {
+            $ne: 'form-metric-control'
+          }
+        },
+        { session: {} }
+      )
+    })
+
+    it('should throw if error', async () => {
+      mockCollection.deleteMany.mockImplementationOnce(() => {
+        throw new Error('bad db call')
+      })
+      await expect(() => clearMetricsData(mockSession)).rejects.toThrow(
+        'bad db call'
+      )
+    })
+  })
 })
 
 /**
- * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
+ * @import { FormOverviewMetric, FormTimelineMetric } from '@defra/forms-model'
  */
