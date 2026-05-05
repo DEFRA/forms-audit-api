@@ -73,11 +73,11 @@ describe('event', () => {
       }
 
       snsMock.on(ReceiveMessageCommand).resolves(receivedMessage)
-      await receiveDlqMessages()
+      await receiveDlqMessages(2, 1)
       expect(snsMock).toHaveReceivedCommandWith(ReceiveMessageCommand, {
         QueueUrl: expect.any(String),
-        VisibilityTimeout: 3,
-        WaitTimeSeconds: 3
+        VisibilityTimeout: 2,
+        WaitTimeSeconds: 1
       })
     })
   })
@@ -107,12 +107,12 @@ describe('event', () => {
       }
 
       snsMock.on(ReceiveMessageCommand).resolves(receivedMessage)
-      await deleteDlqMessage(messageStub.MessageId, 5, 2)
+      await deleteDlqMessage(messageStub.MessageId, 2, 1)
       expect(snsMock).toHaveReceivedCommandWith(ReceiveMessageCommand, {
         QueueUrl: expect.any(String),
         MaxNumberOfMessages: 10,
-        VisibilityTimeout: 5,
-        WaitTimeSeconds: 2
+        VisibilityTimeout: 2,
+        WaitTimeSeconds: 1
       })
       expect(snsMock).toHaveReceivedCommandWith(DeleteMessageCommand, {
         QueueUrl: expect.any(String),
