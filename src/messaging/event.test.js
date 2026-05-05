@@ -11,6 +11,7 @@ import 'aws-sdk-client-mock-jest'
 import {
   deleteDlqMessage,
   deleteEventMessage,
+  getDlqMessage,
   receiveDlqMessages,
   receiveEventMessages,
   redriveDlqMessages,
@@ -78,6 +79,20 @@ describe('event', () => {
         QueueUrl: expect.any(String),
         VisibilityTimeout: 2,
         WaitTimeSeconds: 1
+      })
+    })
+
+    it('should receive dead-letter queue messages with default settings', async () => {
+      const receivedMessage = {
+        Messages: [messageStub]
+      }
+
+      snsMock.on(ReceiveMessageCommand).resolves(receivedMessage)
+      await receiveDlqMessages()
+      expect(snsMock).toHaveReceivedCommandWith(ReceiveMessageCommand, {
+        QueueUrl: expect.any(String),
+        VisibilityTimeout: 3,
+        WaitTimeSeconds: 3
       })
     })
   })
@@ -172,6 +187,22 @@ describe('event', () => {
       await expect(() =>
         resubmitDlqMessage(messageStub.MessageId, messageStub.Body)
       ).rejects.toThrow('bad SQS command')
+    })
+  })
+
+  describe('getDlqMessage', () => {
+    it('should receive dead-letter queue message with default timing values', async () => {
+      const receivedMessage = {
+        Messages: [messageStub]
+      }
+
+      snsMock.on(ReceiveMessageCommand).resolves(receivedMessage)
+      await getDlqMessage(messageId)
+      expect(snsMock).toHaveReceivedCommandWith(ReceiveMessageCommand, {
+        QueueUrl: expect.any(String),
+        VisibilityTimeout: 3,
+        WaitTimeSeconds: 3
+      })
     })
   })
 })
