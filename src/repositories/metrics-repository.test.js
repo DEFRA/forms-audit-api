@@ -412,6 +412,45 @@ describe('metrics-repository', () => {
       })
       const res = getAllOverviewMetrics({}, mockSession)
       expect(res).toEqual({ cursor: {} })
+      expect(mockCollection.find).toHaveBeenCalledWith(
+        { type: 'overview-metric' },
+        { session: {} }
+      )
+    })
+
+    it('should get overview metrics with filter', () => {
+      mockCollection.find.mockReturnValueOnce({
+        sort: jest.fn(() => {
+          return { cursor: {} }
+        })
+      })
+      const filter = {
+        searchText: 'some text',
+        status: ['draft', 'live'],
+        org: ['Org1', 'Org2']
+      }
+      const res = getAllOverviewMetrics(filter, mockSession)
+      expect(res).toEqual({ cursor: {} })
+      expect(mockCollection.find).toHaveBeenCalledWith(
+        {
+          type: 'overview-metric',
+          'summaryMetrics.name': { $regex: 'some text', $options: 'i' },
+          formStatus: {
+            $in: ['draft', 'live']
+          },
+          'summaryMetrics.organisation': {
+            $in: ['Org1', 'Org2']
+          }
+        },
+        { session: {} }
+      )
+    })
+
+    it('should throw overview metrics if error', () => {
+      mockCollection.find.mockImplementationOnce(() => {
+        throw new Error('bad find')
+      })
+      expect(() => getAllOverviewMetrics({}, mockSession)).toThrow('bad find')
     })
 
     it('should get all timeline metrics', () => {
