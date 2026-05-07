@@ -651,7 +651,7 @@ function createFormMap(metricValues) {
 /**
  * @param {{ overview: FormOverviewMetric[], totals: FormTotalsMetric}} metrics
  */
-function applyExtraColumns(metrics) {
+export function applyExtraColumns(metrics) {
   // Create a map of certain counts per form for quicker lookups
   const submissionCountsLive = createFormMap(metrics.totals.liveSubmissions)
   const submissionCountsDraft = createFormMap(metrics.totals.draftSubmissions)
