@@ -447,8 +447,10 @@ describe('metrics-repository', () => {
     })
 
     it('should throw overview metrics if error', () => {
-      mockCollection.find.mockImplementationOnce(() => {
-        throw new Error('bad find')
+      mockCollection.find.mockReturnValueOnce({
+        sort: jest.fn(() => {
+          throw new Error('bad find')
+        })
       })
       expect(() => getAllOverviewMetrics({}, mockSession)).toThrow('bad find')
     })
@@ -461,6 +463,15 @@ describe('metrics-repository', () => {
       })
       const res = getAllTimelineMetrics(mockSession)
       expect(res).toEqual({ cursor: {} })
+    })
+
+    it('should throw timeline metrics if error', () => {
+      mockCollection.find.mockReturnValueOnce({
+        sort: jest.fn(() => {
+          throw new Error('bad find')
+        })
+      })
+      expect(() => getAllTimelineMetrics(mockSession)).toThrow('bad find')
     })
 
     it('should get metrics totals', () => {
