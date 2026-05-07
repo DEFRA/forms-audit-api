@@ -35,6 +35,13 @@ import {
   updateMetricTotals
 } from '~/src/repositories/metrics-repository.js'
 
+/**
+ * @typedef {object} FilterCriteria
+ * @property {string} [searchText] - text to search within a form name
+ * @property {string[]} [status] - array of statuses
+ * @property {string[]} [org] - arrays of organisations
+ */
+
 const managerUrl = config.get('managerUrl')
 const submissionUrl = config.get('submissionUrl')
 
@@ -610,16 +617,19 @@ export function decrementCountsForRepublish(map) {
 
 /**
  * Generates a report based on the stored metrics
+ * @param {FilterCriteria} filter
  */
-export async function generateReport() {
+export async function generateReport(filter) {
   const session = client.startSession()
 
   try {
-    // Overview
-    const overview = await getAllOverviewMetrics(session).toArray()
+    // Get raw metrics
+    const overview = await getAllOverviewMetrics(filter, session).toArray()
     const totals = await getMetricTotals(session)
+    // Apply extra columns: submssionsCount, re-published, daysToPublish
+    const overviewFull = applyExtraColumns({ overview, totals })
     return {
-      overview,
+      overview: overviewFull,
       totals
     }
   } finally {
@@ -628,6 +638,45 @@ export async function generateReport() {
 }
 
 /**
+ * @param {Record<string, number> | undefined} metricValues
+ */
+function createFormMap(metricValues) {
+  const formMap = new Map()
+  for (const [formId, count] of Object.entries(metricValues ?? {})) {
+    formMap.set(formId, count)
+  }
+  return formMap
+}
+
+/**
+ * @param {{ overview: FormOverviewMetric[], totals: FormTotalsMetric}} metrics
+ */
+function applyExtraColumns(metrics) {
+  // Create a map of certain counts per form for quicker lookups
+  const submissionCountsLive = createFormMap(metrics.totals.liveSubmissions)
+  const submissionCountsDraft = createFormMap(metrics.totals.draftSubmissions)
+  const formDaysToPublish = createFormMap(metrics.totals.daysToPublish)
+  const formRepublished = createFormMap(metrics.totals.republished)
+
+  return metrics.overview.map((metric) => ({
+    summaryMetrics: metric.summaryMetrics,
+    formName: metric.summaryMetrics.name,
+    submissionsCount:
+      (metric.formStatus === FormStatus.Live
+        ? submissionCountsLive.get(metric.formId)
+        : submissionCountsDraft.get(metric.formId)) ?? 0,
+    daysToPublish:
+      metric.formStatus === FormStatus.Live
+        ? (formDaysToPublish.get(metric.formId) ?? 0)
+        : undefined,
+    republished:
+      metric.formStatus === FormStatus.Live
+        ? (formRepublished.get(metric.formId) ?? 0)
+        : undefined
+  }))
+}
+
+/**
  * @import { ClientSession, FindCursor, WithId } from 'mongodb'
- * @import { AuditRecordInput, FormMetricType, FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
+ * @import { AuditRecordInput, FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
  */

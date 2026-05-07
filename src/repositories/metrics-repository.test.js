@@ -5,7 +5,6 @@ import { db } from '~/src/mongo.js'
 import {
   clearMetricsData,
   deleteFormOverviewMetrics,
-  getAllMetricsOfType,
   getAllOverviewMetrics,
   getAllTimelineMetrics,
   getFirstDraft,
@@ -404,14 +403,14 @@ describe('metrics-repository', () => {
     })
   })
 
-  describe('getAllxxxxMetrics', () => {
+  describe('getAllMetrics', () => {
     it('should get all overview metrics', () => {
       mockCollection.find.mockReturnValueOnce({
         sort: jest.fn(() => {
           return { cursor: {} }
         })
       })
-      const res = getAllOverviewMetrics(mockSession)
+      const res = getAllOverviewMetrics({}, mockSession)
       expect(res).toEqual({ cursor: {} })
     })
 
@@ -423,30 +422,6 @@ describe('metrics-repository', () => {
       })
       const res = getAllTimelineMetrics(mockSession)
       expect(res).toEqual({ cursor: {} })
-    })
-
-    it('should get metrics of type', () => {
-      mockCollection.find.mockReturnValueOnce({
-        sort: jest.fn(() => {
-          return { cursor: {} }
-        })
-      })
-      const res = getAllMetricsOfType(
-        FormMetricType.OverviewMetric,
-        mockSession
-      )
-      expect(res).toEqual({ cursor: {} })
-    })
-
-    it('should throw if error when getting metrics of type', () => {
-      mockCollection.find.mockReturnValueOnce({
-        sort: jest.fn().mockImplementationOnce(() => {
-          throw new Error('Bad cursor')
-        })
-      })
-      expect(() =>
-        getAllMetricsOfType(FormMetricType.OverviewMetric, mockSession)
-      ).toThrow('Bad cursor')
     })
 
     it('should get metrics totals', () => {
