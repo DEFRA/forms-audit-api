@@ -5,7 +5,6 @@ import { db } from '~/src/mongo.js'
 import {
   clearMetricsData,
   deleteFormOverviewMetrics,
-  getAllMetricsOfType,
   getAllOverviewMetrics,
   getAllTimelineMetrics,
   getFirstDraft,
@@ -404,15 +403,56 @@ describe('metrics-repository', () => {
     })
   })
 
-  describe('getAllxxxxMetrics', () => {
+  describe('getAllMetrics', () => {
     it('should get all overview metrics', () => {
       mockCollection.find.mockReturnValueOnce({
         sort: jest.fn(() => {
           return { cursor: {} }
         })
       })
-      const res = getAllOverviewMetrics(mockSession)
+      const res = getAllOverviewMetrics({}, mockSession)
       expect(res).toEqual({ cursor: {} })
+      expect(mockCollection.find).toHaveBeenCalledWith(
+        { type: 'overview-metric' },
+        { session: {} }
+      )
+    })
+
+    it('should get overview metrics with filter', () => {
+      mockCollection.find.mockReturnValueOnce({
+        sort: jest.fn(() => {
+          return { cursor: {} }
+        })
+      })
+      const filter = {
+        searchText: 'some text',
+        status: ['draft', 'live'],
+        org: ['Org1', 'Org2']
+      }
+      const res = getAllOverviewMetrics(filter, mockSession)
+      expect(res).toEqual({ cursor: {} })
+      expect(mockCollection.find).toHaveBeenCalledWith(
+        {
+          type: 'overview-metric',
+          'summaryMetrics.name': { $regex: 'some text', $options: 'i' },
+          formStatus: {
+            $in: ['draft', 'live']
+          },
+          'summaryMetrics.organisation': {
+            $in: ['Org1', 'Org2']
+          }
+        },
+        { session: {} }
+      )
+    })
+
+    it('should throw overview metrics if error', () => {
+      mockCollection.find.mockReturnValueOnce({
+        sort: jest.fn(() => {
+          throw new Error('bad find')
+        })
+      })
+      expect(() => getAllOverviewMetrics({}, mockSession)).toThrow('bad find')
     })
 
     it('should get all timeline metrics', () => {
@@ -425,28 +465,13 @@ describe('metrics-repository', () => {
       expect(res).toEqual({ cursor: {} })
     })
 
-    it('should get metrics of type', () => {
+    it('should throw timeline metrics if error', () => {
       mockCollection.find.mockReturnValueOnce({
         sort: jest.fn(() => {
-          return { cursor: {} }
+          throw new Error('bad find')
         })
       })
-      const res = getAllMetricsOfType(
-        FormMetricType.OverviewMetric,
-        mockSession
-      )
-      expect(res).toEqual({ cursor: {} })
-    })
-
-    it('should throw if error when getting metrics of type', () => {
-      mockCollection.find.mockReturnValueOnce({
-        sort: jest.fn().mockImplementationOnce(() => {
-          throw new Error('Bad cursor')
-        })
-      })
-      expect(() =>
-        getAllMetricsOfType(FormMetricType.OverviewMetric, mockSession)
-      ).toThrow('Bad cursor')
+      expect(() => getAllTimelineMetrics(mockSession)).toThrow('bad find')
     })
 
     it('should get metrics totals', () => {
