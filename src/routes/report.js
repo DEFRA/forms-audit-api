@@ -1,4 +1,5 @@
 import { Scopes } from '@defra/forms-model'
+import Joi from 'joi'
 
 import {
   generateReport,
@@ -7,6 +8,15 @@ import {
 
 const HTTP_OK = 200
 
+const filteringSchema = Joi.object({
+  searchText: Joi.string().optional(),
+  status: Joi.array()
+    .items(Joi.string().valid('draft', 'live'))
+    .single()
+    .optional(),
+  org: Joi.array().items(Joi.string()).single().optional()
+})
+
 export default [
   /**
    * @satisfies {ServerRoute}
@@ -14,13 +24,17 @@ export default [
   ({
     method: 'GET',
     path: '/report',
-    async handler(_request, h) {
-      const metrics = await generateReport()
+    async handler(request, h) {
+      const { query } = request
+      const metrics = await generateReport(query)
 
       return h.response(metrics).code(HTTP_OK)
     },
     options: {
-      auth: false
+      auth: false,
+      validate: {
+        query: filteringSchema
+      }
     }
   }),
 

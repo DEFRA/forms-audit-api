@@ -29,6 +29,7 @@ describe('Report routes', () => {
     test('/report route returns 200', async () => {
       jest
         .mocked(generateReport)
+        // @ts-expect-error - partial data mock
         .mockResolvedValue({ overview: [], totals: null })
 
       const response = await server.inject({

@@ -155,13 +155,47 @@ export async function getFormTimelineMetrics(formId, session) {
 
 /**
  * Get all overview metrics
+ * @param {FilterCriteria} filter
  * @param {ClientSession} session
  * @returns {FindCursor<WithId<FormOverviewMetric>>}
  */
-export function getAllOverviewMetrics(session) {
-  return /** @type {FindCursor<WithId<FormOverviewMetric>>} */ (
-    getAllMetricsOfType(FormMetricType.OverviewMetric, session)
-  )
+export function getAllOverviewMetrics(filter, session) {
+  const coll = getMetricCollection()
+
+  const filterPart1 = filter.searchText
+    ? { 'summaryMetrics.name': { $regex: filter.searchText, $options: 'i' } }
+    : {}
+
+  const filterPart2 = filter.status
+    ? { formStatus: { $in: filter.status } }
+    : {}
+
+  const filterPart3 = filter.org
+    ? { 'summaryMetrics.organisation': { $in: filter.org } }
+    : {}
+
+  try {
+    const cursor = /** @type {FindCursor<WithId<FormOverviewMetric>>} */ (
+      coll
+        .find(
+          {
+            type: FormMetricType.OverviewMetric,
+            ...filterPart1,
+            ...filterPart2,
+            ...filterPart3
+          },
+          { session }
+        )
+        .sort({ updatedAt: -1 })
+    )
+    return cursor
+  } catch (err) {
+    logger.error(
+      err,
+      `Failed to read all overview metrics - ${getErrorMessage(err)}`
+    )
+    throw err
+  }
 }
 
 /**
@@ -170,9 +204,22 @@ export function getAllOverviewMetrics(session) {
  * @returns {FindCursor<WithId<FormTimelineMetric>>}
  */
 export function getAllTimelineMetrics(session) {
-  return /** @type {FindCursor<WithId<FormTimelineMetric>>} */ (
-    getAllMetricsOfType(FormMetricType.TimelineMetric, session)
-  )
+  const coll = getMetricCollection()
+
+  try {
+    const cursor = /** @type {FindCursor<WithId<FormTimelineMetric>>} */ (
+      coll
+        .find({ type: FormMetricType.TimelineMetric }, { session })
+        .sort({ updatedAt: -1 })
+    )
+    return cursor
+  } catch (err) {
+    logger.error(
+      err,
+      `Failed to read all timeline metrics - ${getErrorMessage(err)}`
+    )
+    throw err
+  }
 }
 
 /**
@@ -205,27 +252,6 @@ export async function getTimelineMetricsForMetricName(
       err,
       `Failed to read timeline metric for metric ${metricName} and form id ${formId} - ${getErrorMessage(err)}`
     )
-    throw err
-  }
-}
-
-/**
- * Gets all metric records of the specified type.
- * @param {FormMetricType} metricType
- * @param {ClientSession} session
- * @returns {FindCursor<WithId<FormOverviewMetric | FormTimelineMetric>>}
- */
-export function getAllMetricsOfType(metricType, session) {
-  const coll = getMetricCollection()
-
-  try {
-    const cursor =
-      /** @type {FindCursor<WithId<FormOverviewMetric | FormTimelineMetric>>} */ (
-        coll.find({ type: metricType }, { session }).sort({ updatedAt: -1 })
-      )
-    return cursor
-  } catch (err) {
-    logger.error(err, `Failed to read all metrics - ${getErrorMessage(err)}`)
     throw err
   }
 }
@@ -265,7 +291,9 @@ export function getMetricTotals(session) {
   const coll = getMetricCollection()
 
   try {
-    return coll.findOne({ type: FormMetricType.TotalsMetric }, { session })
+    return /** @type {Promise<WithId<FormTotalsMetric>>} */ (
+      coll.findOne({ type: FormMetricType.TotalsMetric }, { session })
+    )
   } catch (err) {
     logger.error(err, `Failed to get totals metric - ${getErrorMessage(err)}`)
     throw err
@@ -534,4 +562,5 @@ export async function clearMetricsData(session) {
 /**
  * @import { ClientSession, Collection, FindCursor, WithId } from 'mongodb'
  * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
+ * @import { FilterCriteria } from '~/src/service/metrics.js'
  */

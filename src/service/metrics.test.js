@@ -1,12 +1,15 @@
 import { FormMetricName, FormMetricType, FormStatus } from '@defra/forms-model'
 import { startOfDay, sub } from 'date-fns'
+import { ObjectId } from 'mongodb'
 
 import { getJson } from '~/src/lib/fetch.js'
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
 import {
+  getAllOverviewMetrics,
   getAllTimelineMetrics,
   getFirstDraft,
+  getMetricTotals,
   getNumberOfFormsInDraft,
   grabLock,
   isFirstPublish,
@@ -15,9 +18,11 @@ import {
   saveFormTimelineMetrics
 } from '~/src/repositories/metrics-repository.js'
 import {
+  applyExtraColumns,
   collectManagerOverviewMetrics,
   collectTimelineMetrics,
   collectTimelineMetricsFromAudit,
+  generateReport,
   recalcMetrics,
   runMetricsCollectionJob,
   setMetricTotal,
@@ -616,8 +621,111 @@ describe('runMetricsCollectionJob', () => {
       expect(period).toEqual({ myMetric: { avgCount: 2, avgTotal: 125 } })
     })
   })
+
+  describe('generateReport', () => {
+    it('should generate report', async () => {
+      const mockNewSession = /** @type {any} */ ({
+        endSession: jest.fn().mockResolvedValue(undefined)
+      })
+      jest.mocked(client.startSession).mockReturnValue(mockNewSession)
+
+      const overviewMetrics = /** @type {WithId<FormOverviewMetric>[]} */ ([
+        {
+          _id: new ObjectId('69fb0727de574045cd8c0b0e'),
+          type: FormMetricType.OverviewMetric,
+          formId: 'form-id-1',
+          formStatus: FormStatus.Live,
+          summaryMetrics: {
+            name: 'Form 1'
+          },
+          featureMetrics: {},
+          submissionsCount: 5,
+          updatedAt: new Date('2026-02-02')
+        }
+      ])
+      jest.mocked(getAllOverviewMetrics).mockReturnValueOnce({
+        // @ts-expect-error - partial data mock
+        toArray: () => overviewMetrics
+      })
+      // @ts-expect-error - partial data mock
+      jest.mocked(getMetricTotals).mockResolvedValueOnce([])
+      const res = await generateReport({})
+      expect(res).toEqual({
+        overview: [
+          {
+            daysToPublish: 0,
+            formName: 'Form 1',
+            republished: 0,
+            submissionsCount: 0,
+            summaryMetrics: {
+              name: 'Form 1'
+            }
+          }
+        ],
+        totals: []
+      })
+    })
+  })
+
+  describe('applyExtraColumns', () => {
+    it('should apply submission counts and others to do with publishing', () => {
+      const metrics = {
+        totals: {
+          liveSubmissions: {
+            'form-id-1': 5,
+            'form-id-2': 7
+          },
+          draftSubmissions: {
+            'form-id-1': 6,
+            'form-id-2': 9
+          },
+          daysToPublish: {
+            'form-id-1': 15
+          },
+          republished: {
+            'form-id-1': 2
+          }
+        },
+        overview: [
+          {
+            formId: 'form-id-1',
+            formStatus: FormStatus.Live,
+            summaryMetrics: {
+              name: 'Form 1'
+            }
+          },
+          {
+            formId: 'form-id-2',
+            formStatus: FormStatus.Draft,
+            summaryMetrics: {
+              name: 'Form 2'
+            }
+          }
+        ]
+      }
+      // @ts-expect-error - partial data mock
+      const res = applyExtraColumns(metrics)
+      expect(res).toEqual([
+        {
+          daysToPublish: 15,
+          formName: 'Form 1',
+          republished: 2,
+          submissionsCount: 5,
+          summaryMetrics: { name: 'Form 1' }
+        },
+        {
+          daysToPublish: undefined,
+          formName: 'Form 2',
+          republished: undefined,
+          submissionsCount: 9,
+          summaryMetrics: { name: 'Form 2' }
+        }
+      ])
+    })
+  })
 })
 
 /**
- * @import { AuditRecordInput, FormTimelineMetric } from '@defra/forms-model'
+ * @import { WithId } from 'mongodb'
+ * @import { AuditRecordInput, FormOverviewMetric, FormTimelineMetric } from '@defra/forms-model'
  */
