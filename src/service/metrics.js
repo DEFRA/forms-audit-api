@@ -83,7 +83,7 @@ export async function runMetricsCollectionJob() {
 
 /**
  * Collect a batch of metrics
- * @returns {Promise<boolean>} stopBatches
+ * @returns {Promise<boolean>} continueBatches
  */
 export async function runMetricsCollectionBatch() {
   logger.info('[metrics] metrics job started')
@@ -104,7 +104,7 @@ export async function runMetricsCollectionBatch() {
         '[metrics] metrics job aborting as another container already has a lock'
       )
       logger.info('[metrics] metrics job finished')
-      return true
+      return false
     }
 
     await session.withTransaction(async () => {
