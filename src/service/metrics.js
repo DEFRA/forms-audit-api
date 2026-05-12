@@ -6,7 +6,6 @@ import {
 import {
   add,
   differenceInDays,
-  format,
   min,
   startOfDay,
   sub,
@@ -35,6 +34,15 @@ import {
   saveFormTimelineMetrics,
   updateMetricTotals
 } from '~/src/repositories/metrics-repository.js'
+import {
+  CalculationTypes,
+  dateFallsInsideTimeslot,
+  formatDateOnly,
+  getMetricCalcType,
+  isDraftSubmission,
+  isLiveSubmission,
+  setTimeOnDate
+} from '~/src/service/metrics-helper.js'
 
 /**
  * @typedef {object} FilterCriteria
@@ -47,55 +55,7 @@ const managerUrl = config.get('managerUrl')
 const submissionUrl = config.get('submissionUrl')
 
 const MAX_DAYS_PER_BATCH = 30
-const EARLIER_REPORT_DATE_AS_STRING = '2025-07-01'
-
-const CalculationTypes = {
-  Accumulation: 'Accumulation',
-  Snapshot: 'Snapshot',
-  Average: 'Average'
-}
-
-const metricConfig =
-  /** { Record<FormMetricName, { calculationType: string }>} */ {
-    [FormMetricName.NewFormsCreated]: {
-      calculationType: CalculationTypes.Accumulation
-    },
-    [FormMetricName.FormsPublished]: {
-      calculationType: CalculationTypes.Accumulation
-    },
-    [FormMetricName.Submissions]: {
-      calculationType: CalculationTypes.Accumulation
-    },
-    [FormMetricName.FormsInDraft]: {
-      calculationType: CalculationTypes.Snapshot
-    },
-    [FormMetricName.TimeToPublish]: {
-      calculationType: CalculationTypes.Average
-    }
-  }
-
-/**
- * @typedef {object} CollectionJobResult
- * @property {boolean} success - true if job was successful
- * @property {string} message - success message or error message
- * @property { Date | undefined } endDate - end date
- * @property {boolean} processMoreBatches - true if more batches need processing
- */
-
-/**
- * @param {Date} date
- */
-export function formatDateOnly(date) {
-  return format(date, 'yyyy-MM-dd')
-}
-
-/**
- * @param {string} inDateStr
- * @param {Date} inTime
- */
-export function setTimeOnDate(inDateStr, inTime) {
-  return new Date(`${inDateStr}T${format(inTime, 'HH:mm:ss')}.000Z`)
-}
+const EARLIEST_REPORT_DATE_AS_STRING = '2025-07-01'
 
 /**
  * Delete all metrics records from teh database (apart from the control record)
@@ -185,13 +145,19 @@ export async function collectMetrics(
   // Make a call for each day since last job run
   // (Normally only one day but also handles full historical data population on first run)
   // For full historical catch-up, it runs in batches until we reach 'yesterday' inclusive)
-  const yesterday = sub(new Date(), { days: 1 })
-  let reportDate =
+  const yesterday = sub(jobStart, { days: 1 })
+  // Reporting start date = last-successful-run + 1, or a fixed time in the past just before events were being stored
+  let reportDate = add(
     lastSuccessfulRunDate ??
-    setTimeOnDate(EARLIER_REPORT_DATE_AS_STRING, yesterday)
-  const maxDate = min([add(reportDate, { days: daysPerBatch }), yesterday])
+      setTimeOnDate(EARLIEST_REPORT_DATE_AS_STRING, yesterday),
+    { days: 1 }
+  )
+  const reportEndDate = min([
+    add(reportDate, { days: daysPerBatch }),
+    yesterday
+  ])
 
-  if (formatDateOnly(reportDate) >= formatDateOnly(maxDate)) {
+  if (formatDateOnly(reportDate) >= formatDateOnly(reportEndDate)) {
     return {
       success: false,
       message: 'Skipped',
@@ -203,7 +169,7 @@ export async function collectMetrics(
   logger.info('[metrics] getting overview metrics')
   await collectManagerOverviewMetrics(jobStart, session)
 
-  while (formatDateOnly(reportDate) <= formatDateOnly(maxDate)) {
+  while (formatDateOnly(reportDate) <= formatDateOnly(reportEndDate)) {
     logger.info(
       `[metrics] getting timeline metrics for ${reportDate.toISOString()}`
     )
@@ -212,13 +178,13 @@ export async function collectMetrics(
     reportDate = add(reportDate, { days: 1 })
   }
 
-  const totals = await recalcMetrics(maxDate, session)
-  await updateMetricTotals(maxDate, totals, session)
+  const totals = await recalcMetrics(reportEndDate, session)
+  await updateMetricTotals(reportEndDate, totals, session)
   return {
     success: true,
     message: 'Completed ok',
     processMoreBatches: formatDateOnly(reportDate) < formatDateOnly(yesterday),
-    endDate: maxDate
+    endDate: reportEndDate
   }
 }
 
@@ -457,43 +423,6 @@ export function updateMetricAverage(metric, period) {
   } else {
     period[metricName] = { avgTotal: metric.metricValue, avgCount: 1 }
   }
-}
-
-/**
- * @param {Date} date
- * @param {Date} startOfRange
- * @param {Date} endOfRange
- */
-function dateFallsInsideTimeslot(date, startOfRange, endOfRange) {
-  return date >= startOfRange && date < endOfRange
-}
-
-/**
- * @param {FormTimelineMetric} metric
- */
-function isDraftSubmission(metric) {
-  return (
-    metric.metricName === FormMetricName.Submissions.toString() &&
-    metric.formStatus === FormStatus.Draft
-  )
-}
-
-/**
- * @param {FormTimelineMetric} metric
- */
-function isLiveSubmission(metric) {
-  return (
-    metric.metricName === FormMetricName.Submissions.toString() &&
-    metric.formStatus === FormStatus.Live
-  )
-}
-
-/**
- * @param {FormTimelineMetric} metric
- */
-function getMetricCalcType(metric) {
-  const metricName = /** @type {FormMetricName} */ (metric.metricName)
-  return metricConfig[metricName].calculationType
 }
 
 /**
@@ -753,4 +682,5 @@ export function applyExtraColumns(metrics) {
 /**
  * @import { ClientSession, FindCursor, WithId } from 'mongodb'
  * @import { AuditRecordInput, FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
+ * @import { CollectionJobResult } from '~/src/service/metrics-helper.js'
  */
