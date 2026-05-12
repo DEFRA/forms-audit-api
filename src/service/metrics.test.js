@@ -662,12 +662,15 @@ describe('runMetricsCollectionJob', () => {
         overview: [
           {
             daysToPublish: 0,
+            formId: 'form-id-1',
             formName: 'Form 1',
+            formStatus: 'live',
             republished: 0,
             submissionsCount: 0,
             summaryMetrics: {
               name: 'Form 1'
-            }
+            },
+            featureMetrics: {}
           }
         ],
         totals: []
@@ -716,17 +719,23 @@ describe('runMetricsCollectionJob', () => {
       expect(res).toEqual([
         {
           daysToPublish: 15,
+          formId: 'form-id-1',
           formName: 'Form 1',
+          formStatus: 'live',
           republished: 2,
           submissionsCount: 5,
-          summaryMetrics: { name: 'Form 1' }
+          summaryMetrics: { name: 'Form 1' },
+          featureMetrics: undefined
         },
         {
           daysToPublish: undefined,
+          formId: 'form-id-2',
           formName: 'Form 2',
+          formStatus: 'draft',
           republished: undefined,
           submissionsCount: 9,
-          summaryMetrics: { name: 'Form 2' }
+          summaryMetrics: { name: 'Form 2' },
+          featureMetrics: undefined
         }
       ])
     })

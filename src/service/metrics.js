@@ -662,8 +662,11 @@ export function applyExtraColumns(metrics) {
   const formRepublished = createFormMap(metrics.totals.republished)
 
   return metrics.overview.map((metric) => ({
+    featureMetrics: metric.featureMetrics,
     summaryMetrics: metric.summaryMetrics,
+    formId: metric.formId,
     formName: metric.summaryMetrics.name,
+    formStatus: metric.formStatus,
     submissionsCount:
       (metric.formStatus === FormStatus.Live
         ? submissionCountsLive.get(metric.formId)
