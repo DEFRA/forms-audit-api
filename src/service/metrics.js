@@ -7,6 +7,7 @@ import {
   add,
   differenceInDays,
   format,
+  min,
   startOfDay,
   sub,
   subDays,
@@ -45,6 +46,9 @@ import {
 const managerUrl = config.get('managerUrl')
 const submissionUrl = config.get('submissionUrl')
 
+const MAX_DAYS_PER_BATCH = 30
+const EARLIER_REPORT_DATE_AS_STRING = '2025-07-01'
+
 const CalculationTypes = {
   Accumulation: 'Accumulation',
   Snapshot: 'Snapshot',
@@ -71,6 +75,14 @@ const metricConfig =
   }
 
 /**
+ * @typedef {object} CollectionJobResult
+ * @property {boolean} success - true if job was successful
+ * @property {string} message - success message or error message
+ * @property { Date | undefined } endDate - end date
+ * @property {boolean} processMoreBatches - true if more batches need processing
+ */
+
+/**
  * @param {Date} date
  */
 export function formatDateOnly(date) {
@@ -78,15 +90,51 @@ export function formatDateOnly(date) {
 }
 
 /**
- * Collect metrics
- * @param {boolean} deleteDatabase
+ * @param {string} inDateStr
+ * @param {Date} inTime
  */
-export async function runMetricsCollectionJob(deleteDatabase = false) {
-  logger.info('[metrics] metrics job started')
-  const result = {
-    success: false,
-    message: ''
+export function setTimeOnDate(inDateStr, inTime) {
+  return new Date(`${inDateStr}T${format(inTime, 'HH:mm:ss')}.000Z`)
+}
+
+/**
+ * Delete all metrics records from teh database (apart from the control record)
+ */
+export async function clearMetricsDatabase() {
+  const session = client.startSession()
+  try {
+    await session.withTransaction(async () => {
+      await clearMetricsData(session)
+    })
+  } finally {
+    await session.endSession()
   }
+}
+
+/**
+ * Collect metrics (this may involve multiple batches being collected)
+ */
+export async function runMetricsCollectionJob() {
+  let continueProcessingBatches = true
+  do {
+    continueProcessingBatches = await runMetricsCollectionBatch()
+  } while (continueProcessingBatches)
+}
+
+/**
+ * Collect a batch of metrics
+ * @returns {Promise<boolean>} stopBatches
+ */
+export async function runMetricsCollectionBatch() {
+  logger.info('[metrics] metrics job started')
+
+  let result = /* @type {CollectionJobResult} */ {
+    success: false,
+    processMoreBatches: false,
+    message: '',
+    endDate: /** @type { Date | undefined } */ (undefined)
+  }
+
   const session = client.startSession()
   try {
     const jobStart = new Date()
@@ -96,46 +144,66 @@ export async function runMetricsCollectionJob(deleteDatabase = false) {
         '[metrics] metrics job aborting as another container already has a lock'
       )
       logger.info('[metrics] metrics job finished')
-      return
+      return true
     }
 
     await session.withTransaction(async () => {
-      if (deleteDatabase) {
-        await clearMetricsData(session)
-        lockResult.lastSuccessfulRun = null
-      }
-      await collectMetrics(jobStart, lockResult.lastSuccessfulRun, session)
-      result.success = true
-      result.message = 'Completed ok'
+      result = await collectMetrics(
+        jobStart,
+        lockResult.lastSuccessfulRun,
+        MAX_DAYS_PER_BATCH,
+        session
+      )
     })
   } catch (err) {
     const message = getErrorMessage(err)
     logger.error(err, `[metrics] metrics job failed - ${message}`)
     result.message = message
   } finally {
-    await releaseLock(result.success, result.message, session)
+    await releaseLock(result, session)
     await session.endSession()
   }
 
   logger.info('[metrics] metrics job finished')
+  return result.processMoreBatches
 }
 
 /**
  * Collect a full set of metrics - both overview and snapshot
  * @param {Date} jobStart
  * @param { Date | null } lastSuccessfulRunDate
+ * @param {number} daysPerBatch
  * @param {ClientSession} session
+ * @returns {Promise<CollectionJobResult>}
  */
-export async function collectMetrics(jobStart, lastSuccessfulRunDate, session) {
+export async function collectMetrics(
+  jobStart,
+  lastSuccessfulRunDate,
+  daysPerBatch,
+  session
+) {
+  // Make a call for each day since last job run
+  // (Normally only one day but also handles full historical data population on first run)
+  // For full historical catch-up, it runs in batches until we reach 'yesterday' inclusive)
+  const yesterday = sub(new Date(), { days: 1 })
+  let reportDate =
+    lastSuccessfulRunDate ??
+    setTimeOnDate(EARLIER_REPORT_DATE_AS_STRING, yesterday)
+  const maxDate = min([add(reportDate, { days: daysPerBatch }), yesterday])
+
+  if (formatDateOnly(reportDate) >= formatDateOnly(maxDate)) {
+    return {
+      success: false,
+      message: 'Skipped',
+      endDate: undefined,
+      processMoreBatches: false
+    }
+  }
+
   logger.info('[metrics] getting overview metrics')
   await collectManagerOverviewMetrics(jobStart, session)
 
-  // Make a call for each day since last job run
-  // (Normally only one day but also handles full historical data population on first run)
-  const yesterday = sub(jobStart, { days: 1 })
-  let reportDate = lastSuccessfulRunDate ?? sub(jobStart, { days: 480 })
-
-  while (formatDateOnly(reportDate) <= formatDateOnly(yesterday)) {
+  while (formatDateOnly(reportDate) <= formatDateOnly(maxDate)) {
     logger.info(
       `[metrics] getting timeline metrics for ${reportDate.toISOString()}`
     )
@@ -144,8 +212,14 @@ export async function collectMetrics(jobStart, lastSuccessfulRunDate, session) {
     reportDate = add(reportDate, { days: 1 })
   }
 
-  const totals = await recalcMetrics(yesterday, session)
-  await updateMetricTotals(yesterday, totals, session)
+  const totals = await recalcMetrics(maxDate, session)
+  await updateMetricTotals(maxDate, totals, session)
+  return {
+    success: true,
+    message: 'Completed ok',
+    processMoreBatches: formatDateOnly(reportDate) < formatDateOnly(yesterday),
+    endDate: maxDate
+  }
 }
 
 /**

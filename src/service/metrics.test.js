@@ -6,6 +6,7 @@ import { getJson } from '~/src/lib/fetch.js'
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
 import {
+  clearMetricsData,
   getAllOverviewMetrics,
   getAllTimelineMetrics,
   getFirstDraft,
@@ -19,6 +20,7 @@ import {
 } from '~/src/repositories/metrics-repository.js'
 import {
   applyExtraColumns,
+  clearMetricsDatabase,
   collectManagerOverviewMetrics,
   collectTimelineMetrics,
   collectTimelineMetricsFromAudit,
@@ -26,6 +28,7 @@ import {
   recalcMetrics,
   runMetricsCollectionJob,
   setMetricTotal,
+  setTimeOnDate,
   updateMetricAverage,
   updateMetricTotal
 } from '~/src/service/metrics.js'
@@ -112,10 +115,10 @@ describe('runMetricsCollectionJob', () => {
   })
 
   it('should run job when able to lock', async () => {
-    const yesterday = startOfDay(sub(now, { days: 1 }))
+    const twoDaysAgo = startOfDay(sub(now, { days: 2 }))
     jest.mocked(grabLock).mockResolvedValueOnce({
       lockSuccess: true,
-      lastSuccessfulRun: yesterday
+      lastSuccessfulRun: twoDaysAgo
     })
 
     const mockNewSession = /** @type {any} */ ({
@@ -155,17 +158,17 @@ describe('runMetricsCollectionJob', () => {
     expect(getJson).toHaveBeenNthCalledWith(
       2,
       new URL(
-        'http://localhost:3002/report/timeline?date=' + yesterday.toISOString()
+        'http://localhost:3002/report/timeline?date=' + twoDaysAgo.toISOString()
       ),
       {}
     )
   })
 
   it('should log error if job fails', async () => {
-    const yesterday = startOfDay(sub(now, { days: 1 }))
+    const twoDaysAgo = startOfDay(sub(now, { days: 2 }))
     jest.mocked(grabLock).mockResolvedValueOnce({
       lockSuccess: true,
-      lastSuccessfulRun: yesterday
+      lastSuccessfulRun: twoDaysAgo
     })
     jest.mocked(getJson).mockImplementationOnce(() => {
       throw new Error('API JSON error')
@@ -182,8 +185,12 @@ describe('runMetricsCollectionJob', () => {
     await runMetricsCollectionJob()
 
     expect(releaseLock).toHaveBeenCalledWith(
-      false,
-      'API JSON error',
+      {
+        success: false,
+        message: 'API JSON error',
+        endDate: undefined,
+        processMoreBatches: false
+      },
       expect.anything()
     )
   })
@@ -721,6 +728,29 @@ describe('runMetricsCollectionJob', () => {
           summaryMetrics: { name: 'Form 2' }
         }
       ])
+    })
+  })
+
+  describe('setTimeOnDate', () => {
+    it('should set time on date', () => {
+      const testDateStr = '2026-02-05'
+      const expectedDate = new Date('2026-02-05T08:59:34.000Z')
+      expect(setTimeOnDate(testDateStr, expectedDate)).toEqual(expectedDate)
+    })
+  })
+
+  describe('clearMetricsDatabase', () => {
+    it('should clear db', async () => {
+      jest.mocked(clearMetricsData).mockResolvedValueOnce()
+      const mockNewSession = /** @type {any} */ ({
+        withTransaction: jest.fn().mockImplementation(async (callback) => {
+          return await callback()
+        }),
+        endSession: jest.fn().mockResolvedValue(undefined)
+      })
+      jest.mocked(client.startSession).mockReturnValue(mockNewSession)
+      await clearMetricsDatabase()
+      expect(clearMetricsData).toHaveBeenCalled()
     })
   })
 })

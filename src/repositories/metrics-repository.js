@@ -499,16 +499,15 @@ export async function grabLock(session) {
 
 /**
  * Removes the metric control lock and updates the control record.
- * @param {boolean} success
- * @param {string} message
+ * @param {{ success: boolean, message: string, endDate: Date | undefined }} result
  * @param {ClientSession} session
  */
-export async function releaseLock(success, message, session) {
+export async function releaseLock({ success, message, endDate }, session) {
   const coll = getMetricCollection()
 
   const now = new Date()
 
-  const lastRunDate = success ? { lastSuccessfulRunDate: now } : {}
+  const lastRunDate = success ? { lastSuccessfulRunDate: endDate } : {}
 
   const updateObj = {
     $set: {
@@ -548,6 +547,13 @@ export async function clearMetricsData(session) {
       {
         type: { $ne: FORM_METRIC_CONTROL }
       },
+      { session }
+    )
+    await coll.updateOne(
+      {
+        type: FORM_METRIC_CONTROL
+      },
+      { $set: { lastSuccessfulRunDate: null } },
       { session }
     )
   } catch (err) {
