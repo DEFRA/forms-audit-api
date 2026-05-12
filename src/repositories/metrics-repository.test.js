@@ -350,7 +350,10 @@ describe('metrics-repository', () => {
 
   describe('releaseLock', () => {
     it('should update control record to release lock with successful job', async () => {
-      await releaseLock(true, 'ok', mockSession)
+      await releaseLock(
+        { success: true, message: 'ok', endDate: new Date() },
+        mockSession
+      )
 
       expect(mockCollection.updateOne).toHaveBeenCalledWith(
         {
@@ -372,7 +375,10 @@ describe('metrics-repository', () => {
     })
 
     it('should update control record to release lock with failed job', async () => {
-      await releaseLock(false, 'some error text', mockSession)
+      await releaseLock(
+        { success: false, message: 'some error text', endDate: new Date() },
+        mockSession
+      )
 
       expect(mockCollection.updateOne).toHaveBeenCalledWith(
         {
@@ -397,9 +403,12 @@ describe('metrics-repository', () => {
         throw new Error('db error')
       })
 
-      await expect(() => releaseLock(true, 'ok', mockSession)).rejects.toThrow(
-        'db error'
-      )
+      await expect(() =>
+        releaseLock(
+          { success: true, message: 'ok', endDate: new Date() },
+          mockSession
+        )
+      ).rejects.toThrow('db error')
     })
   })
 

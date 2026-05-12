@@ -6,6 +6,7 @@ import { getJson } from '~/src/lib/fetch.js'
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
 import {
+  clearMetricsData,
   getAllOverviewMetrics,
   getAllTimelineMetrics,
   getFirstDraft,
@@ -19,7 +20,9 @@ import {
 } from '~/src/repositories/metrics-repository.js'
 import {
   applyExtraColumns,
+  clearMetricsDatabase,
   collectManagerOverviewMetrics,
+  collectMetrics,
   collectTimelineMetrics,
   collectTimelineMetricsFromAudit,
   generateReport,
@@ -64,6 +67,50 @@ function createTimelineMetric(
     metricName,
     createdAt: new Date(dateStr),
     metricValue
+  }
+}
+
+const firstCreated = /** @type {AuditRecordInput[]} */ ([
+  {
+    type: 'FORM_CREATED',
+    entityId: 'form-id-1a',
+    createdAt: new Date('2026-03-30')
+  }
+])
+const mockAsyncIteratorFirstCreated = {
+  [Symbol.asyncIterator]: function* () {
+    for (const metric of firstCreated) {
+      yield metric
+    }
+  }
+}
+const draftCreatedFromLive = /** @type {AuditRecordInput[]} */ ([
+  {
+    type: 'FORM_CREATED',
+    entityId: 'form-id-1a',
+    createdAt: new Date('2026-03-30')
+  }
+])
+const mockAsyncIteratorDraftCreatedFromLive = {
+  [Symbol.asyncIterator]: function* () {
+    for (const metric of draftCreatedFromLive) {
+      yield metric
+    }
+  }
+}
+
+const firstPublished = /** @type {AuditRecordInput[]} */ ([
+  {
+    type: 'FORM_DRAFT_CREATED_FROM_LIVE',
+    entityId: 'form-id-1a',
+    createdAt: new Date('2026-04-08')
+  }
+])
+const mockAsyncIteratorFirstPublished = {
+  [Symbol.asyncIterator]: function* () {
+    for (const metric of firstPublished) {
+      yield metric
+    }
   }
 }
 
@@ -112,10 +159,11 @@ describe('runMetricsCollectionJob', () => {
   })
 
   it('should run job when able to lock', async () => {
-    const yesterday = startOfDay(sub(now, { days: 1 }))
+    const threeDaysAgo = startOfDay(sub(now, { days: 3 }))
+    const twoDaysAgo = startOfDay(sub(now, { days: 2 }))
     jest.mocked(grabLock).mockResolvedValueOnce({
       lockSuccess: true,
-      lastSuccessfulRun: yesterday
+      lastSuccessfulRun: threeDaysAgo
     })
 
     const mockNewSession = /** @type {any} */ ({
@@ -155,17 +203,17 @@ describe('runMetricsCollectionJob', () => {
     expect(getJson).toHaveBeenNthCalledWith(
       2,
       new URL(
-        'http://localhost:3002/report/timeline?date=' + yesterday.toISOString()
+        'http://localhost:3002/report/timeline?date=' + twoDaysAgo.toISOString()
       ),
       {}
     )
   })
 
   it('should log error if job fails', async () => {
-    const yesterday = startOfDay(sub(now, { days: 1 }))
+    const threeDaysAgo = startOfDay(sub(now, { days: 3 }))
     jest.mocked(grabLock).mockResolvedValueOnce({
       lockSuccess: true,
-      lastSuccessfulRun: yesterday
+      lastSuccessfulRun: threeDaysAgo
     })
     jest.mocked(getJson).mockImplementationOnce(() => {
       throw new Error('API JSON error')
@@ -182,8 +230,12 @@ describe('runMetricsCollectionJob', () => {
     await runMetricsCollectionJob()
 
     expect(releaseLock).toHaveBeenCalledWith(
-      false,
-      'API JSON error',
+      {
+        success: false,
+        message: 'API JSON error',
+        endDate: undefined,
+        processMoreBatches: false
+      },
       expect.anything()
     )
   })
@@ -462,50 +514,6 @@ describe('runMetricsCollectionJob', () => {
       const testDate = new Date('2026-04-01')
 
       jest.mocked(getNumberOfFormsInDraft).mockResolvedValueOnce(17)
-      const firstCreated = /** @type {AuditRecordInput[]} */ ([
-        {
-          type: 'FORM_CREATED',
-          entityId: 'form-id-1a',
-          createdAt: new Date('2026-03-30')
-        }
-      ])
-      const mockAsyncIteratorFirstCreated = {
-        [Symbol.asyncIterator]: function* () {
-          for (const metric of firstCreated) {
-            yield metric
-          }
-        }
-      }
-      const draftCreatedFromLive = /** @type {AuditRecordInput[]} */ ([
-        {
-          type: 'FORM_CREATED',
-          entityId: 'form-id-1a',
-          createdAt: new Date('2026-03-30')
-        }
-      ])
-      const mockAsyncIteratorDraftCreatedFromLive = {
-        [Symbol.asyncIterator]: function* () {
-          for (const metric of draftCreatedFromLive) {
-            yield metric
-          }
-        }
-      }
-
-      const firstPublished = /** @type {AuditRecordInput[]} */ ([
-        {
-          type: 'FORM_DRAFT_CREATED_FROM_LIVE',
-          entityId: 'form-id-1a',
-          createdAt: new Date('2026-04-08')
-        }
-      ])
-      const mockAsyncIteratorFirstPublished = {
-        [Symbol.asyncIterator]: function* () {
-          for (const metric of firstPublished) {
-            yield metric
-          }
-        }
-      }
-
       jest
         .mocked(getAuditRecordsOfType)
         // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
@@ -654,12 +662,15 @@ describe('runMetricsCollectionJob', () => {
         overview: [
           {
             daysToPublish: 0,
+            formId: 'form-id-1',
             formName: 'Form 1',
+            formStatus: 'live',
             republished: 0,
             submissionsCount: 0,
             summaryMetrics: {
               name: 'Form 1'
-            }
+            },
+            featureMetrics: {}
           }
         ],
         totals: []
@@ -708,19 +719,154 @@ describe('runMetricsCollectionJob', () => {
       expect(res).toEqual([
         {
           daysToPublish: 15,
+          formId: 'form-id-1',
           formName: 'Form 1',
+          formStatus: 'live',
           republished: 2,
           submissionsCount: 5,
-          summaryMetrics: { name: 'Form 1' }
+          summaryMetrics: { name: 'Form 1' },
+          featureMetrics: undefined
         },
         {
           daysToPublish: undefined,
+          formId: 'form-id-2',
           formName: 'Form 2',
+          formStatus: 'draft',
           republished: undefined,
           submissionsCount: 9,
-          summaryMetrics: { name: 'Form 2' }
+          summaryMetrics: { name: 'Form 2' },
+          featureMetrics: undefined
         }
       ])
+    })
+  })
+
+  describe('clearMetricsDatabase', () => {
+    it('should clear db', async () => {
+      jest.mocked(clearMetricsData).mockResolvedValueOnce()
+      const mockNewSession = /** @type {any} */ ({
+        withTransaction: jest.fn().mockImplementation(async (callback) => {
+          return await callback()
+        }),
+        endSession: jest.fn().mockResolvedValue(undefined)
+      })
+      jest.mocked(client.startSession).mockReturnValue(mockNewSession)
+      await clearMetricsDatabase()
+      expect(clearMetricsData).toHaveBeenCalled()
+    })
+  })
+
+  describe('collectMetrics', () => {
+    it('should skip if reporting is up-to-date', async () => {
+      const lastRunDate = new Date('2026-03-10T04:00:00.000Z')
+      const currentRunDate = new Date('2026-03-10T03:00:00.000Z')
+      const res = await collectMetrics(
+        currentRunDate,
+        lastRunDate,
+        30,
+        mockSession
+      )
+      expect(res).toEqual({
+        success: false,
+        message: 'Skipped',
+        endDate: undefined,
+        processMoreBatches: false
+      })
+    })
+
+    it('should loop if multiple days to report', async () => {
+      const lastRunDate = new Date('2026-03-06T04:00:00.000Z')
+      const currentRunDate = new Date('2026-03-10T03:00:00.000Z')
+
+      const mockNewSession = /** @type {any} */ ({
+        withTransaction: jest.fn().mockImplementation(async (callback) => {
+          return await callback()
+        }),
+        endSession: jest.fn().mockResolvedValue(undefined)
+      })
+      jest.mocked(client.startSession).mockReturnValue(mockNewSession)
+      jest
+        .mocked(getJson)
+        .mockResolvedValueOnce({ response: {}, body: { draft: {}, live: {} } })
+        .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
+        .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
+        .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
+        .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
+
+      jest
+        .mocked(getAuditRecordsOfType)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorFirstCreated)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorDraftCreatedFromLive)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorFirstPublished)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorFirstCreated)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorDraftCreatedFromLive)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorFirstPublished)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorFirstCreated)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorDraftCreatedFromLive)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorFirstPublished)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorFirstCreated)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorDraftCreatedFromLive)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorFirstPublished)
+
+      const blankSet = /** @type {AuditRecordInput[]} */ ([])
+      const mockAsyncIteratorBlankSet = {
+        [Symbol.asyncIterator]: function* () {
+          for (const metric of blankSet) {
+            yield metric
+          }
+        }
+      }
+
+      jest
+        .mocked(getAllTimelineMetrics)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorBlankSet)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorBlankSet)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorBlankSet)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorBlankSet)
+
+      const res = await collectMetrics(
+        currentRunDate,
+        lastRunDate,
+        30,
+        mockSession
+      )
+
+      expect(res).toEqual({
+        success: true,
+        message: 'Completed ok',
+        endDate: new Date('2026-03-09T03:00:00.000Z'),
+        processMoreBatches: false
+      })
+      expect(getJson).toHaveBeenCalledTimes(4)
+      const calls = jest.mocked(getJson).mock.calls
+      expect(calls[0][0].href).toBe(
+        'http://localhost:3001/report/overview?date=2026-03-10T03:00:00.000Z'
+      )
+      expect(calls[1][0].href).toBe(
+        'http://localhost:3002/report/timeline?date=2026-03-07T04:00:00.000Z'
+      )
+      expect(calls[2][0].href).toBe(
+        'http://localhost:3002/report/timeline?date=2026-03-08T04:00:00.000Z'
+      )
+      expect(calls[3][0].href).toBe(
+        'http://localhost:3002/report/timeline?date=2026-03-09T04:00:00.000Z'
+      )
     })
   })
 })

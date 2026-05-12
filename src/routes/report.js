@@ -2,6 +2,7 @@ import { Scopes } from '@defra/forms-model'
 import Joi from 'joi'
 
 import {
+  clearMetricsDatabase,
   generateReport,
   runMetricsCollectionJob
 } from '~/src/service/metrics.js'
@@ -44,9 +45,11 @@ export default [
   ({
     method: 'POST',
     path: '/report/regenerate',
-    handler(_request, h) {
+    async handler(_request, h) {
+      await clearMetricsDatabase()
+      // Fire-and-forget so UI doesn't timeout
       // eslint-disable-next-line no-void
-      void runMetricsCollectionJob(true)
+      void runMetricsCollectionJob()
       return h.response({ message: 'success' }).code(HTTP_OK)
     },
     options: {

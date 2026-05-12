@@ -6,7 +6,7 @@ import {
 import {
   add,
   differenceInDays,
-  format,
+  min,
   startOfDay,
   sub,
   subDays,
@@ -34,6 +34,15 @@ import {
   saveFormTimelineMetrics,
   updateMetricTotals
 } from '~/src/repositories/metrics-repository.js'
+import {
+  CalculationTypes,
+  dateFallsInsideTimeslot,
+  formatDateOnly,
+  getMetricCalcType,
+  isDraftSubmission,
+  isLiveSubmission,
+  setTimeOnDate
+} from '~/src/service/metrics-helper.js'
 
 /**
  * @typedef {object} FilterCriteria
@@ -45,48 +54,47 @@ import {
 const managerUrl = config.get('managerUrl')
 const submissionUrl = config.get('submissionUrl')
 
-const CalculationTypes = {
-  Accumulation: 'Accumulation',
-  Snapshot: 'Snapshot',
-  Average: 'Average'
-}
+const MAX_DAYS_PER_BATCH = 30
+const EARLIEST_REPORT_DATE_AS_STRING = '2025-07-01'
 
-const metricConfig =
-  /** { Record<FormMetricName, { calculationType: string }>} */ {
-    [FormMetricName.NewFormsCreated]: {
-      calculationType: CalculationTypes.Accumulation
-    },
-    [FormMetricName.FormsPublished]: {
-      calculationType: CalculationTypes.Accumulation
-    },
-    [FormMetricName.Submissions]: {
-      calculationType: CalculationTypes.Accumulation
-    },
-    [FormMetricName.FormsInDraft]: {
-      calculationType: CalculationTypes.Snapshot
-    },
-    [FormMetricName.TimeToPublish]: {
-      calculationType: CalculationTypes.Average
-    }
+/**
+ * Delete all metrics records from teh database (apart from the control record)
+ */
+export async function clearMetricsDatabase() {
+  const session = client.startSession()
+  try {
+    await session.withTransaction(async () => {
+      await clearMetricsData(session)
+    })
+  } finally {
+    await session.endSession()
   }
-
-/**
- * @param {Date} date
- */
-export function formatDateOnly(date) {
-  return format(date, 'yyyy-MM-dd')
 }
 
 /**
- * Collect metrics
- * @param {boolean} deleteDatabase
+ * Collect metrics (this may involve multiple batches being collected)
  */
-export async function runMetricsCollectionJob(deleteDatabase = false) {
+export async function runMetricsCollectionJob() {
+  let continueProcessingBatches = true
+  do {
+    continueProcessingBatches = await runMetricsCollectionBatch()
+  } while (continueProcessingBatches)
+}
+
+/**
+ * Collect a batch of metrics
+ * @returns {Promise<boolean>} continueBatches
+ */
+export async function runMetricsCollectionBatch() {
   logger.info('[metrics] metrics job started')
-  const result = {
+
+  let result = /* @type {CollectionJobResult} */ {
     success: false,
-    message: ''
+    processMoreBatches: false,
+    message: '',
+    endDate: /** @type { Date | undefined } */ (undefined)
   }
+
   const session = client.startSession()
   try {
     const jobStart = new Date()
@@ -96,46 +104,72 @@ export async function runMetricsCollectionJob(deleteDatabase = false) {
         '[metrics] metrics job aborting as another container already has a lock'
       )
       logger.info('[metrics] metrics job finished')
-      return
+      return false
     }
 
     await session.withTransaction(async () => {
-      if (deleteDatabase) {
-        await clearMetricsData(session)
-        lockResult.lastSuccessfulRun = null
-      }
-      await collectMetrics(jobStart, lockResult.lastSuccessfulRun, session)
-      result.success = true
-      result.message = 'Completed ok'
+      result = await collectMetrics(
+        jobStart,
+        lockResult.lastSuccessfulRun,
+        MAX_DAYS_PER_BATCH,
+        session
+      )
     })
   } catch (err) {
     const message = getErrorMessage(err)
     logger.error(err, `[metrics] metrics job failed - ${message}`)
     result.message = message
   } finally {
-    await releaseLock(result.success, result.message, session)
+    await releaseLock(result, session)
     await session.endSession()
   }
 
   logger.info('[metrics] metrics job finished')
+  return result.processMoreBatches
 }
 
 /**
  * Collect a full set of metrics - both overview and snapshot
  * @param {Date} jobStart
  * @param { Date | null } lastSuccessfulRunDate
+ * @param {number} daysPerBatch
  * @param {ClientSession} session
+ * @returns {Promise<CollectionJobResult>}
  */
-export async function collectMetrics(jobStart, lastSuccessfulRunDate, session) {
+export async function collectMetrics(
+  jobStart,
+  lastSuccessfulRunDate,
+  daysPerBatch,
+  session
+) {
+  // Make a call for each day since last job run
+  // (Normally only one day but also handles full historical data population on first run)
+  // For full historical catch-up, it runs in batches until we reach 'yesterday' inclusive)
+  const yesterday = sub(jobStart, { days: 1 })
+  // Reporting start date = last-successful-run + 1, or a fixed time in the past just before events were being stored
+  let reportDate = add(
+    lastSuccessfulRunDate ??
+      setTimeOnDate(EARLIEST_REPORT_DATE_AS_STRING, yesterday),
+    { days: 1 }
+  )
+  const reportEndDate = min([
+    add(reportDate, { days: daysPerBatch }),
+    yesterday
+  ])
+
+  if (formatDateOnly(reportDate) >= formatDateOnly(reportEndDate)) {
+    return {
+      success: false,
+      message: 'Skipped',
+      endDate: undefined,
+      processMoreBatches: false
+    }
+  }
+
   logger.info('[metrics] getting overview metrics')
   await collectManagerOverviewMetrics(jobStart, session)
 
-  // Make a call for each day since last job run
-  // (Normally only one day but also handles full historical data population on first run)
-  const yesterday = sub(jobStart, { days: 1 })
-  let reportDate = lastSuccessfulRunDate ?? sub(jobStart, { days: 480 })
-
-  while (formatDateOnly(reportDate) <= formatDateOnly(yesterday)) {
+  while (formatDateOnly(reportDate) <= formatDateOnly(reportEndDate)) {
     logger.info(
       `[metrics] getting timeline metrics for ${reportDate.toISOString()}`
     )
@@ -144,8 +178,14 @@ export async function collectMetrics(jobStart, lastSuccessfulRunDate, session) {
     reportDate = add(reportDate, { days: 1 })
   }
 
-  const totals = await recalcMetrics(yesterday, session)
-  await updateMetricTotals(yesterday, totals, session)
+  const totals = await recalcMetrics(reportEndDate, session)
+  await updateMetricTotals(reportEndDate, totals, session)
+  return {
+    success: true,
+    message: 'Completed ok',
+    processMoreBatches: formatDateOnly(reportDate) < formatDateOnly(yesterday),
+    endDate: reportEndDate
+  }
 }
 
 /**
@@ -386,43 +426,6 @@ export function updateMetricAverage(metric, period) {
 }
 
 /**
- * @param {Date} date
- * @param {Date} startOfRange
- * @param {Date} endOfRange
- */
-function dateFallsInsideTimeslot(date, startOfRange, endOfRange) {
-  return date >= startOfRange && date < endOfRange
-}
-
-/**
- * @param {FormTimelineMetric} metric
- */
-function isDraftSubmission(metric) {
-  return (
-    metric.metricName === FormMetricName.Submissions.toString() &&
-    metric.formStatus === FormStatus.Draft
-  )
-}
-
-/**
- * @param {FormTimelineMetric} metric
- */
-function isLiveSubmission(metric) {
-  return (
-    metric.metricName === FormMetricName.Submissions.toString() &&
-    metric.formStatus === FormStatus.Live
-  )
-}
-
-/**
- * @param {FormTimelineMetric} metric
- */
-function getMetricCalcType(metric) {
-  const metricName = /** @type {FormMetricName} */ (metric.metricName)
-  return metricConfig[metricName].calculationType
-}
-
-/**
  * Update metric totals by summing metrics within given windows
  * @param {Date} reportingDate
  * @param {ClientSession} session
@@ -659,8 +662,11 @@ export function applyExtraColumns(metrics) {
   const formRepublished = createFormMap(metrics.totals.republished)
 
   return metrics.overview.map((metric) => ({
+    featureMetrics: metric.featureMetrics,
     summaryMetrics: metric.summaryMetrics,
+    formId: metric.formId,
     formName: metric.summaryMetrics.name,
+    formStatus: metric.formStatus,
     submissionsCount:
       (metric.formStatus === FormStatus.Live
         ? submissionCountsLive.get(metric.formId)
@@ -679,4 +685,5 @@ export function applyExtraColumns(metrics) {
 /**
  * @import { ClientSession, FindCursor, WithId } from 'mongodb'
  * @import { AuditRecordInput, FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
+ * @import { CollectionJobResult } from '~/src/service/metrics-helper.js'
  */
