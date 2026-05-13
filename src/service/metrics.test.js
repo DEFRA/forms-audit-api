@@ -758,7 +758,7 @@ describe('runMetricsCollectionJob', () => {
 
   describe('collectMetrics', () => {
     it('should skip if reporting is up-to-date', async () => {
-      const lastRunDate = new Date('2026-03-10T04:00:00.000Z')
+      const lastRunDate = new Date('2026-03-09T04:00:00.000Z')
       const currentRunDate = new Date('2026-03-10T03:00:00.000Z')
       const res = await collectMetrics(
         currentRunDate,
@@ -772,6 +772,101 @@ describe('runMetricsCollectionJob', () => {
         endDate: undefined,
         processMoreBatches: false
       })
+    })
+
+    it('should skip if reporting is ahead', async () => {
+      const lastRunDate = new Date('2026-03-11T04:00:00.000Z')
+      const currentRunDate = new Date('2026-03-10T03:00:00.000Z')
+      const res = await collectMetrics(
+        currentRunDate,
+        lastRunDate,
+        30,
+        mockSession
+      )
+      expect(res).toEqual({
+        success: false,
+        message: 'Skipped',
+        endDate: undefined,
+        processMoreBatches: false
+      })
+    })
+
+    it('should skip if reporting is ahead only by a minute', async () => {
+      const lastRunDate = new Date('2026-03-10T03:01:00.000Z')
+      const currentRunDate = new Date('2026-03-10T03:00:00.000Z')
+      const res = await collectMetrics(
+        currentRunDate,
+        lastRunDate,
+        30,
+        mockSession
+      )
+      expect(res).toEqual({
+        success: false,
+        message: 'Skipped',
+        endDate: undefined,
+        processMoreBatches: false
+      })
+    })
+
+    it('should run for single day of processing', async () => {
+      const lastRunDate = new Date('2026-05-11T15:56:04.364Z')
+      const currentRunDate = new Date('2026-05-13T03:00:00.000Z')
+
+      const mockNewSession = /** @type {any} */ ({
+        withTransaction: jest.fn().mockImplementation(async (callback) => {
+          return await callback()
+        }),
+        endSession: jest.fn().mockResolvedValue(undefined)
+      })
+      jest.mocked(client.startSession).mockReturnValue(mockNewSession)
+      jest
+        .mocked(getJson)
+        .mockResolvedValueOnce({ response: {}, body: { draft: {}, live: {} } })
+        .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
+
+      jest
+        .mocked(getAuditRecordsOfType)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorFirstCreated)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorDraftCreatedFromLive)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorFirstPublished)
+
+      const blankSet = /** @type {AuditRecordInput[]} */ ([])
+      const mockAsyncIteratorBlankSet = {
+        [Symbol.asyncIterator]: function* () {
+          for (const metric of blankSet) {
+            yield metric
+          }
+        }
+      }
+
+      jest
+        .mocked(getAllTimelineMetrics)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorBlankSet)
+
+      const res = await collectMetrics(
+        currentRunDate,
+        lastRunDate,
+        30,
+        mockSession
+      )
+      expect(res).toEqual({
+        success: true,
+        message: 'Completed ok',
+        endDate: new Date('2026-05-12T03:00:00.000Z'),
+        processMoreBatches: false
+      })
+      expect(getJson).toHaveBeenCalledTimes(2)
+      const calls = jest.mocked(getJson).mock.calls
+      expect(calls[0][0].href).toBe(
+        'http://localhost:3001/report/overview?date=2026-05-13T03:00:00.000Z'
+      )
+      expect(calls[1][0].href).toBe(
+        'http://localhost:3002/report/timeline?date=2026-05-12T15:56:04.364Z'
+      )
     })
 
     it('should loop if multiple days to report', async () => {

@@ -157,7 +157,7 @@ export async function collectMetrics(
     yesterday
   ])
 
-  if (formatDateOnly(reportDate) >= formatDateOnly(reportEndDate)) {
+  if (formatDateOnly(reportDate) > formatDateOnly(reportEndDate)) {
     return {
       success: false,
       message: 'Skipped',
