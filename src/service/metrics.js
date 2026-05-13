@@ -157,7 +157,7 @@ export async function collectMetrics(
     yesterday
   ])
 
-  if (formatDateOnly(reportDate) >= formatDateOnly(reportEndDate)) {
+  if (formatDateOnly(reportDate) > formatDateOnly(reportEndDate)) {
     return {
       success: false,
       message: 'Skipped',
@@ -619,6 +619,19 @@ export function decrementCountsForRepublish(map) {
 }
 
 /**
+ * Decode param list of encoded strings
+ * @param { string[] | undefined } params
+ */
+export function decodeParamList(params) {
+  // Decode param list (if applicable)
+  const paramsDecoded = /** @type {string[]} */ ([])
+  if (params) {
+    params.forEach((o) => paramsDecoded.push(decodeURI(o)))
+  }
+  return paramsDecoded.length ? paramsDecoded : undefined
+}
+
+/**
  * Generates a report based on the stored metrics
  * @param {FilterCriteria} filter
  */
@@ -626,6 +639,9 @@ export async function generateReport(filter) {
   const session = client.startSession()
 
   try {
+    // Decode org list (if applicable)
+    filter.org = decodeParamList(filter.org)
+
     // Get raw metrics
     const overview = await getAllOverviewMetrics(filter, session).toArray()
     const totals = await getMetricTotals(session)
