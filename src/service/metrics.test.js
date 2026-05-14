@@ -477,7 +477,7 @@ describe('runMetricsCollectionJob', () => {
             count: 1
           },
           TimeToPublish: {
-            count: '14.0'
+            count: 14
           }
         },
         allTime: {
@@ -491,7 +491,7 @@ describe('runMetricsCollectionJob', () => {
             count: 20
           },
           TimeToPublish: {
-            count: '14.0'
+            count: 14
           }
         },
         draftSubmissions: {
