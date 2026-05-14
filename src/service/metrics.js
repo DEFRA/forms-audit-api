@@ -576,7 +576,7 @@ function calcAverage(
   if (metricPropertyName === 'avgTotal') {
     const total = totals[periodName][metricName].avgTotal
     const count = totals[periodName][metricName].avgCount
-    totalsCopy[periodName][metricName].count = (total / count).toFixed(1)
+    totalsCopy[periodName][metricName].count = total / count
     delete totalsCopy[periodName][metricName].avgTotal
     delete totalsCopy[periodName][metricName].avgCount
   }
