@@ -662,14 +662,14 @@ describe('runMetricsCollectionJob', () => {
       expect(res).toEqual({
         overview: [
           {
-            daysToPublish: 0,
             formId: 'form-id-1',
             formName: 'Form 1',
             formStatus: 'live',
-            republished: 0,
             submissionsCount: 0,
             summaryMetrics: {
-              name: 'Form 1'
+              name: 'Form 1',
+              daysToPublish: 0,
+              republished: 0
             },
             featureMetrics: {}
           }
@@ -719,23 +719,27 @@ describe('runMetricsCollectionJob', () => {
       const res = applyExtraColumns(metrics)
       expect(res).toEqual([
         {
-          daysToPublish: 15,
           formId: 'form-id-1',
           formName: 'Form 1',
           formStatus: 'live',
-          republished: 2,
           submissionsCount: 5,
-          summaryMetrics: { name: 'Form 1' },
+          summaryMetrics: {
+            daysToPublish: 15,
+            republished: 2,
+            name: 'Form 1'
+          },
           featureMetrics: undefined
         },
         {
-          daysToPublish: undefined,
           formId: 'form-id-2',
           formName: 'Form 2',
           formStatus: 'draft',
-          republished: undefined,
           submissionsCount: 9,
-          summaryMetrics: { name: 'Form 2' },
+          summaryMetrics: {
+            daysToPublish: undefined,
+            republished: undefined,
+            name: 'Form 2'
+          },
           featureMetrics: undefined
         }
       ])

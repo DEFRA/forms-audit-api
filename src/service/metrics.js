@@ -679,22 +679,24 @@ export function applyExtraColumns(metrics) {
 
   return metrics.overview.map((metric) => ({
     featureMetrics: metric.featureMetrics,
-    summaryMetrics: metric.summaryMetrics,
+    summaryMetrics: {
+      ...metric.summaryMetrics,
+      daysToPublish:
+        metric.formStatus === FormStatus.Live
+          ? (formDaysToPublish.get(metric.formId) ?? 0)
+          : undefined,
+      republished:
+        metric.formStatus === FormStatus.Live
+          ? (formRepublished.get(metric.formId) ?? 0)
+          : undefined
+    },
     formId: metric.formId,
     formName: metric.summaryMetrics.name,
     formStatus: metric.formStatus,
     submissionsCount:
       (metric.formStatus === FormStatus.Live
         ? submissionCountsLive.get(metric.formId)
-        : submissionCountsDraft.get(metric.formId)) ?? 0,
-    daysToPublish:
-      metric.formStatus === FormStatus.Live
-        ? (formDaysToPublish.get(metric.formId) ?? 0)
-        : undefined,
-    republished:
-      metric.formStatus === FormStatus.Live
-        ? (formRepublished.get(metric.formId) ?? 0)
-        : undefined
+        : submissionCountsDraft.get(metric.formId)) ?? 0
   }))
 }
 
