@@ -25,7 +25,6 @@ import {
   collectMetrics,
   collectTimelineMetrics,
   collectTimelineMetricsFromAudit,
-  decodeParamList,
   generateReport,
   recalcMetrics,
   runMetricsCollectionJob,
@@ -967,19 +966,6 @@ describe('runMetricsCollectionJob', () => {
       expect(calls[3][0].href).toBe(
         'http://localhost:3002/report/timeline?date=2026-03-09T04:00:00.000Z'
       )
-    })
-  })
-
-  describe('decodeParamList', () => {
-    it('should decode params', () => {
-      const params = ['abc%20def', 'def%20ghi']
-      const expectedParams = ['abc def', 'def ghi']
-      expect(decodeParamList(params)).toEqual(expectedParams)
-    })
-
-    it('should return undefined for no params', () => {
-      const params = /** @type {string[]} */ ([])
-      expect(decodeParamList(params)).toBeUndefined()
     })
   })
 })

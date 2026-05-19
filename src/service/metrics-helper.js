@@ -87,5 +87,29 @@ export function getMetricCalcType(metric) {
 }
 
 /**
+ * Decode param list of encoded strings
+ * @param { string[] | undefined } params
+ */
+export function decodeParamList(params) {
+  // Decode param list (if applicable)
+  const paramsDecoded = /** @type {string[]} */ ([])
+  if (params) {
+    params.forEach((o) => paramsDecoded.push(decodeURI(o)))
+  }
+  return paramsDecoded.length ? paramsDecoded : undefined
+}
+
+/**
+ * @param {Record<string, number> | undefined} metricValues
+ */
+export function createFormMap(metricValues) {
+  const formMap = new Map()
+  for (const [formId, count] of Object.entries(metricValues ?? {})) {
+    formMap.set(formId, count)
+  }
+  return formMap
+}
+
+/**
  * @import { FormTimelineMetric } from '@defra/forms-model'
  */
