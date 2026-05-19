@@ -676,6 +676,42 @@ describe('runMetricsCollectionJob', () => {
         totals: []
       })
     })
+
+    it('should generate report using filter criteria', async () => {
+      const mockNewSession = /** @type {any} */ ({
+        endSession: jest.fn().mockResolvedValue(undefined)
+      })
+      jest.mocked(client.startSession).mockReturnValue(mockNewSession)
+
+      const overviewMetrics = /** @type {WithId<FormOverviewMetric>[]} */ ([
+        {
+          _id: new ObjectId('69fb0727de574045cd8c0b0e'),
+          type: FormMetricType.OverviewMetric,
+          formId: 'form-id-1',
+          formStatus: FormStatus.Live,
+          summaryMetrics: {
+            name: 'Form 1'
+          },
+          featureMetrics: {},
+          submissionsCount: 5,
+          updatedAt: new Date('2026-02-02')
+        }
+      ])
+      jest.mocked(getAllOverviewMetrics).mockReturnValueOnce({
+        // @ts-expect-error - partial data mock
+        toArray: () => overviewMetrics
+      })
+      // @ts-expect-error - partial data mock
+      jest.mocked(getMetricTotals).mockResolvedValueOnce([])
+      await generateReport({ searchText: 'abc%20def', org: ['org%201'] })
+      expect(getAllOverviewMetrics).toHaveBeenCalledWith(
+        {
+          org: ['org 1'],
+          searchText: 'abc def'
+        },
+        expect.anything()
+      )
+    })
   })
 
   describe('applyExtraColumns', () => {
