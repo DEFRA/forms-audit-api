@@ -87,5 +87,16 @@ export function getMetricCalcType(metric) {
 }
 
 /**
+ * @param {Record<string, number> | undefined} metricValues
+ */
+export function createFormMap(metricValues) {
+  const formMap = new Map()
+  for (const [formId, count] of Object.entries(metricValues ?? {})) {
+    formMap.set(formId, count)
+  }
+  return formMap
+}
+
+/**
  * @import { FormTimelineMetric } from '@defra/forms-model'
  */

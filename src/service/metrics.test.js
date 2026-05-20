@@ -25,7 +25,6 @@ import {
   collectMetrics,
   collectTimelineMetrics,
   collectTimelineMetricsFromAudit,
-  decodeParamList,
   generateReport,
   recalcMetrics,
   runMetricsCollectionJob,
@@ -677,6 +676,42 @@ describe('runMetricsCollectionJob', () => {
         totals: []
       })
     })
+
+    it('should generate report using filter criteria', async () => {
+      const mockNewSession = /** @type {any} */ ({
+        endSession: jest.fn().mockResolvedValue(undefined)
+      })
+      jest.mocked(client.startSession).mockReturnValue(mockNewSession)
+
+      const overviewMetrics = /** @type {WithId<FormOverviewMetric>[]} */ ([
+        {
+          _id: new ObjectId('69fb0727de574045cd8c0b0e'),
+          type: FormMetricType.OverviewMetric,
+          formId: 'form-id-1',
+          formStatus: FormStatus.Live,
+          summaryMetrics: {
+            name: 'Form 1'
+          },
+          featureMetrics: {},
+          submissionsCount: 5,
+          updatedAt: new Date('2026-02-02')
+        }
+      ])
+      jest.mocked(getAllOverviewMetrics).mockReturnValueOnce({
+        // @ts-expect-error - partial data mock
+        toArray: () => overviewMetrics
+      })
+      // @ts-expect-error - partial data mock
+      jest.mocked(getMetricTotals).mockResolvedValueOnce([])
+      await generateReport({ searchText: 'abc def', org: ['org 1'] })
+      expect(getAllOverviewMetrics).toHaveBeenCalledWith(
+        {
+          org: ['org 1'],
+          searchText: 'abc def'
+        },
+        expect.anything()
+      )
+    })
   })
 
   describe('applyExtraColumns', () => {
@@ -967,19 +1002,6 @@ describe('runMetricsCollectionJob', () => {
       expect(calls[3][0].href).toBe(
         'http://localhost:3002/report/timeline?date=2026-03-09T04:00:00.000Z'
       )
-    })
-  })
-
-  describe('decodeParamList', () => {
-    it('should decode params', () => {
-      const params = ['abc%20def', 'def%20ghi']
-      const expectedParams = ['abc def', 'def ghi']
-      expect(decodeParamList(params)).toEqual(expectedParams)
-    })
-
-    it('should return undefined for no params', () => {
-      const params = /** @type {string[]} */ ([])
-      expect(decodeParamList(params)).toBeUndefined()
     })
   })
 })

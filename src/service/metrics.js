@@ -36,6 +36,7 @@ import {
 } from '~/src/repositories/metrics-repository.js'
 import {
   CalculationTypes,
+  createFormMap,
   dateFallsInsideTimeslot,
   formatDateOnly,
   getMetricCalcType,
@@ -619,19 +620,6 @@ export function decrementCountsForRepublish(map) {
 }
 
 /**
- * Decode param list of encoded strings
- * @param { string[] | undefined } params
- */
-export function decodeParamList(params) {
-  // Decode param list (if applicable)
-  const paramsDecoded = /** @type {string[]} */ ([])
-  if (params) {
-    params.forEach((o) => paramsDecoded.push(decodeURI(o)))
-  }
-  return paramsDecoded.length ? paramsDecoded : undefined
-}
-
-/**
  * Generates a report based on the stored metrics
  * @param {FilterCriteria} filter
  */
@@ -639,9 +627,6 @@ export async function generateReport(filter) {
   const session = client.startSession()
 
   try {
-    // Decode org list (if applicable)
-    filter.org = decodeParamList(filter.org)
-
     // Get raw metrics
     const overview = await getAllOverviewMetrics(filter, session).toArray()
     const totals = await getMetricTotals(session)
@@ -654,17 +639,6 @@ export async function generateReport(filter) {
   } finally {
     await session.endSession()
   }
-}
-
-/**
- * @param {Record<string, number> | undefined} metricValues
- */
-function createFormMap(metricValues) {
-  const formMap = new Map()
-  for (const [formId, count] of Object.entries(metricValues ?? {})) {
-    formMap.set(formId, count)
-  }
-  return formMap
 }
 
 /**
