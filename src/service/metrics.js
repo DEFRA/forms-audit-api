@@ -38,7 +38,6 @@ import {
   CalculationTypes,
   createFormMap,
   dateFallsInsideTimeslot,
-  decodeParamList,
   formatDateOnly,
   getMetricCalcType,
   isDraftSubmission,
@@ -628,14 +627,6 @@ export async function generateReport(filter) {
   const session = client.startSession()
 
   try {
-    // Decode org list (if applicable)
-    filter.org = decodeParamList(filter.org)
-
-    // Decode searchText (if applicable)
-    if (filter.searchText) {
-      filter.searchText = decodeURI(filter.searchText)
-    }
-
     // Get raw metrics
     const overview = await getAllOverviewMetrics(filter, session).toArray()
     const totals = await getMetricTotals(session)

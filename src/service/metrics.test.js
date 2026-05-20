@@ -703,7 +703,7 @@ describe('runMetricsCollectionJob', () => {
       })
       // @ts-expect-error - partial data mock
       jest.mocked(getMetricTotals).mockResolvedValueOnce([])
-      await generateReport({ searchText: 'abc%20def', org: ['org%201'] })
+      await generateReport({ searchText: 'abc def', org: ['org 1'] })
       expect(getAllOverviewMetrics).toHaveBeenCalledWith(
         {
           org: ['org 1'],
