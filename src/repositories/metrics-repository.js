@@ -335,15 +335,15 @@ export async function isFirstPublish(formId, session) {
   const coll = getMetricCollection()
 
   try {
-    const numberOfRecords = await coll.countDocuments(
+    const countFirstPublished = await coll.countDocuments(
       {
         type: FormMetricType.TimelineMetric,
-        metricName: FormMetricName.FormsPublished,
+        metricName: FormMetricName.FormsFirstPublished,
         formId
       },
       { session }
     )
-    return numberOfRecords < 2
+    return countFirstPublished === 0
   } catch (err) {
     logger.error(
       err,

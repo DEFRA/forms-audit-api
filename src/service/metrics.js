@@ -265,40 +265,28 @@ export async function collectTimelineMetricsFromAudit(reportingDate, session) {
     numOfFormsNotLive++
   }
 
-  // Draft created (from live form)
-  const createdFromLiveCursor = getAuditRecordsOfType(
-    AuditEventMessageType.FORM_DRAFT_CREATED_FROM_LIVE,
-    reportingDate,
-    session
-  )
-  await saveBulkTimelineMetrics(
-    createdFromLiveCursor,
-    FormMetricName.NewFormsCreated,
-    FormStatus.Draft,
-    1,
-    session
-  )
-
   // Form published + time to publish
   const publishCursor = getAuditRecordsOfType(
     AuditEventMessageType.FORM_LIVE_CREATED_FROM_DRAFT,
     reportingDate,
-    session
+    session,
+    { createdAt: 1 } // Sort earliest first in case the first publish (and subsequent publised) occur on the same day
   )
   for await (const publish of publishCursor) {
-    const metricPublish = /** @type {FormTimelineMetric} */ ({
-      formStatus: FormStatus.Live,
-      metricName: FormMetricName.FormsPublished,
-      metricValue: 1,
-      createdAt: publish.createdAt
-    })
-    await saveFormTimelineMetrics(publish.entityId, metricPublish, session)
-
     // Check if first publish
     const firstPublish = await isFirstPublish(publish.entityId, session)
     if (firstPublish) {
       // Time to first publish
       numOfFormsNotLive--
+
+      const metricPublish = /** @type {FormTimelineMetric} */ ({
+        formStatus: FormStatus.Live,
+        metricName: FormMetricName.FormsFirstPublished,
+        metricValue: 1,
+        createdAt: publish.createdAt
+      })
+      await saveFormTimelineMetrics(publish.entityId, metricPublish, session)
+
       const firstDraft = await getFirstDraft(publish.entityId, session)
       if (firstDraft) {
         const metricTimeToPublish = /** @type {FormTimelineMetric} */ ({
@@ -316,6 +304,14 @@ export async function collectTimelineMetricsFromAudit(reportingDate, session) {
           session
         )
       }
+    } else {
+      const metricPublish = /** @type {FormTimelineMetric} */ ({
+        formStatus: FormStatus.Live,
+        metricName: FormMetricName.FormsRePublished,
+        metricValue: 1,
+        createdAt: publish.createdAt
+      })
+      await saveFormTimelineMetrics(publish.entityId, metricPublish, session)
     }
   }
 
@@ -359,6 +355,9 @@ export async function saveBulkTimelineMetrics(
  * @param {string} calculationType
  */
 export function handleMetricValue(metric, period, calculationType) {
+  if (calculationType === CalculationTypes.AccumulationWithDrilldown) {
+    updateMetricTotal(metric, period, true)
+  }
   if (calculationType === CalculationTypes.Accumulation) {
     updateMetricTotal(metric, period)
   }
@@ -372,22 +371,28 @@ export function handleMetricValue(metric, period, calculationType) {
 
 /**
  * @param {FormTimelineMetric} metric
- * @param { Record<string, { count?: number }> | undefined } period
+ * @param { Record<string, { count?: number, details?: FormTimelineMetric[] }> | undefined } period
+ * @param {boolean} [drillDown]
  */
-export function updateMetricTotal(metric, period) {
+export function updateMetricTotal(metric, period, drillDown) {
   const metricName = metric.metricName
   if (
     !period ||
-    (metric.metricName === FormMetricName.Submissions.toString() &&
+    (metric.metricName === FormMetricName.Submissions &&
       metric.formStatus !== FormStatus.Live)
   ) {
     return
   }
   if (metricName in period && 'count' in period[metricName]) {
     const currentTotal = period[metricName].count ?? 0
-    period[metricName].count = currentTotal + metric.metricValue
+    const newTotal = currentTotal + metric.metricValue
+    const detail = drillDown
+      ? { details: [...(period[metricName].details ?? []), metric] }
+      : {}
+    period[metricName] = { count: newTotal, ...detail }
   } else {
-    period[metricName] = { count: metric.metricValue }
+    const detail = drillDown ? { details: [metric] } : {}
+    period[metricName] = { count: metric.metricValue, ...detail }
   }
 }
 
@@ -457,20 +462,29 @@ export async function recalcMetrics(reportingDate, session) {
     prevYear: {},
     allTime: {}
   })
+
+  let earliestDataDate = new Date('2100-01-01')
+
   for await (const metric of getAllTimelineMetrics(session)) {
     const metricCalcType = getMetricCalcType(metric)
-    if (metricCalcType === CalculationTypes.Accumulation) {
+    if (metric.metricName === FormMetricName.Submissions) {
       // Live submissions
       handleLiveSubmissions(metric, maps.formSubmissionsMapLive)
 
       // Draft submissions
       handleDraftSubmissions(metric, maps.formSubmissionsMapDraft)
+
+      // Find earliest submission
+      const createdAt = new Date(metric.createdAt)
+      if (createdAt < earliestDataDate) {
+        earliestDataDate = createdAt
+      }
     }
 
-    if (metric.metricName === FormMetricName.TimeToPublish.toString()) {
+    if (metric.metricName === FormMetricName.TimeToPublish) {
       maps.formDaysToPublishMap.set(metric.formId, metric.metricValue)
     }
-    if (metric.metricName === FormMetricName.FormsPublished.toString()) {
+    if (metric.metricName === FormMetricName.FormsRePublished) {
       const formTotalSoFar = maps.formRepublishedMap.get(metric.formId) ?? 0
       maps.formRepublishedMap.set(
         metric.formId,
@@ -510,9 +524,8 @@ export async function recalcMetrics(reportingDate, session) {
   totals.liveSubmissions = Object.fromEntries(maps.formSubmissionsMapLive)
   totals.draftSubmissions = Object.fromEntries(maps.formSubmissionsMapDraft)
   totals.daysToPublish = Object.fromEntries(maps.formDaysToPublishMap)
-  totals.republished = Object.fromEntries(
-    decrementCountsForRepublish(maps.formRepublishedMap)
-  )
+  totals.republished = Object.fromEntries(maps.formRepublishedMap)
+  totals.earliestDate = earliestDataDate
   const finalTotals = calcAverages(totals)
   return finalTotals
 }
@@ -609,17 +622,6 @@ export function calcAverages(totals) {
 }
 
 /**
- * @param {Map<string, number>} map
- */
-export function decrementCountsForRepublish(map) {
-  const mapWithDecrementedValues = new Map()
-  for (const [key, value] of map) {
-    mapWithDecrementedValues.set(key, value - 1)
-  }
-  return mapWithDecrementedValues
-}
-
-/**
  * Generates a report based on the stored metrics
  * @param {FilterCriteria} filter
  */
@@ -627,11 +629,14 @@ export async function generateReport(filter) {
   const session = client.startSession()
 
   try {
-    // Get raw metrics
+    // Get metrics per form
     const overview = await getAllOverviewMetrics(filter, session).toArray()
+
+    // Get summary siles
     const totals = await getMetricTotals(session)
     // Apply extra columns: submssionsCount, re-published, daysToPublish
     const overviewFull = applyExtraColumns({ overview, totals })
+
     return {
       overview: overviewFull,
       totals

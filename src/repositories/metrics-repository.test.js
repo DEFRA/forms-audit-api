@@ -533,27 +533,27 @@ describe('metrics-repository', () => {
 
   describe('isFirstPublish', () => {
     it('should return true if one or fewer records', async () => {
-      mockCollection.countDocuments.mockReturnValueOnce(1)
+      mockCollection.countDocuments.mockReturnValueOnce(0)
       const res = await isFirstPublish('form-id', mockSession)
       expect(res).toBe(true)
       expect(mockCollection.countDocuments).toHaveBeenCalledWith(
         {
           type: FormMetricType.TimelineMetric,
-          metricName: FormMetricName.FormsPublished,
+          metricName: FormMetricName.FormsFirstPublished,
           formId: 'form-id'
         },
         { session: {} }
       )
     })
 
-    it('should return false if two or more records', async () => {
-      mockCollection.countDocuments.mockReturnValueOnce(2)
+    it('should return false if one or more records', async () => {
+      mockCollection.countDocuments.mockReturnValueOnce(1)
       const res = await isFirstPublish('form-id', mockSession)
       expect(res).toBe(false)
       expect(mockCollection.countDocuments).toHaveBeenCalledWith(
         {
           type: FormMetricType.TimelineMetric,
-          metricName: FormMetricName.FormsPublished,
+          metricName: FormMetricName.FormsFirstPublished,
           formId: 'form-id'
         },
         { session: {} }

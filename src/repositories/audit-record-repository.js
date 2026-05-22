@@ -118,9 +118,15 @@ export async function getConsolidatedAuditRecords(filter, pagination) {
  * @param {AuditEventMessageType} type
  * @param {Date} reportDate
  * @param {ClientSession} session
+ * @param {Sort} [sort]
  * @returns {FindCursor<WithId<AuditRecordInput>>}
  */
-export function getAuditRecordsOfType(type, reportDate, session) {
+export function getAuditRecordsOfType(
+  type,
+  reportDate,
+  session,
+  sort = { createdAt: -1 }
+) {
   const coll = getCollection()
 
   const withoutTime = reportDate.toISOString().substring(0, 10)
@@ -140,7 +146,7 @@ export function getAuditRecordsOfType(type, reportDate, session) {
           },
           { session }
         )
-        .sort({ createdAt: -1 })
+        .sort(sort)
     )
     return cursor
   } catch (err) {
@@ -177,6 +183,6 @@ export async function createAuditRecord(auditRecordInput, session) {
 
 /**
  * @import { AuditEventMessageType, AuditRecordInput, PaginationOptions } from '@defra/forms-model'
- * @import { ClientSession, Collection, Filter, FindCursor, WithId } from 'mongodb'
+ * @import { ClientSession, Collection, Filter, FindCursor, WithId, Sort } from 'mongodb'
  * @import { ConsolidatedAuditResult, FacetResult } from '~/src/repositories/aggregation/types.js'
  */
