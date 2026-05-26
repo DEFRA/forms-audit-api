@@ -387,13 +387,27 @@ export function updateMetricTotal(metric, period, drillDown) {
     const currentTotal = period[metricName].count ?? 0
     const newTotal = currentTotal + metric.metricValue
     const detail = drillDown
-      ? { details: [...(period[metricName].details ?? []), metric] }
+      ? {
+          details: [...(period[metricName].details ?? []), mapToMinimal(metric)]
+        }
       : {}
     period[metricName] = { count: newTotal, ...detail }
   } else {
-    const detail = drillDown ? { details: [metric] } : {}
+    const detail = drillDown ? { details: [mapToMinimal(metric)] } : {}
     period[metricName] = { count: metric.metricValue, ...detail }
   }
+}
+
+/**
+ * Remove unwanted properties (reduces the overall document size)
+ * @param {FormTimelineMetric} detail
+ */
+function mapToMinimal(detail) {
+  return /** @type {FormTimelineMetric} */ ({
+    formId: detail.formId,
+    metricValue: detail.metricValue,
+    createdAt: detail.createdAt
+  })
 }
 
 /**
