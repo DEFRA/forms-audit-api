@@ -4,6 +4,7 @@ import Joi from 'joi'
 import {
   clearMetricsDatabase,
   generateReport,
+  generateReportForForm,
   runMetricsCollectionJob
 } from '~/src/service/metrics.js'
 
@@ -16,6 +17,10 @@ const filteringSchema = Joi.object({
     .single()
     .optional(),
   org: Joi.array().items(Joi.string()).single().optional()
+})
+
+const paramSchema = Joi.object({
+  formId: Joi.string().required()
 })
 
 export default [
@@ -35,6 +40,26 @@ export default [
       auth: false,
       validate: {
         query: filteringSchema
+      }
+    }
+  }),
+
+  /**
+   * @satisfies {ServerRoute}
+   */
+  ({
+    method: 'GET',
+    path: '/report/{formId}',
+    async handler(request, h) {
+      const { params } = request
+      const metrics = await generateReportForForm(params.formId)
+
+      return h.response(metrics).code(HTTP_OK)
+    },
+    options: {
+      auth: false,
+      validate: {
+        params: paramSchema
       }
     }
   }),
