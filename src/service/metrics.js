@@ -489,9 +489,9 @@ export async function recalcMetrics(reportingDate, session) {
       handleDraftSubmissions(metric, maps.formSubmissionsMapDraft)
 
       // Find earliest submission
-      const createdAt = new Date(metric.createdAt)
-      if (createdAt < earliestDataDate) {
-        earliestDataDate = createdAt
+      const createdAtSubmission = new Date(metric.createdAt)
+      if (createdAtSubmission < earliestDataDate) {
+        earliestDataDate = createdAtSubmission
       }
     }
 
