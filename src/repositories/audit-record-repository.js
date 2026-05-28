@@ -121,12 +121,7 @@ export async function getConsolidatedAuditRecords(filter, pagination) {
  * @param {Sort} [sort]
  * @returns {FindCursor<WithId<AuditRecordInput>>}
  */
-export function getAuditRecordsOfType(
-  type,
-  reportDate,
-  session,
-  sort = { createdAt: -1 }
-) {
+export function getAuditRecordsOfType(type, reportDate, session, sort) {
   const coll = getCollection()
 
   const withoutTime = reportDate.toISOString().substring(0, 10)
@@ -146,7 +141,7 @@ export function getAuditRecordsOfType(
           },
           { session }
         )
-        .sort(sort)
+        .sort(sort ?? { createdAt: -1 })
     )
     return cursor
   } catch (err) {
