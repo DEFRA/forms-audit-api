@@ -60,7 +60,7 @@ const MAX_DAYS_PER_BATCH = 30
 const EARLIEST_REPORT_DATE_AS_STRING = '2025-07-01'
 
 /**
- * Delete all metrics records from teh database (apart from the control record)
+ * Delete all xxx metrics records from teh database (apart from the control record)
  */
 export async function clearMetricsDatabase() {
   const session = client.startSession()

@@ -33,6 +33,8 @@ import {
   updateMetricTotal
 } from '~/src/service/metrics.js'
 
+// xxx
+
 jest.mock('~/src/lib/fetch.js')
 jest.mock('~/src/repositories/metrics-repository.js')
 jest.mock('~/src/repositories/audit-record-repository.js')
