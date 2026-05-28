@@ -26,6 +26,8 @@ import {
   collectTimelineMetrics,
   collectTimelineMetricsFromAudit,
   generateReport,
+  getAllFormIds,
+  getOverviewMetricsForForms,
   recalcMetrics,
   runMetricsCollectionJob,
   setMetricTotal,
@@ -190,6 +192,7 @@ describe('runMetricsCollectionJob', () => {
     jest.mocked(client.startSession).mockReturnValue(mockNewSession)
     jest
       .mocked(getJson)
+      .mockResolvedValueOnce({ response: {}, body: ['form-id-1', 'form-id-2'] })
       .mockResolvedValueOnce({ response: {}, body: { draft: {}, live: {} } })
       .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
       .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
@@ -207,16 +210,21 @@ describe('runMetricsCollectionJob', () => {
     jest.mocked(getAllTimelineMetrics).mockReturnValueOnce(mockAsyncIterator)
 
     await runMetricsCollectionJob()
-    expect(getJson).toHaveBeenCalledTimes(2)
+    expect(getJson).toHaveBeenCalledTimes(3)
     expect(getJson).toHaveBeenNthCalledWith(
       1,
-      new URL(
-        'http://localhost:3001/report/overview?date=' + now.toISOString()
-      ),
+      new URL('http://localhost:3001/all-form-ids'),
       {}
     )
     expect(getJson).toHaveBeenNthCalledWith(
       2,
+      new URL(
+        'http://localhost:3001/report/overview?ids=form-id-1&ids=form-id-2'
+      ),
+      {}
+    )
+    expect(getJson).toHaveBeenNthCalledWith(
+      3,
       new URL(
         'http://localhost:3002/report/timeline?date=' + twoDaysAgo.toISOString()
       ),
@@ -257,15 +265,21 @@ describe('runMetricsCollectionJob', () => {
 
   describe('collectManagerOverviewMetrics', () => {
     it('should save each metric', async () => {
-      jest.mocked(getJson).mockResolvedValueOnce({
-        response: {},
-        body: {
-          draft: [{ draftProperty: 123 }],
-          live: [{ liveProperty: 123 }]
-        }
-      })
+      jest
+        .mocked(getJson)
+        .mockResolvedValueOnce({
+          response: {},
+          body: ['form-id-1', 'form-id-2']
+        })
+        .mockResolvedValueOnce({
+          response: {},
+          body: {
+            draft: [{ draftProperty: 123 }],
+            live: [{ liveProperty: 123 }]
+          }
+        })
 
-      await collectManagerOverviewMetrics(new Date(), mockSession)
+      await collectManagerOverviewMetrics(mockSession)
       expect(saveFormOverviewMetrics).toHaveBeenCalledTimes(2)
     })
   })
@@ -912,6 +926,10 @@ describe('runMetricsCollectionJob', () => {
       jest.mocked(client.startSession).mockReturnValue(mockNewSession)
       jest
         .mocked(getJson)
+        .mockResolvedValueOnce({
+          response: {},
+          body: ['form-id-1', 'form-id-2']
+        })
         .mockResolvedValueOnce({ response: {}, body: { draft: {}, live: {} } })
         .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
 
@@ -950,12 +968,13 @@ describe('runMetricsCollectionJob', () => {
         endDate: new Date('2026-05-12T03:00:00.000Z'),
         processMoreBatches: false
       })
-      expect(getJson).toHaveBeenCalledTimes(2)
+      expect(getJson).toHaveBeenCalledTimes(3)
       const calls = jest.mocked(getJson).mock.calls
-      expect(calls[0][0].href).toBe(
-        'http://localhost:3001/report/overview?date=2026-05-13T03:00:00.000Z'
-      )
+      expect(calls[0][0].href).toBe('http://localhost:3001/all-form-ids')
       expect(calls[1][0].href).toBe(
+        'http://localhost:3001/report/overview?ids=form-id-1&ids=form-id-2'
+      )
+      expect(calls[2][0].href).toBe(
         'http://localhost:3002/report/timeline?date=2026-05-12T15:56:04.364Z'
       )
     })
@@ -973,6 +992,10 @@ describe('runMetricsCollectionJob', () => {
       jest.mocked(client.startSession).mockReturnValue(mockNewSession)
       jest
         .mocked(getJson)
+        .mockResolvedValueOnce({
+          response: {},
+          body: ['form-id-1', 'form-id-2']
+        })
         .mockResolvedValueOnce({ response: {}, body: { draft: {}, live: {} } })
         .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
         .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
@@ -1039,19 +1062,50 @@ describe('runMetricsCollectionJob', () => {
         endDate: new Date('2026-03-09T03:00:00.000Z'),
         processMoreBatches: false
       })
-      expect(getJson).toHaveBeenCalledTimes(4)
+      expect(getJson).toHaveBeenCalledTimes(5)
       const calls = jest.mocked(getJson).mock.calls
-      expect(calls[0][0].href).toBe(
-        'http://localhost:3001/report/overview?date=2026-03-10T03:00:00.000Z'
-      )
+      expect(calls[0][0].href).toBe('http://localhost:3001/all-form-ids')
       expect(calls[1][0].href).toBe(
-        'http://localhost:3002/report/timeline?date=2026-03-07T04:00:00.000Z'
+        'http://localhost:3001/report/overview?ids=form-id-1&ids=form-id-2'
       )
       expect(calls[2][0].href).toBe(
-        'http://localhost:3002/report/timeline?date=2026-03-08T04:00:00.000Z'
+        'http://localhost:3002/report/timeline?date=2026-03-07T04:00:00.000Z'
       )
       expect(calls[3][0].href).toBe(
+        'http://localhost:3002/report/timeline?date=2026-03-08T04:00:00.000Z'
+      )
+      expect(calls[4][0].href).toBe(
         'http://localhost:3002/report/timeline?date=2026-03-09T04:00:00.000Z'
+      )
+    })
+  })
+
+  describe('getAllFormIds', () => {
+    it('should call correct URL', async () => {
+      jest
+        .mocked(getJson)
+        .mockResolvedValueOnce({ body: ['id1', 'id2'], response: {} })
+      const res = await getAllFormIds()
+      expect(res).toEqual(['id1', 'id2'])
+      expect(getJson).toHaveBeenCalledWith(
+        new URL('http://localhost:3001/all-form-ids'),
+        {}
+      )
+    })
+  })
+
+  describe('getOverviewMetricsForForms', () => {
+    it('should call correct URL with correct query params', async () => {
+      jest
+        .mocked(getJson)
+        .mockResolvedValueOnce({ body: ['res1'], response: {} })
+      const res = await getOverviewMetricsForForms(['id1', 'id2', 'id3'])
+      expect(res).toEqual(['res1'])
+      expect(getJson).toHaveBeenCalledWith(
+        new URL(
+          'http://localhost:3001/report/overview?ids=id1&ids=id2&ids=id3'
+        ),
+        {}
       )
     })
   })
