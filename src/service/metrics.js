@@ -481,9 +481,11 @@ export async function recalcMetrics(reportingDate, session, formId) {
 
   let earliestDataDate = new Date('2100-01-01')
 
-  for await (const metric of formId
+  const metricCursor = formId
     ? getFormTimelineMetricsCursor(formId, session)
-    : getAllTimelineMetrics(session)) {
+    : getAllTimelineMetrics(session)
+
+  for await (const metric of metricCursor) {
     const metricCalcType = getMetricCalcType(metric)
     if (metric.metricName === FormMetricName.Submissions) {
       // Live submissions
