@@ -266,7 +266,7 @@ describe('runMetricsCollectionJob', () => {
   })
 
   describe('collectManagerOverviewMetrics', () => {
-    it('should save each metric', async () => {
+    it('should save each metric as one batch when batch is less than 20 in size', async () => {
       jest
         .mocked(getJson)
         .mockResolvedValueOnce({
@@ -283,6 +283,32 @@ describe('runMetricsCollectionJob', () => {
 
       await collectManagerOverviewMetrics(mockSession)
       expect(saveFormOverviewMetrics).toHaveBeenCalledTimes(2)
+    })
+
+    it('should save each metric as multiple batches when more than 20 in size', async () => {
+      jest
+        .mocked(getJson)
+        .mockResolvedValueOnce({
+          response: {},
+          body: Array(25).fill('form-id')
+        })
+        .mockResolvedValueOnce({
+          response: {},
+          body: {
+            draft: Array(20).fill({ draftProperty: 123 }),
+            live: [{ liveProperty: 123 }]
+          }
+        })
+        .mockResolvedValueOnce({
+          response: {},
+          body: {
+            draft: Array(5).fill({ draftProperty: 123 }),
+            live: [{ liveProperty: 123 }]
+          }
+        })
+
+      await collectManagerOverviewMetrics(mockSession)
+      expect(saveFormOverviewMetrics).toHaveBeenCalledTimes(27)
     })
   })
 
