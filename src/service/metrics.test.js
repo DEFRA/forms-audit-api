@@ -10,6 +10,7 @@ import {
   getAllOverviewMetrics,
   getAllTimelineMetrics,
   getFirstDraft,
+  getFormTimelineMetricsCursor,
   getMetricTotals,
   getNumberOfFormsInDraft,
   grabLock,
@@ -26,6 +27,7 @@ import {
   collectTimelineMetrics,
   collectTimelineMetricsFromAudit,
   generateReport,
+  generateReportForForm,
   getAllFormIds,
   getOverviewMetricsForForms,
   recalcMetrics,
@@ -1107,6 +1109,78 @@ describe('runMetricsCollectionJob', () => {
         ),
         {}
       )
+    })
+  })
+
+  describe('generateReportForForm', () => {
+    it('should generate metrics for a single form', async () => {
+      const mockNewSession = /** @type {any} */ ({
+        endSession: jest.fn().mockResolvedValue(undefined)
+      })
+      jest.mocked(client.startSession).mockReturnValue(mockNewSession)
+
+      const timelineSet = [
+        createTimelineMetric(
+          FormMetricName.NewFormsCreated,
+          FormStatus.Draft,
+          '2024-04-20',
+          1,
+          'form-id-1'
+        )
+      ]
+
+      const mockAsyncIteratorTimelineSet = {
+        [Symbol.asyncIterator]: function* () {
+          for (const metric of timelineSet) {
+            yield metric
+          }
+        }
+      }
+      jest
+        .mocked(getAllTimelineMetrics)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorTimelineSet)
+      jest
+        .mocked(getFormTimelineMetricsCursor)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorTimelineSet)
+      jest.mocked(getMetricTotals).mockResolvedValueOnce(
+        // @ts-expect-error - partial mock of data
+        {
+          earliestDate: new Date('2026-01-01'),
+          updatedAt: new Date('2026-05-01')
+        }
+      )
+
+      const res = await generateReportForForm('form-id-1')
+      expect(res).toEqual({
+        totals: {
+          last7Days: {},
+          prev7Days: {},
+          last30Days: {},
+          prev30Days: {},
+          lastYear: {},
+          prevYear: {},
+          allTime: {
+            [FormMetricName.NewFormsCreated]: {
+              count: 1,
+              details: [
+                {
+                  createdAt: new Date('2024-04-20T00:00:00.000Z'),
+                  formId: 'form-id-1',
+                  metricValue: 1
+                }
+              ]
+            }
+          },
+          liveSubmissions: {},
+          draftSubmissions: {},
+          daysToPublish: {},
+          republished: {},
+          earliestDate: new Date('2026-01-01'),
+          updatedAt: new Date('2026-05-01')
+        }
+      })
     })
   })
 })

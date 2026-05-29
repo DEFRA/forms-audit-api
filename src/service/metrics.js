@@ -521,9 +521,11 @@ export async function recalcMetrics(reportingDate, session, formId) {
 
   let earliestDataDate = new Date('2100-01-01')
 
-  for await (const metric of formId
+  const metricCursor = formId
     ? getFormTimelineMetricsCursor(formId, session)
-    : getAllTimelineMetrics(session)) {
+    : getAllTimelineMetrics(session)
+
+  for await (const metric of metricCursor) {
     const metricCalcType = getMetricCalcType(metric)
     if (metric.metricName === FormMetricName.Submissions) {
       // Live submissions
@@ -533,9 +535,9 @@ export async function recalcMetrics(reportingDate, session, formId) {
       handleDraftSubmissions(metric, maps.formSubmissionsMapDraft)
 
       // Find earliest submission
-      const createdAt = new Date(metric.createdAt)
-      if (createdAt < earliestDataDate) {
-        earliestDataDate = createdAt
+      const createdAtSubmission = new Date(metric.createdAt)
+      if (createdAtSubmission < earliestDataDate) {
+        earliestDataDate = createdAtSubmission
       }
     }
 
