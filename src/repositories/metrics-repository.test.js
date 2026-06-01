@@ -533,10 +533,10 @@ describe('metrics-repository', () => {
 
   describe('isFirstPublish', () => {
     it('should return true if one or fewer records', async () => {
-      mockCollection.countDocuments.mockReturnValueOnce(0)
+      mockCollection.findOne.mockReturnValueOnce(null)
       const res = await isFirstPublish('form-id', mockSession)
       expect(res).toBe(true)
-      expect(mockCollection.countDocuments).toHaveBeenCalledWith(
+      expect(mockCollection.findOne).toHaveBeenCalledWith(
         {
           type: FormMetricType.TimelineMetric,
           metricName: FormMetricName.FormsFirstPublished,
@@ -547,10 +547,10 @@ describe('metrics-repository', () => {
     })
 
     it('should return false if one or more records', async () => {
-      mockCollection.countDocuments.mockReturnValueOnce(1)
+      mockCollection.findOne.mockReturnValueOnce({})
       const res = await isFirstPublish('form-id', mockSession)
       expect(res).toBe(false)
-      expect(mockCollection.countDocuments).toHaveBeenCalledWith(
+      expect(mockCollection.findOne).toHaveBeenCalledWith(
         {
           type: FormMetricType.TimelineMetric,
           metricName: FormMetricName.FormsFirstPublished,
@@ -561,7 +561,7 @@ describe('metrics-repository', () => {
     })
 
     it('should throw if error', async () => {
-      mockCollection.countDocuments.mockImplementationOnce(() => {
+      mockCollection.findOne.mockImplementationOnce(() => {
         throw new Error('bad db call')
       })
       await expect(() =>
