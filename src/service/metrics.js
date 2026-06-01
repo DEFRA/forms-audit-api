@@ -25,6 +25,7 @@ import {
   getAllOverviewMetrics,
   getAllTimelineMetrics,
   getFirstDraft,
+  getFormTimelineMetricsCursor,
   getMetricTotals,
   getNumberOfFormsInDraft,
   grabLock,
@@ -449,9 +450,10 @@ export function updateMetricAverage(metric, period) {
  * Update metric totals by summing metrics within given windows
  * @param {Date} reportingDate
  * @param {ClientSession} session
+ * @param {string} [formId] - supplied if calcs are for a specific form
  * @returns {Promise<FormTotalsMetric>}
  */
-export async function recalcMetrics(reportingDate, session) {
+export async function recalcMetrics(reportingDate, session, formId) {
   const reportMorning = startOfDay(reportingDate)
   const sevenDaysAgo = subDays(reportMorning, 7)
   const fourteenDaysAgo = subDays(reportMorning, 14)
@@ -479,7 +481,11 @@ export async function recalcMetrics(reportingDate, session) {
 
   let earliestDataDate = new Date('2100-01-01')
 
-  for await (const metric of getAllTimelineMetrics(session)) {
+  const metricCursor = formId
+    ? getFormTimelineMetricsCursor(formId, session)
+    : getAllTimelineMetrics(session)
+
+  for await (const metric of metricCursor) {
     const metricCalcType = getMetricCalcType(metric)
     if (metric.metricName === FormMetricName.Submissions) {
       // Live submissions
@@ -646,13 +652,37 @@ export async function generateReport(filter) {
     // Get metrics per form
     const overview = await getAllOverviewMetrics(filter, session).toArray()
 
-    // Get summary siles
+    // Get summary tiles
     const totals = await getMetricTotals(session)
     // Apply extra columns: submssionsCount, re-published, daysToPublish
     const overviewFull = applyExtraColumns({ overview, totals })
 
     return {
       overview: overviewFull,
+      totals
+    }
+  } finally {
+    await session.endSession()
+  }
+}
+
+/**
+ * Generates a report for a single form, based on the stored metrics
+ * @param {string} formId
+ */
+export async function generateReportForForm(formId) {
+  const session = client.startSession()
+
+  try {
+    const yesterday = sub(new Date(), { days: 1 })
+
+    const totals = await recalcMetrics(yesterday, session, formId)
+
+    const { earliestDate, updatedAt } = await getMetricTotals(session)
+    totals.earliestDate = earliestDate
+    totals.updatedAt = updatedAt
+
+    return {
       totals
     }
   } finally {

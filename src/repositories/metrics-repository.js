@@ -131,9 +131,9 @@ export async function deleteFormOverviewMetrics(session) {
  * Gets overview metric records for a form.
  * @param {string} formId
  * @param {ClientSession} session
- * @returns {Promise<WithId<FormTimelineMetric>[]>}
+ * @returns {FindCursor<WithId<FormTimelineMetric>>}
  */
-export async function getFormTimelineMetrics(formId, session) {
+export function getFormTimelineMetricsCursor(formId, session) {
   const coll = getMetricCollection()
 
   try {
@@ -143,7 +143,7 @@ export async function getFormTimelineMetrics(formId, session) {
           .find({ formId, type: FormMetricType.TimelineMetric }, { session })
           .sort({ createdAt: -1 })
       )
-    return await timelineRecords.toArray()
+    return timelineRecords
   } catch (err) {
     logger.error(
       err,
@@ -151,6 +151,16 @@ export async function getFormTimelineMetrics(formId, session) {
     )
     throw err
   }
+}
+
+/**
+ * Gets overview metric records for a form.
+ * @param {string} formId
+ * @param {ClientSession} session
+ * @returns {Promise<WithId<FormTimelineMetric>[]>}
+ */
+export async function getFormTimelineMetrics(formId, session) {
+  return getFormTimelineMetricsCursor(formId, session).toArray()
 }
 
 /**

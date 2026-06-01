@@ -1,6 +1,7 @@
 import { createServer } from '~/src/api/server.js'
 import {
   generateReport,
+  generateReportForForm,
   runMetricsCollectionJob
 } from '~/src/service/metrics.js'
 import { authSuperAdmin as auth } from '~/test/fixtures/auth.js'
@@ -35,6 +36,23 @@ describe('Report routes', () => {
       const response = await server.inject({
         method: 'GET',
         url: '/report',
+        auth
+      })
+
+      expect(response.statusCode).toEqual(okStatusCode)
+      expect(response.headers['content-type']).toContain(jsonContentType)
+      expect(response.result).toEqual({ overview: [], totals: null })
+    })
+
+    test('/report/form-id route returns 200', async () => {
+      jest
+        .mocked(generateReportForForm)
+        // @ts-expect-error - partial data mock
+        .mockResolvedValue({ overview: [], totals: null })
+
+      const response = await server.inject({
+        method: 'GET',
+        url: '/report/form-id',
         auth
       })
 
