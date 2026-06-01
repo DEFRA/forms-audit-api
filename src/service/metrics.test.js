@@ -46,7 +46,7 @@ jest.mock('~/src/mongo.js', () => ({
 }))
 
 /**
- * @param {string} metricName
+ * @param {FormMetricName} metricName
  * @param {FormStatus} formStatus
  * @param {string} dateStr
  * @param {number} metricValue
@@ -101,7 +101,7 @@ const mockAsyncIteratorDraftCreatedFromLive = {
 
 const firstPublished = /** @type {AuditRecordInput[]} */ ([
   {
-    type: 'FORM_DRAFT_CREATED_FROM_LIVE',
+    type: 'FORM_LIVE_CREATED_FROM_DRAFT',
     entityId: 'form-id-1a',
     createdAt: new Date('2026-04-08')
   }
@@ -109,6 +109,21 @@ const firstPublished = /** @type {AuditRecordInput[]} */ ([
 const mockAsyncIteratorFirstPublished = {
   [Symbol.asyncIterator]: function* () {
     for (const metric of firstPublished) {
+      yield metric
+    }
+  }
+}
+
+const rePublished = /** @type {AuditRecordInput[]} */ ([
+  {
+    type: 'FORM_LIVE_CREATED_FROM_DRAFT',
+    entityId: 'form-id-1a',
+    createdAt: new Date('2026-04-14')
+  }
+])
+const mockAsyncIteratorRePublished = {
+  [Symbol.asyncIterator]: function* () {
+    for (const metric of rePublished) {
       yield metric
     }
   }
@@ -279,6 +294,7 @@ describe('runMetricsCollectionJob', () => {
       type: FormMetricType.TimelineMetric,
       formId: 'form-id',
       formStatus: FormStatus.Draft,
+      // @ts-expect-error - example metric name not in enum
       metricName: 'metricName',
       metricValue: 5,
       createdAt: new Date()
@@ -402,7 +418,7 @@ describe('runMetricsCollectionJob', () => {
           'form-id-1'
         ),
         createTimelineMetric(
-          FormMetricName.FormsPublished,
+          FormMetricName.FormsRePublished,
           FormStatus.Live,
           '2024-05-03',
           1,
@@ -410,7 +426,7 @@ describe('runMetricsCollectionJob', () => {
         ),
         // A re-publish of the form
         createTimelineMetric(
-          FormMetricName.FormsPublished,
+          FormMetricName.FormsFirstPublished,
           FormStatus.Live,
           '2024-05-05',
           1,
@@ -430,88 +446,131 @@ describe('runMetricsCollectionJob', () => {
 
       const totals = await recalcMetrics(new Date('2026-01-01'), mockSession)
 
-      expect(totals).toEqual({
-        last7Days: {
-          NewFormsCreated: {
-            count: 6
-          },
-          Submissions: {
-            count: 6
-          }
+      expect(totals.last7Days?.NewFormsCreated.details).toHaveLength(3)
+      expect(totals.last7Days?.Submissions.details).toHaveLength(1)
+      // Remove 'details' attributes for comparison
+      delete totals.last7Days?.NewFormsCreated.details
+      delete totals.last7Days?.Submissions.details
+      expect(totals.last7Days).toEqual({
+        NewFormsCreated: {
+          count: 6
         },
-        prev7Days: {
-          NewFormsCreated: {
-            count: 9
-          }
-        },
-        last30Days: {
-          NewFormsCreated: {
-            count: 15
-          },
-          Submissions: {
-            count: 6
-          }
-        },
-        prev30Days: {
-          NewFormsCreated: {
-            count: 4
-          },
-          Submissions: {
-            count: 1
-          }
-        },
-        lastYear: {
-          NewFormsCreated: {
-            count: 19
-          },
-          Submissions: {
-            count: 7
-          }
-        },
-        prevYear: {
-          FormsPublished: {
-            count: 2
-          },
-          NewFormsCreated: {
-            count: 1
-          },
-          TimeToPublish: {
-            count: 14
-          }
-        },
-        allTime: {
-          Submissions: {
-            count: 7
-          },
-          FormsPublished: {
-            count: 2
-          },
-          NewFormsCreated: {
-            count: 20
-          },
-          TimeToPublish: {
-            count: 14
-          }
-        },
-        draftSubmissions: {
-          'form-id': 3
-        },
-        liveSubmissions: {
-          'form-id': 7
-        },
-        republished: {
-          'form-id-1': 1
-        },
-        daysToPublish: {
-          'form-id-1': 14
+        Submissions: {
+          count: 6
         }
+      })
+      expect(totals.prev7Days?.NewFormsCreated.details).toHaveLength(2)
+      // Remove 'details' attributes for comparison
+      delete totals.prev7Days?.NewFormsCreated.details
+      expect(totals.prev7Days).toEqual({
+        NewFormsCreated: {
+          count: 9
+        }
+      })
+      expect(totals.last30Days?.NewFormsCreated.details).toHaveLength(5)
+      expect(totals.last30Days?.Submissions.details).toHaveLength(1)
+      // Remove 'details' attributes for comparison
+      delete totals.last30Days?.NewFormsCreated.details
+      delete totals.last30Days?.Submissions.details
+      expect(totals.last30Days).toEqual({
+        NewFormsCreated: {
+          count: 15
+        },
+        Submissions: {
+          count: 6
+        }
+      })
+      expect(totals.prev30Days?.NewFormsCreated.details).toHaveLength(2)
+      expect(totals.prev30Days?.Submissions.details).toHaveLength(1)
+      // Remove 'details' attributes for comparison
+      delete totals.prev30Days?.NewFormsCreated.details
+      delete totals.prev30Days?.Submissions.details
+      expect(totals.prev30Days).toEqual({
+        NewFormsCreated: {
+          count: 4
+        },
+        Submissions: {
+          count: 1
+        }
+      })
+      expect(totals.lastYear?.NewFormsCreated.details).toHaveLength(7)
+      expect(totals.lastYear?.Submissions.details).toHaveLength(2)
+      // Remove 'details' attributes for comparison
+      delete totals.lastYear?.NewFormsCreated.details
+      delete totals.lastYear?.Submissions.details
+      expect(totals.lastYear).toEqual({
+        NewFormsCreated: {
+          count: 19
+        },
+        Submissions: {
+          count: 7
+        }
+      })
+      expect(totals.prevYear?.NewFormsCreated.details).toHaveLength(1)
+      expect(totals.prevYear?.FormsFirstPublished.details).toHaveLength(1)
+      expect(totals.prevYear?.FormsRePublished.details).toHaveLength(1)
+      // Remove 'details' attributes for comparison
+      delete totals.prevYear?.NewFormsCreated.details
+      delete totals.prevYear?.FormsFirstPublished.details
+      delete totals.prevYear?.FormsRePublished.details
+      expect(totals.prevYear).toEqual({
+        FormsFirstPublished: {
+          count: 1
+        },
+        FormsRePublished: {
+          count: 1
+        },
+        NewFormsCreated: {
+          count: 1
+        },
+        TimeToPublish: {
+          count: 14
+        }
+      })
+      expect(totals.allTime?.NewFormsCreated.details).toHaveLength(8)
+      expect(totals.allTime?.FormsFirstPublished.details).toHaveLength(1)
+      expect(totals.allTime?.FormsRePublished.details).toHaveLength(1)
+      expect(totals.allTime?.Submissions.details).toHaveLength(2)
+      // Remove 'details' attributes for comparison
+      delete totals.allTime?.NewFormsCreated.details
+      delete totals.allTime?.FormsFirstPublished.details
+      delete totals.allTime?.FormsRePublished.details
+      delete totals.allTime?.Submissions.details
+      expect(totals.allTime).toEqual({
+        Submissions: {
+          count: 7
+        },
+        FormsFirstPublished: {
+          count: 1
+        },
+        FormsRePublished: {
+          count: 1
+        },
+        NewFormsCreated: {
+          count: 20
+        },
+        TimeToPublish: {
+          count: 14
+        }
+      })
+      expect(totals.draftSubmissions).toEqual({
+        'form-id': 3
+      })
+      expect(totals.liveSubmissions).toEqual({
+        'form-id': 7
+      })
+      expect(totals.republished).toEqual({
+        'form-id-1': 1
+      })
+      expect(totals.daysToPublish).toEqual({
+        'form-id-1': 14
       })
     })
   })
 
   describe('collectTimelineMetricsFromAudit', () => {
     it('should save each metric', async () => {
-      const testDate = new Date('2026-04-01')
+      const testDate = new Date('2026-05-01')
 
       jest.mocked(getNumberOfFormsInDraft).mockResolvedValueOnce(17)
       jest
@@ -519,18 +578,21 @@ describe('runMetricsCollectionJob', () => {
         // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
         .mockReturnValueOnce(mockAsyncIteratorFirstCreated)
         // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
-        .mockReturnValueOnce(mockAsyncIteratorDraftCreatedFromLive)
-        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
         .mockReturnValueOnce(mockAsyncIteratorFirstPublished)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorRePublished)
 
-      jest.mocked(isFirstPublish).mockResolvedValue(true)
+      jest
+        .mocked(isFirstPublish)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false)
       jest
         .mocked(getFirstDraft)
         // @ts-expect-error - partial mock of record
         .mockResolvedValue({ createdAt: new Date('2026-03-30') })
 
       await collectTimelineMetricsFromAudit(testDate, mockSession)
-      expect(saveFormTimelineMetrics).toHaveBeenCalledTimes(5)
+      expect(saveFormTimelineMetrics).toHaveBeenCalledTimes(4)
       expect(saveFormTimelineMetrics).toHaveBeenNthCalledWith(
         1,
         'form-id-1a',
@@ -546,9 +608,9 @@ describe('runMetricsCollectionJob', () => {
         2,
         'form-id-1a',
         {
-          createdAt: new Date('2026-03-30T00:00:00.000Z'),
-          formStatus: 'draft',
-          metricName: 'NewFormsCreated',
+          createdAt: new Date('2026-04-08T00:00:00.000Z'),
+          formStatus: 'live',
+          metricName: 'FormsFirstPublished',
           metricValue: 1
         },
         expect.anything()
@@ -559,27 +621,16 @@ describe('runMetricsCollectionJob', () => {
         {
           createdAt: new Date('2026-04-08T00:00:00.000Z'),
           formStatus: 'live',
-          metricName: 'FormsPublished',
-          metricValue: 1
-        },
-        expect.anything()
-      )
-      expect(saveFormTimelineMetrics).toHaveBeenNthCalledWith(
-        4,
-        'form-id-1a',
-        {
-          createdAt: new Date('2026-04-08T00:00:00.000Z'),
-          formStatus: 'live',
           metricName: 'TimeToPublish',
           metricValue: 9
         },
         expect.anything()
       )
       expect(saveFormTimelineMetrics).toHaveBeenNthCalledWith(
-        5,
+        4,
         'n/a',
         {
-          createdAt: new Date('2026-04-01T00:00:00.000Z'),
+          createdAt: new Date('2026-05-01T00:00:00.000Z'),
           formStatus: 'draft',
           metricName: 'FormsInDraft',
           metricValue: 17
