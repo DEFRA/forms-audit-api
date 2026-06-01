@@ -270,7 +270,7 @@ export async function collectTimelineMetricsFromAudit(reportingDate, session) {
     AuditEventMessageType.FORM_LIVE_CREATED_FROM_DRAFT,
     reportingDate,
     session,
-    { createdAt: 1 } // Sort earliest first in case the first publish (and subsequent publised) occur on the same day
+    { createdAt: 1 } // Sort earliest first in case the first publish (and subsequent published) occur on the same day
   )
   for await (const publish of publishCursor) {
     // Check if first publish
@@ -322,31 +322,6 @@ export async function collectTimelineMetricsFromAudit(reportingDate, session) {
     createdAt: reportingDate
   })
   await saveFormTimelineMetrics('n/a', draftCount, session)
-}
-
-/**
- * @param {FindCursor<WithId<AuditRecordInput>>} cursor
- * @param {FormMetricName} metricName
- * @param {FormStatus} formStatus
- * @param {number} metricValue
- * @param {ClientSession} session
- */
-export async function saveBulkTimelineMetrics(
-  cursor,
-  metricName,
-  formStatus,
-  metricValue,
-  session
-) {
-  for await (const created of cursor) {
-    const metric = /** @type {FormTimelineMetric} */ ({
-      formStatus,
-      metricName,
-      metricValue,
-      createdAt: created.createdAt
-    })
-    await saveFormTimelineMetrics(created.entityId, metric, session)
-  }
 }
 
 /**
@@ -477,7 +452,8 @@ export async function recalcMetrics(reportingDate, session) {
     allTime: {}
   })
 
-  let earliestDataDate = new Date('2100-01-01')
+  /** @type { Date | undefined } */
+  let earliestDataDate
 
   for await (const metric of getAllTimelineMetrics(session)) {
     const metricCalcType = getMetricCalcType(metric)
@@ -490,7 +466,7 @@ export async function recalcMetrics(reportingDate, session) {
 
       // Find earliest submission
       const createdAtSubmission = new Date(metric.createdAt)
-      if (createdAtSubmission < earliestDataDate) {
+      if (!earliestDataDate || createdAtSubmission < earliestDataDate) {
         earliestDataDate = createdAtSubmission
       }
     }
@@ -539,7 +515,8 @@ export async function recalcMetrics(reportingDate, session) {
   totals.draftSubmissions = Object.fromEntries(maps.formSubmissionsMapDraft)
   totals.daysToPublish = Object.fromEntries(maps.formDaysToPublishMap)
   totals.republished = Object.fromEntries(maps.formRepublishedMap)
-  totals.earliestDate = earliestDataDate
+  // Approximate implementation date as fallback if no submissions found
+  totals.earliestDate = earliestDataDate ?? new Date('2025-12-01')
   const finalTotals = calcAverages(totals)
   return finalTotals
 }
@@ -646,9 +623,9 @@ export async function generateReport(filter) {
     // Get metrics per form
     const overview = await getAllOverviewMetrics(filter, session).toArray()
 
-    // Get summary siles
+    // Get summary tiles
     const totals = await getMetricTotals(session)
-    // Apply extra columns: submssionsCount, re-published, daysToPublish
+    // Apply extra columns: submissionsCount, re-published, daysToPublish
     const overviewFull = applyExtraColumns({ overview, totals })
 
     return {
