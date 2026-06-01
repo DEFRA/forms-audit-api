@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 
 export const CalculationTypes = {
   Accumulation: 'Accumulation',
+  AccumulationWithDrilldown: 'AccumulationWithDrilldown',
   Snapshot: 'Snapshot',
   Average: 'Average'
 }
@@ -10,13 +11,16 @@ export const CalculationTypes = {
 export const metricConfig =
   /** { Record<FormMetricName, { calculationType: string }>} */ {
     [FormMetricName.NewFormsCreated]: {
-      calculationType: CalculationTypes.Accumulation
+      calculationType: CalculationTypes.AccumulationWithDrilldown
     },
-    [FormMetricName.FormsPublished]: {
-      calculationType: CalculationTypes.Accumulation
+    [FormMetricName.FormsFirstPublished]: {
+      calculationType: CalculationTypes.AccumulationWithDrilldown
+    },
+    [FormMetricName.FormsRePublished]: {
+      calculationType: CalculationTypes.AccumulationWithDrilldown
     },
     [FormMetricName.Submissions]: {
-      calculationType: CalculationTypes.Accumulation
+      calculationType: CalculationTypes.AccumulationWithDrilldown
     },
     [FormMetricName.FormsInDraft]: {
       calculationType: CalculationTypes.Snapshot
@@ -63,7 +67,7 @@ export function dateFallsInsideTimeslot(date, startOfRange, endOfRange) {
  */
 export function isDraftSubmission(metric) {
   return (
-    metric.metricName === FormMetricName.Submissions.toString() &&
+    metric.metricName === FormMetricName.Submissions &&
     metric.formStatus === FormStatus.Draft
   )
 }
@@ -73,7 +77,7 @@ export function isDraftSubmission(metric) {
  */
 export function isLiveSubmission(metric) {
   return (
-    metric.metricName === FormMetricName.Submissions.toString() &&
+    metric.metricName === FormMetricName.Submissions &&
     metric.formStatus === FormStatus.Live
   )
 }
