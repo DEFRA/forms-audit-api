@@ -8,17 +8,6 @@ import { metricDrilldownPeriods } from '~/src/service/metrics-helper.js'
 const FORM_METRIC_CONTROL = 'form-metric-control'
 
 /**
- * @typedef {object} FormMetricControl
- * @property {string} type - type of record
- * @property {boolean} locked - true if locked i.e. a container is already running the job
- * @property {Date} jobStart - timestamp for when the job started
- * @property { Date | null } jobEnd - timestamp for when the job ended
- * @property { Date | null } lastSuccessfulRunDate - timestamp for when the last successful run started
- * @property {string} lastRunResult - outcome of last run
- * @property {Date} updatedAt - last updated timestamp
- */
-
-/**
  * Gets the metric collection
  * @returns {Collection<FormOverviewMetric | FormTimelineMetric | FormTotalsMetric | FormDrilldownMetric | FormMetricControl>}
  */
@@ -640,5 +629,5 @@ export async function clearMetricsData(session) {
 /**
  * @import { ClientSession, Collection, FindCursor, WithId } from 'mongodb'
  * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FormDrilldownMetric } from '@defra/forms-model'
- * @import { FilterCriteria } from '~/src/service/metrics.js'
+ * @import { FilterCriteria, FormMetricControl } from '~/src/service/metrics.js'
  */

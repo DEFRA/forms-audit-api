@@ -788,10 +788,10 @@ describe('metrics-repository', () => {
     const details = [{ detail: '1' }, { detail: '2' }, { detail: '3' }]
 
     it('should save batch of records', async () => {
-      // @ts-expect-error - partial mock of data
       await saveDrilldownRecords(
         'last7Days',
         FormMetricName.NewFormsCreated,
+        // @ts-expect-error - partial mock of data
         details,
         mockSession
       )
@@ -806,6 +806,7 @@ describe('metrics-repository', () => {
         saveDrilldownRecords(
           'last7Days',
           FormMetricName.NewFormsCreated,
+          // @ts-expect-error - partial mock of data
           details,
           mockSession
         )

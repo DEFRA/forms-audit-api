@@ -53,6 +53,17 @@ import {
  * @property {string[]} [org] - arrays of organisations
  */
 
+/**
+ * @typedef {object} FormMetricControl
+ * @property {string} type - type of record
+ * @property {boolean} locked - true if locked i.e. a container is already running the job
+ * @property {Date} jobStart - timestamp for when the job started
+ * @property { Date | null } jobEnd - timestamp for when the job ended
+ * @property { Date | null } lastSuccessfulRunDate - timestamp for when the last successful run started
+ * @property {string} lastRunResult - outcome of last run
+ * @property {Date} updatedAt - last updated timestamp
+ */
+
 const managerUrl = config.get('managerUrl')
 const submissionUrl = config.get('submissionUrl')
 
@@ -698,7 +709,7 @@ export function applyExtraColumns(metrics) {
 }
 
 /**
- * @import { ClientSession, FindCursor, WithId } from 'mongodb'
- * @import { AuditRecordInput, FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
+ * @import { ClientSession } from 'mongodb'
+ * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
  * @import { CollectionJobResult } from '~/src/service/metrics-helper.js'
  */
