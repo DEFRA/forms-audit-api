@@ -655,6 +655,10 @@ export async function generateReportForForm(formId) {
 
     const totals = await recalcMetrics(yesterday, session, formId)
 
+    // Determine the full date range (from = earliestDate, to = updatedAt)
+    // of when submissions have been collected (not just for this for form but
+    // across the system), so the user can be shown when the system started
+    // storing submissions.
     const { earliestDate, updatedAt } = await getMetricTotals(session)
     totals.earliestDate = earliestDate
     totals.updatedAt = updatedAt
