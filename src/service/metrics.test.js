@@ -9,6 +9,7 @@ import {
   clearMetricsData,
   getAllOverviewMetrics,
   getAllTimelineMetrics,
+  getDrilldownRecords,
   getFirstDraft,
   getMetricTotals,
   getNumberOfFormsInDraft,
@@ -25,6 +26,7 @@ import {
   collectMetrics,
   collectTimelineMetrics,
   collectTimelineMetricsFromAudit,
+  generateDrilldownReport,
   generateReport,
   recalcMetrics,
   runMetricsCollectionJob,
@@ -1035,9 +1037,42 @@ describe('runMetricsCollectionJob', () => {
       )
     })
   })
+
+  describe('generateDrilldownReport', () => {
+    it('should generate drilldown report', async () => {
+      const mockNewSession = /** @type {any} */ ({
+        endSession: jest.fn().mockResolvedValue(undefined)
+      })
+      jest.mocked(client.startSession).mockReturnValue(mockNewSession)
+
+      const drilldownMetrics = /** @type {WithId<FormDrilldownMetric>[]} */ ([
+        {
+          type: FormMetricType.DrilldownMetric,
+          formId: 'form-id-1',
+          createdAt: new Date('2026-02-02')
+        }
+      ])
+      // @ts-expect-error - partial mock of data
+      jest.mocked(getDrilldownRecords).mockReturnValueOnce(drilldownMetrics)
+
+      const res = await generateDrilldownReport(
+        'last7Days',
+        FormMetricName.NewFormsCreated
+      )
+      expect(res).toEqual({
+        drilldownRows: [
+          {
+            createdAt: new Date('2026-02-02'),
+            formId: 'form-id-1',
+            type: FormMetricType.DrilldownMetric
+          }
+        ]
+      })
+    })
+  })
 })
 
 /**
  * @import { WithId } from 'mongodb'
- * @import { AuditRecordInput, FormOverviewMetric, FormTimelineMetric } from '@defra/forms-model'
+ * @import { AuditRecordInput, FormDrilldownMetric, FormOverviewMetric, FormTimelineMetric } from '@defra/forms-model'
  */
