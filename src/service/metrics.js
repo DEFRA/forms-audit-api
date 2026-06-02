@@ -24,6 +24,7 @@ import {
   deleteFormOverviewMetrics,
   getAllOverviewMetrics,
   getAllTimelineMetrics,
+  getDrilldownRecords,
   getFirstDraft,
   getMetricTotals,
   getNumberOfFormsInDraft,
@@ -328,10 +329,16 @@ export async function collectTimelineMetricsFromAudit(reportingDate, session) {
  * @param {FormTimelineMetric} metric
  * @param { Record<string, { count?: number }> | undefined } period
  * @param {string} calculationType
+ * @param {boolean} [saveDrilldown]
  */
-export function handleMetricValue(metric, period, calculationType) {
+export function handleMetricValue(
+  metric,
+  period,
+  calculationType,
+  saveDrilldown
+) {
   if (calculationType === CalculationTypes.AccumulationWithDrilldown) {
-    updateMetricTotal(metric, period, true)
+    updateMetricTotal(metric, period, saveDrilldown)
   }
   if (calculationType === CalculationTypes.Accumulation) {
     updateMetricTotal(metric, period)
@@ -486,7 +493,7 @@ export async function recalcMetrics(reportingDate, session) {
     const createdAt = new Date(metric.createdAt)
     // Last 7 days
     // prettier-ignore
-    handleTimeslot(metric, totals.last7Days, metricCalcType, createdAt, sevenDaysAgo, reportMorning)
+    handleTimeslot(metric, totals.last7Days, metricCalcType, createdAt, sevenDaysAgo, reportMorning, true)
 
     // Previous 7 days
     // prettier-ignore
@@ -494,7 +501,7 @@ export async function recalcMetrics(reportingDate, session) {
 
     // Last 30 days
     // prettier-ignore
-    handleTimeslot(metric, totals.last30Days, metricCalcType, createdAt, thirtyDaysAgo, reportMorning)
+    handleTimeslot(metric, totals.last30Days, metricCalcType, createdAt, thirtyDaysAgo, reportMorning, true)
 
     // Previous 30 days
     // prettier-ignore
@@ -509,7 +516,7 @@ export async function recalcMetrics(reportingDate, session) {
     handleTimeslot(metric, totals.prevYear, metricCalcType, createdAt, twoYearsAgo, oneYearAgo)
 
     // All time
-    handleMetricValue(metric, totals.allTime, metricCalcType)
+    handleMetricValue(metric, totals.allTime, metricCalcType, true)
   }
   totals.liveSubmissions = Object.fromEntries(maps.formSubmissionsMapLive)
   totals.draftSubmissions = Object.fromEntries(maps.formSubmissionsMapDraft)
@@ -550,6 +557,7 @@ function handleDraftSubmissions(metric, map) {
  * @param {Date} createdAt
  * @param {Date} startOfSlot
  * @param {Date} endOfSlot
+ * @param {boolean} [saveDrilldown]
  */
 function handleTimeslot(
   metric,
@@ -557,10 +565,11 @@ function handleTimeslot(
   metricCalcType,
   createdAt,
   startOfSlot,
-  endOfSlot
+  endOfSlot,
+  saveDrilldown
 ) {
   if (dateFallsInsideTimeslot(createdAt, startOfSlot, endOfSlot)) {
-    handleMetricValue(metric, period, metricCalcType)
+    handleMetricValue(metric, period, metricCalcType, saveDrilldown)
   }
 }
 
@@ -631,6 +640,24 @@ export async function generateReport(filter) {
     return {
       overview: overviewFull,
       totals
+    }
+  } finally {
+    await session.endSession()
+  }
+}
+
+/**
+ * Generates a drilldown report (sub-details of a tile)
+ * @param {string} period
+ * @param {FormMetricName} metricName
+ */
+export async function generateDrilldownReport(period, metricName) {
+  const session = client.startSession()
+
+  try {
+    const drilldownRows = await getDrilldownRecords(period, metricName, session)
+    return {
+      drilldownRows
     }
   } finally {
     await session.endSession()
