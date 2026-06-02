@@ -25,6 +25,7 @@ import {
   getAllOverviewMetrics,
   getAllTimelineMetrics,
   getFirstDraft,
+  getFormTimelineMetricsCursor,
   getMetricTotals,
   getNumberOfFormsInDraft,
   grabLock,
@@ -424,9 +425,10 @@ export function updateMetricAverage(metric, period) {
  * Update metric totals by summing metrics within given windows
  * @param {Date} reportingDate
  * @param {ClientSession} session
+ * @param {string} [formId] - supplied if calcs are for a specific form
  * @returns {Promise<FormTotalsMetric>}
  */
-export async function recalcMetrics(reportingDate, session) {
+export async function recalcMetrics(reportingDate, session, formId) {
   const reportMorning = startOfDay(reportingDate)
   const sevenDaysAgo = subDays(reportMorning, 7)
   const fourteenDaysAgo = subDays(reportMorning, 14)
@@ -455,7 +457,11 @@ export async function recalcMetrics(reportingDate, session) {
   /** @type { Date | undefined } */
   let earliestDataDate
 
-  for await (const metric of getAllTimelineMetrics(session)) {
+  const metricCursor = formId
+    ? getFormTimelineMetricsCursor(formId, session)
+    : getAllTimelineMetrics(session)
+
+  for await (const metric of metricCursor) {
     const metricCalcType = getMetricCalcType(metric)
     if (metric.metricName === FormMetricName.Submissions) {
       // Live submissions
@@ -630,6 +636,34 @@ export async function generateReport(filter) {
 
     return {
       overview: overviewFull,
+      totals
+    }
+  } finally {
+    await session.endSession()
+  }
+}
+
+/**
+ * Generates a report for a single form, based on the stored metrics
+ * @param {string} formId
+ */
+export async function generateReportForForm(formId) {
+  const session = client.startSession()
+
+  try {
+    const yesterday = sub(new Date(), { days: 1 })
+
+    const totals = await recalcMetrics(yesterday, session, formId)
+
+    // Determine the full date range (from = earliestDate, to = updatedAt)
+    // of when submissions have been collected (not just for this for form but
+    // across the system), so the user can be shown when the system started
+    // storing submissions.
+    const { earliestDate, updatedAt } = await getMetricTotals(session)
+    totals.earliestDate = earliestDate
+    totals.updatedAt = updatedAt
+
+    return {
       totals
     }
   } finally {
