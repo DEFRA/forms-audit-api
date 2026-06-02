@@ -14,7 +14,6 @@ import {
 } from 'date-fns'
 
 import { config } from '~/src/config/index.js'
-import { getErrorMessage } from '~/src/helpers/error-message.js'
 import { logger } from '~/src/helpers/logging/logger.js'
 import { getJson } from '~/src/lib/fetch.js'
 import { client } from '~/src/mongo.js'
@@ -28,9 +27,7 @@ import {
   getFormTimelineMetricsCursor,
   getMetricTotals,
   getNumberOfFormsInDraft,
-  grabLock,
   isFirstPublish,
-  releaseLock,
   saveFormOverviewMetrics,
   saveFormTimelineMetrics,
   updateMetricTotals
@@ -56,12 +53,11 @@ import {
 const managerUrl = config.get('managerUrl')
 const submissionUrl = config.get('submissionUrl')
 
-const MAX_DAYS_PER_BATCH = 30
 const EARLIEST_REPORT_DATE_AS_STRING = '2025-07-01'
 const METRICS_FORM_BATCH_SIZE = 20
 
 /**
- * Delete all metrics records from teh database (apart from the control record)
+ * Delete all metrics records from the database (apart from the control record)
  */
 export async function clearMetricsDatabase() {
   const session = client.startSession()
@@ -72,63 +68,6 @@ export async function clearMetricsDatabase() {
   } finally {
     await session.endSession()
   }
-}
-
-/**
- * Collect metrics (this may involve multiple batches being collected)
- */
-export async function runMetricsCollectionJob() {
-  let continueProcessingBatches = true
-  do {
-    continueProcessingBatches = await runMetricsCollectionBatch()
-  } while (continueProcessingBatches)
-}
-
-/**
- * Collect a batch of metrics
- * @returns {Promise<boolean>} continueBatches
- */
-export async function runMetricsCollectionBatch() {
-  logger.info('[metrics] metrics job started')
-
-  let result = /* @type {CollectionJobResult} */ {
-    success: false,
-    processMoreBatches: false,
-    message: '',
-    endDate: /** @type { Date | undefined } */ (undefined)
-  }
-
-  const session = client.startSession()
-  try {
-    const jobStart = new Date()
-    const lockResult = await grabLock(session)
-    if (!lockResult.lockSuccess) {
-      logger.info(
-        '[metrics] metrics job aborting as another container already has a lock'
-      )
-      logger.info('[metrics] metrics job finished')
-      return false
-    }
-
-    await session.withTransaction(async () => {
-      result = await collectMetrics(
-        jobStart,
-        lockResult.lastSuccessfulRun,
-        MAX_DAYS_PER_BATCH,
-        session
-      )
-    })
-  } catch (err) {
-    const message = getErrorMessage(err)
-    logger.error(err, `[metrics] metrics job failed - ${message}`)
-    result.message = message
-  } finally {
-    await releaseLock(result, session)
-    await session.endSession()
-  }
-
-  logger.info('[metrics] metrics job finished')
-  return result.processMoreBatches
 }
 
 /**

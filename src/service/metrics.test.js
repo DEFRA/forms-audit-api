@@ -19,6 +19,7 @@ import {
   saveFormOverviewMetrics,
   saveFormTimelineMetrics
 } from '~/src/repositories/metrics-repository.js'
+import { runMetricsCollectionJob } from '~/src/service/metrics-job.js'
 import {
   applyExtraColumns,
   clearMetricsDatabase,
@@ -31,7 +32,6 @@ import {
   getAllFormIds,
   getOverviewMetricsForForms,
   recalcMetrics,
-  runMetricsCollectionJob,
   setMetricTotal,
   updateMetricAverage,
   updateMetricTotal

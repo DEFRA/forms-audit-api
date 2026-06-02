@@ -1,11 +1,11 @@
 import { Scopes } from '@defra/forms-model'
 import Joi from 'joi'
 
+import { runMetricsCollectionJob } from '~/src/service/metrics-job.js'
 import {
   clearMetricsDatabase,
   generateReport,
-  generateReportForForm,
-  runMetricsCollectionJob
+  generateReportForForm
 } from '~/src/service/metrics.js'
 
 const HTTP_OK = 200
