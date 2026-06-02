@@ -1,5 +1,6 @@
 import { createServer } from '~/src/api/server.js'
 import {
+  generateDrilldownReport,
   generateReport,
   runMetricsCollectionJob
 } from '~/src/service/metrics.js'
@@ -41,6 +42,23 @@ describe('Report routes', () => {
       expect(response.statusCode).toEqual(okStatusCode)
       expect(response.headers['content-type']).toContain(jsonContentType)
       expect(response.result).toEqual({ overview: [], totals: null })
+    })
+
+    test('/report/period/metricName route returns 200', async () => {
+      jest
+        .mocked(generateDrilldownReport)
+        // @ts-expect-error - partial data mock
+        .mockResolvedValue([])
+
+      const response = await server.inject({
+        method: 'GET',
+        url: '/report/last7Days/NewFormsCreated',
+        auth
+      })
+
+      expect(response.statusCode).toEqual(okStatusCode)
+      expect(response.headers['content-type']).toContain(jsonContentType)
+      expect(response.result).toEqual([])
     })
   })
 

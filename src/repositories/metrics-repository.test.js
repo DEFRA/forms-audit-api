@@ -7,15 +7,17 @@ import {
   deleteFormOverviewMetrics,
   getAllOverviewMetrics,
   getAllTimelineMetrics,
+  getDrilldownRecords,
   getFirstDraft,
   getFormOverviewMetrics,
   getFormTimelineMetrics,
   getMetricTotals,
   getNumberOfFormsInDraft,
-  getTimelineMetricsForMetricName,
   grabLock,
   isFirstPublish,
   releaseLock,
+  saveDrilldown,
+  saveDrilldownRecords,
   saveFormOverviewMetrics,
   saveFormTimelineMetrics,
   updateMetricTotals
@@ -497,40 +499,6 @@ describe('metrics-repository', () => {
     })
   })
 
-  describe('getTimelineMetricsForMetricName', () => {
-    it('should get records for specific formId and metric name', async () => {
-      mockCollection.find.mockReturnValueOnce({
-        sort: jest.fn(() => {
-          return { toArray: () => [] }
-        })
-      })
-      await getTimelineMetricsForMetricName(
-        'metric-name',
-        'form-id',
-        mockSession
-      )
-      expect(mockCollection.find).toHaveBeenCalledWith(
-        {
-          type: FormMetricType.TimelineMetric,
-          metricName: 'metric-name',
-          formId: 'form-id'
-        },
-        { session: {} }
-      )
-    })
-
-    it('should throw if error', async () => {
-      mockCollection.find.mockReturnValueOnce({
-        sort: () => {
-          throw new Error('bad db call passing metric name')
-        }
-      })
-      await expect(() =>
-        getTimelineMetricsForMetricName('metric-name', 'form-id', mockSession)
-      ).rejects.toThrow('bad db call passing metric name')
-    })
-  })
-
   describe('isFirstPublish', () => {
     it('should return true if one or fewer records', async () => {
       mockCollection.findOne.mockReturnValueOnce(null)
@@ -617,6 +585,41 @@ describe('metrics-repository', () => {
     })
   })
 
+  describe('getDrilldownRecords', () => {
+    it('should return records', async () => {
+      mockCollection.find.mockReturnValueOnce({
+        toArray: () => [{ drill1: 123 }, { drill2: 456 }]
+      })
+      const res = await getDrilldownRecords(
+        'last7Days',
+        FormMetricName.NewFormsCreated,
+        mockSession
+      )
+      expect(res).toEqual([{ drill1: 123 }, { drill2: 456 }])
+      expect(mockCollection.find).toHaveBeenCalledWith(
+        {
+          type: FormMetricType.DrilldownMetric,
+          metricName: FormMetricName.NewFormsCreated,
+          periodName: 'last7Days'
+        },
+        { session: {} }
+      )
+    })
+
+    it('should throw if error', async () => {
+      mockCollection.find.mockImplementationOnce(() => {
+        throw new Error('bad db call')
+      })
+      await expect(() =>
+        getDrilldownRecords(
+          'last7Days',
+          FormMetricName.NewFormsCreated,
+          mockSession
+        )
+      ).rejects.toThrow('bad db call')
+    })
+  })
+
   describe('getNumberOfFormsInDraft', () => {
     const testDate = new Date('2026-04-01')
 
@@ -684,6 +687,129 @@ describe('metrics-repository', () => {
       await expect(() => clearMetricsData(mockSession)).rejects.toThrow(
         'bad db call'
       )
+    })
+  })
+
+  describe('saveDrilldown', () => {
+    it('should save a batch of drilldown records', async () => {
+      const totals = {
+        last7Days: {
+          NewFormsCreated: {
+            count: 2,
+            details: [
+              {
+                formId: 'form-id-1',
+                createdAt: new Date('2026-01-01T14:00:00.000Z'),
+                metricValue: 1
+              },
+              {
+                formId: 'form-id-2',
+                createdAt: new Date('2026-01-02T14:00:00.000Z'),
+                metricValue: 1
+              }
+            ]
+          },
+          NoDetails: {
+            count: 17
+          }
+        },
+        last30Days: {
+          NewFormsCreated: {
+            count: 3,
+            details: [
+              {
+                formId: 'form-id-1',
+                createdAt: new Date('2026-01-01T14:00:00.000Z'),
+                metricValue: 1
+              },
+              {
+                formId: 'form-id-2',
+                createdAt: new Date('2026-01-02T14:00:00.000Z'),
+                metricValue: 1
+              },
+              {
+                formId: 'form-id-3',
+                createdAt: new Date('2025-12-02T14:00:00.000Z'),
+                metricValue: 1
+              }
+            ]
+          }
+        },
+        allTime: {
+          NewFormsCreated: {
+            count: 5,
+            details: [
+              {
+                formId: 'form-id-1',
+                createdAt: new Date('2026-01-01T14:00:00.000Z'),
+                metricValue: 1
+              },
+              {
+                formId: 'form-id-2',
+                createdAt: new Date('2026-01-02T14:00:00.000Z'),
+                metricValue: 1
+              },
+              {
+                formId: 'form-id-3',
+                createdAt: new Date('2025-12-02T14:00:00.000Z'),
+                metricValue: 1
+              },
+              {
+                formId: 'form-id-4',
+                createdAt: new Date('2025-11-02T14:00:00.000Z'),
+                metricValue: 1
+              },
+              {
+                formId: 'form-id-5',
+                createdAt: new Date('2025-10-02T14:00:00.000Z'),
+                metricValue: 1
+              }
+            ]
+          }
+        }
+      }
+      // @ts-expect-error - partial mock of data
+      await saveDrilldown(totals, mockSession)
+
+      expect(mockCollection.insertOne).toHaveBeenCalledTimes(10)
+    })
+
+    it('should throw if error', async () => {
+      mockCollection.deleteMany.mockImplementationOnce(() => {
+        throw new Error('bad db call')
+      })
+      await expect(() => clearMetricsData(mockSession)).rejects.toThrow(
+        'bad db call'
+      )
+    })
+  })
+
+  describe('saveDrilldownRecords', () => {
+    const details = [{ detail: '1' }, { detail: '2' }, { detail: '3' }]
+
+    it('should save batch of records', async () => {
+      // @ts-expect-error - partial mock of data
+      await saveDrilldownRecords(
+        'last7Days',
+        FormMetricName.NewFormsCreated,
+        details,
+        mockSession
+      )
+      expect(mockCollection.insertOne).toHaveBeenCalledTimes(3)
+    })
+
+    it('should throw if error', async () => {
+      mockCollection.insertOne.mockImplementationOnce(() => {
+        throw new Error('bad db call')
+      })
+      await expect(() =>
+        saveDrilldownRecords(
+          'last7Days',
+          FormMetricName.NewFormsCreated,
+          details,
+          mockSession
+        )
+      ).rejects.toThrow('bad db call')
     })
   })
 })

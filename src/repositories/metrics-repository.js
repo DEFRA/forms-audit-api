@@ -224,66 +224,6 @@ export function getAllTimelineMetrics(session) {
 }
 
 /**
- * Get all timeline metrics for a particular metric name and formId
- * @param {string} metricName
- * @param { string | undefined } formId
- * @param {ClientSession} session
- * @param {Date} [fromDate]
- * @param {Date} [toDate]
- * @returns {Promise<WithId<FormTimelineMetric>[]>}
- */
-export async function getTimelineMetricsForMetricName(
-  metricName,
-  formId,
-  session,
-  fromDate,
-  toDate
-) {
-  const coll = getMetricCollection()
-
-  const formIdCriteria = formId ? { formId } : {}
-
-  let dateRange = {}
-  if (fromDate && toDate) {
-    const fromDateWithoutTime = fromDate.toISOString().substring(0, 10)
-    const rangeStart = `${fromDateWithoutTime}T00:00:00.000Z`
-    const toDateWithoutTime = toDate.toISOString().substring(0, 10)
-    const rangeEnd = `${toDateWithoutTime}T23:59:59.999Z`
-
-    dateRange = {
-      createdAt: {
-        $gte: new Date(rangeStart),
-        $lte: new Date(rangeEnd)
-      }
-    }
-  }
-
-  try {
-    const timelineRecords =
-      /** @type {FindCursor<WithId<FormTimelineMetric>>} */ (
-        coll
-          .find(
-            {
-              type: FormMetricType.TimelineMetric,
-              metricName,
-              ...formIdCriteria,
-              ...dateRange
-            },
-            { session }
-          )
-          .sort({ createdAt: -1 })
-      )
-    return await timelineRecords.toArray()
-  } catch (err) {
-    logger.error(
-      err,
-      `Failed to read timeline metric for metric ${metricName} and form id ${formId} - ${getErrorMessage(err)}`
-    )
-    throw err
-  }
-}
-
-/**
  * Saves snapshot metric records for a form.
  * @param {string} formId
  * @param {FormTimelineMetric} metricData
@@ -398,20 +338,22 @@ export async function saveDrilldown(totals, session) {
   for (const periodName of metricDrilldownPeriods) {
     // @ts-expect-error - dynamic lookup
     const period = totals[periodName]
-    if (period) {
-      for (const metricName of Object.keys(period)) {
-        const detail = period[metricName]
-        if ('details' in detail) {
-          const details = /** @type {FormDrilldownMetric[]} */ (detail.details)
-          await saveDrilldownRecords(
-            periodName,
-            /** @type {FormMetricName} */ (metricName),
-            details,
-            session
-          )
-          // @ts-expect-error - dynamic lookup
-          delete totals[periodName][metricName].details
-        }
+    if (!period) {
+      continue
+    }
+
+    for (const metricName of Object.keys(period)) {
+      const detail = period[metricName]
+      if ('details' in detail) {
+        const details = /** @type {FormDrilldownMetric[]} */ (detail.details)
+        await saveDrilldownRecords(
+          periodName,
+          /** @type {FormMetricName} */ (metricName),
+          details,
+          session
+        )
+        // @ts-expect-error - dynamic lookup
+        delete totals[periodName][metricName].details
       }
     }
   }
