@@ -137,62 +137,51 @@ export async function collectMetrics(
 export async function collectManagerOverviewMetrics(session) {
   await deleteFormOverviewMetrics(session)
 
-  // Batch up requests into small batches (say 20 forms at a time) to ensure the
+  // Batch up requests into pages (say 20 forms at a time) to ensure the
   // API calls to forms-manager never take over 1 second to process (over 1 second response triggers an alert)
-  let batchOfIds = []
-  const formIds = await getAllFormIds()
-  for (const id of formIds) {
-    batchOfIds.push(id)
-    if (batchOfIds.length >= METRICS_FORM_BATCH_SIZE) {
-      await processMetricsBatch(batchOfIds, session)
-      batchOfIds = []
-    }
-  }
-
-  // Process the remainder that didn't make up a full batch
-  if (batchOfIds.length) {
-    await processMetricsBatch(batchOfIds, session)
-  }
+  let currentPage = 0
+  let pageInfo = /** @type {{totalItems: number}} */ ({})
+  do {
+    currentPage++
+    pageInfo = await processMetricsBatch(
+      currentPage,
+      METRICS_FORM_BATCH_SIZE,
+      session
+    )
+  } while (pageInfo.totalItems > currentPage * METRICS_FORM_BATCH_SIZE)
 }
 
 /**
- * @param {string[]} ids
+ * @param {number} page
+ * @param {number} perPage
  * @param {ClientSession} session
  */
-async function processMetricsBatch(ids, session) {
-  const metricsMap = await getOverviewMetricsForForms(ids)
+async function processMetricsBatch(page, perPage, session) {
+  const metricsData = await getOverviewMetricsForForms(page, perPage)
 
-  for (const [formId, metrics] of Object.entries(metricsMap.draft)) {
+  for (const [formId, metrics] of Object.entries(metricsData.data.draft)) {
     await saveFormOverviewMetrics(formId, FormStatus.Draft, metrics, session)
   }
 
-  for (const [formId, metrics] of Object.entries(metricsMap.live)) {
+  for (const [formId, metrics] of Object.entries(metricsData.data.live)) {
     await saveFormOverviewMetrics(formId, FormStatus.Live, metrics, session)
   }
+
+  return metricsData
 }
 
 /**
- * Get list of all form ids
+ * @param {number} page
+ * @param {number} perPage
  */
-export async function getAllFormIds() {
-  const { body } = /** @type {{ body: string[] }} */ (
-    await getJson(new URL(`${managerUrl}/all-form-ids`), {})
+export async function getOverviewMetricsForForms(page, perPage) {
+  const requestUrl = new URL(
+    `${managerUrl}/report/overview?page=${page}&perPage=${perPage}`
   )
-  return body
-}
-
-/**
- * @param {string[]} formIds
- */
-export async function getOverviewMetricsForForms(formIds) {
-  const requestUrl = new URL(`${managerUrl}/report/overview`)
-  formIds.forEach((id) => {
-    requestUrl.searchParams.append('ids', id)
-  })
 
   const { body } = await getJson(requestUrl, {})
 
-  return /** @type {{ draft: Record<string, FormOverviewMetric>, live: Record<string, FormOverviewMetric>}} */ (
+  return /** @type {{ data: { draft: Record<string, FormOverviewMetric>, live: Record<string, FormOverviewMetric>}, totalItems: number, filters: FilterOptions }} */ (
     body
   )
 }
@@ -684,7 +673,7 @@ export function applyExtraColumns(metrics) {
 }
 
 /**
- * @import { ClientSession, FindCursor, WithId } from 'mongodb'
- * @import { AuditRecordInput, FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
+ * @import { ClientSession } from 'mongodb'
+ * @import { FilterOptions, FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
  * @import { CollectionJobResult } from '~/src/service/metrics-helper.js'
  */
