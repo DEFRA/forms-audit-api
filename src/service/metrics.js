@@ -169,12 +169,7 @@ async function processMetricsBatch(page, perPage, session) {
       )
     }
     if (live) {
-      await saveFormOverviewMetrics(
-        live.formId,
-        FormStatus.Draft,
-        live,
-        session
-      )
+      await saveFormOverviewMetrics(live.formId, FormStatus.Live, live, session)
     }
   }
 
