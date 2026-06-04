@@ -3,26 +3,16 @@ import { FormMetricName, FormMetricType, FormStatus } from '@defra/forms-model'
 import { getErrorMessage } from '~/src/helpers/error-message.js'
 import { logger } from '~/src/helpers/logging/logger.js'
 import { METRICS_COLLECTION_NAME, db } from '~/src/mongo.js'
+import { metricDrilldownPeriods } from '~/src/service/metrics-helper.js'
 
 const FORM_METRIC_CONTROL = 'form-metric-control'
 
 /**
- * @typedef {object} FormMetricControl
- * @property {string} type - type of record
- * @property {boolean} locked - true if locked i.e. a container is already running the job
- * @property {Date} jobStart - timestamp for when the job started
- * @property { Date | null } jobEnd - timestamp for when the job ended
- * @property { Date | null } lastSuccessfulRunDate - timestamp for when the last successful run started
- * @property {string} lastRunResult - outcome of last run
- * @property {Date} updatedAt - last updated timestamp
- */
-
-/**
  * Gets the metric collection
- * @returns {Collection<FormOverviewMetric | FormTimelineMetric | FormTotalsMetric | FormMetricControl>}
+ * @returns {Collection<FormOverviewMetric | FormTimelineMetric | FormTotalsMetric | FormDrilldownMetric | FormMetricControl>}
  */
 function getMetricCollection() {
-  return /** @type {Collection<FormOverviewMetric | FormTimelineMetric | FormTotalsMetric | FormMetricControl>} */ (
+  return /** @type {Collection<FormOverviewMetric | FormTimelineMetric | FormTotalsMetric | FormDrilldownMetric | FormMetricControl>} */ (
     db.collection(METRICS_COLLECTION_NAME)
   )
 }
@@ -233,40 +223,6 @@ export function getAllTimelineMetrics(session) {
 }
 
 /**
- * Get all timeline metrics for a particular metric name and formId
- * @param {string} metricName
- * @param {string} formId
- * @param {ClientSession} session
- * @returns {Promise<WithId<FormTimelineMetric>[]>}
- */
-export async function getTimelineMetricsForMetricName(
-  metricName,
-  formId,
-  session
-) {
-  const coll = getMetricCollection()
-
-  try {
-    const timelineRecords =
-      /** @type {FindCursor<WithId<FormTimelineMetric>>} */ (
-        coll
-          .find(
-            { type: FormMetricType.TimelineMetric, metricName, formId },
-            { session }
-          )
-          .sort({ createdAt: -1 })
-      )
-    return await timelineRecords.toArray()
-  } catch (err) {
-    logger.error(
-      err,
-      `Failed to read timeline metric for metric ${metricName} and form id ${formId} - ${getErrorMessage(err)}`
-    )
-    throw err
-  }
-}
-
-/**
  * Saves snapshot metric records for a form.
  * @param {string} formId
  * @param {FormTimelineMetric} metricData
@@ -311,6 +267,37 @@ export function getMetricTotals(session) {
 }
 
 /**
+ * Gets metric drilldown records.
+ * @param {string} periodName
+ * @param {FormMetricName} metricName
+ * @param {ClientSession} session
+ */
+export async function getDrilldownRecords(periodName, metricName, session) {
+  const coll = getMetricCollection()
+
+  try {
+    return await /** @type {Promise<WithId<FormDrilldownMetric>[]>} */ (
+      coll
+        .find(
+          {
+            type: FormMetricType.DrilldownMetric,
+            periodName,
+            metricName
+          },
+          { session }
+        )
+        .toArray()
+    )
+  } catch (err) {
+    logger.error(
+      err,
+      `Failed to get drilldown metrics - ${getErrorMessage(err)}`
+    )
+    throw err
+  }
+}
+
+/**
  * Saves snapshot metric records for a form.
  * @param {Date} reportDate
  * @param {FormTotalsMetric} totals
@@ -320,8 +307,14 @@ export async function updateMetricTotals(reportDate, totals, session) {
   const coll = getMetricCollection()
 
   try {
-    totals.updatedAt = reportDate
     await coll.deleteMany({ type: FormMetricType.TotalsMetric }, { session })
+    await coll.deleteMany({ type: FormMetricType.DrilldownMetric }, { session })
+
+    // Extract drilldown detail from 'totals' data, and save as drilldown records
+    totals = await saveDrilldown(totals, session)
+    totals.updatedAt = reportDate
+
+    // Now save 'totals' records with drilldown data removed
     await coll.insertOne(
       {
         ...totals,
@@ -331,6 +324,76 @@ export async function updateMetricTotals(reportDate, totals, session) {
     )
   } catch (err) {
     logger.error(err, `Failed to save totals metric - ${getErrorMessage(err)}`)
+    throw err
+  }
+}
+
+/**
+ * Saves drilldown details.
+ * @param {FormTotalsMetric} totals
+ * @param {ClientSession} session
+ */
+export async function saveDrilldown(totals, session) {
+  for (const periodName of metricDrilldownPeriods) {
+    // @ts-expect-error - dynamic lookup
+    const period = totals[periodName]
+    if (!period) {
+      continue
+    }
+
+    for (const metricName of Object.keys(period)) {
+      const detail = period[metricName]
+      if ('details' in detail) {
+        const details = /** @type {FormDrilldownMetric[]} */ (detail.details)
+        await saveDrilldownRecords(
+          periodName,
+          /** @type {FormMetricName} */ (metricName),
+          details,
+          session
+        )
+        // @ts-expect-error - dynamic lookup
+        delete totals[periodName][metricName].details
+      }
+    }
+  }
+
+  return totals
+}
+
+/**
+ * Saves drilldown metric records.
+ * @param {string} periodName
+ * @param {FormMetricName} metricName
+ * @param {FormDrilldownMetric[]} details
+ * @param {ClientSession} session
+ */
+export async function saveDrilldownRecords(
+  periodName,
+  metricName,
+  details,
+  session
+) {
+  const coll = getMetricCollection()
+
+  if (details.length === 0) {
+    return
+  }
+
+  try {
+    await coll.insertMany(
+      details.map((detail) => ({
+        ...detail,
+        metricName,
+        periodName,
+        type: FormMetricType.DrilldownMetric
+      })),
+      { session }
+    )
+  } catch (err) {
+    logger.error(
+      err,
+      `Failed to save drilldown metric record - period: ${periodName} metricName: ${metricName} ${getErrorMessage(err)}`
+    )
     throw err
   }
 }
@@ -577,6 +640,6 @@ export async function clearMetricsData(session) {
 
 /**
  * @import { ClientSession, Collection, FindCursor, WithId } from 'mongodb'
- * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
- * @import { FilterCriteria } from '~/src/service/metrics.js'
+ * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FormDrilldownMetric } from '@defra/forms-model'
+ * @import { FilterCriteria, FormMetricControl } from '~/src/service/metrics.js'
  */

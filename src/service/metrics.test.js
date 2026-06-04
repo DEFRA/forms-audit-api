@@ -9,6 +9,7 @@ import {
   clearMetricsData,
   getAllOverviewMetrics,
   getAllTimelineMetrics,
+  getDrilldownRecords,
   getFirstDraft,
   getFormTimelineMetricsCursor,
   getMetricTotals,
@@ -27,6 +28,7 @@ import {
   collectMetrics,
   collectTimelineMetrics,
   collectTimelineMetricsFromAudit,
+  generateDrilldownReport,
   generateReport,
   generateReportForForm,
   getOverviewMetricsForForms,
@@ -504,9 +506,6 @@ describe('runMetricsCollectionJob', () => {
           count: 6
         }
       })
-      expect(totals.prev7Days?.NewFormsCreated.details).toHaveLength(2)
-      // Remove 'details' attributes for comparison
-      delete totals.prev7Days?.NewFormsCreated.details
       expect(totals.prev7Days).toEqual({
         NewFormsCreated: {
           count: 9
@@ -525,11 +524,6 @@ describe('runMetricsCollectionJob', () => {
           count: 6
         }
       })
-      expect(totals.prev30Days?.NewFormsCreated.details).toHaveLength(2)
-      expect(totals.prev30Days?.Submissions.details).toHaveLength(1)
-      // Remove 'details' attributes for comparison
-      delete totals.prev30Days?.NewFormsCreated.details
-      delete totals.prev30Days?.Submissions.details
       expect(totals.prev30Days).toEqual({
         NewFormsCreated: {
           count: 4
@@ -538,11 +532,6 @@ describe('runMetricsCollectionJob', () => {
           count: 1
         }
       })
-      expect(totals.lastYear?.NewFormsCreated.details).toHaveLength(7)
-      expect(totals.lastYear?.Submissions.details).toHaveLength(2)
-      // Remove 'details' attributes for comparison
-      delete totals.lastYear?.NewFormsCreated.details
-      delete totals.lastYear?.Submissions.details
       expect(totals.lastYear).toEqual({
         NewFormsCreated: {
           count: 19
@@ -551,13 +540,6 @@ describe('runMetricsCollectionJob', () => {
           count: 7
         }
       })
-      expect(totals.prevYear?.NewFormsCreated.details).toHaveLength(1)
-      expect(totals.prevYear?.FormsFirstPublished.details).toHaveLength(1)
-      expect(totals.prevYear?.FormsRePublished.details).toHaveLength(1)
-      // Remove 'details' attributes for comparison
-      delete totals.prevYear?.NewFormsCreated.details
-      delete totals.prevYear?.FormsFirstPublished.details
-      delete totals.prevYear?.FormsRePublished.details
       expect(totals.prevYear).toEqual({
         FormsFirstPublished: {
           count: 1
@@ -1192,9 +1174,41 @@ describe('runMetricsCollectionJob', () => {
       })
     })
   })
+  describe('generateDrilldownReport', () => {
+    it('should generate drilldown report', async () => {
+      const mockNewSession = /** @type {any} */ ({
+        endSession: jest.fn().mockResolvedValue(undefined)
+      })
+      jest.mocked(client.startSession).mockReturnValue(mockNewSession)
+
+      const drilldownMetrics = /** @type {WithId<FormDrilldownMetric>[]} */ ([
+        {
+          type: FormMetricType.DrilldownMetric,
+          formId: 'form-id-1',
+          createdAt: new Date('2026-02-02')
+        }
+      ])
+      // @ts-expect-error - partial mock of data
+      jest.mocked(getDrilldownRecords).mockReturnValueOnce(drilldownMetrics)
+
+      const res = await generateDrilldownReport(
+        'last7Days',
+        FormMetricName.NewFormsCreated
+      )
+      expect(res).toEqual({
+        drilldownRows: [
+          {
+            createdAt: new Date('2026-02-02'),
+            formId: 'form-id-1',
+            type: FormMetricType.DrilldownMetric
+          }
+        ]
+      })
+    })
+  })
 })
 
 /**
  * @import { WithId } from 'mongodb'
- * @import { AuditRecordInput, FormOverviewMetric, FormTimelineMetric } from '@defra/forms-model'
+ * @import { AuditRecordInput, FormDrilldownMetric, FormOverviewMetric, FormTimelineMetric } from '@defra/forms-model'
  */

@@ -1,9 +1,10 @@
-import { Scopes } from '@defra/forms-model'
+import { FormMetricName, Scopes } from '@defra/forms-model'
 import Joi from 'joi'
 
 import { runMetricsCollectionJob } from '~/src/service/metrics-job.js'
 import {
   clearMetricsDatabase,
+  generateDrilldownReport,
   generateReport,
   generateReportForForm
 } from '~/src/service/metrics.js'
@@ -21,6 +22,13 @@ const filteringSchema = Joi.object({
 
 const paramSchema = Joi.object({
   formId: Joi.string().required()
+})
+
+const drilldownSchema = Joi.object({
+  period: Joi.string().valid('last7Days', 'last30Days', 'allTime').required(),
+  metricName: Joi.string()
+    .valid(...Object.values(FormMetricName))
+    .required()
 })
 
 export default [
@@ -60,6 +68,29 @@ export default [
       auth: false,
       validate: {
         params: paramSchema
+      }
+    }
+  }),
+
+  /**
+   * @satisfies {ServerRoute<{ Params: { period: string, metricName: FormMetricName } }>}
+   */
+  ({
+    method: 'GET',
+    path: '/report/{period}/{metricName}',
+    async handler(request, h) {
+      const { params } = request
+      const metrics = await generateDrilldownReport(
+        params.period,
+        params.metricName
+      )
+
+      return h.response(metrics).code(HTTP_OK)
+    },
+    options: {
+      auth: false,
+      validate: {
+        params: drilldownSchema
       }
     }
   }),

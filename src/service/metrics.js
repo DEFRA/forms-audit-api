@@ -23,6 +23,7 @@ import {
   deleteFormOverviewMetrics,
   getAllOverviewMetrics,
   getAllTimelineMetrics,
+  getDrilldownRecords,
   getFirstDraft,
   getFormTimelineMetricsCursor,
   getMetricTotals,
@@ -48,6 +49,17 @@ import {
  * @property {string} [searchText] - text to search within a form name
  * @property {string[]} [status] - array of statuses
  * @property {string[]} [org] - arrays of organisations
+ */
+
+/**
+ * @typedef {object} FormMetricControl
+ * @property {string} type - type of record
+ * @property {boolean} locked - true if locked i.e. a container is already running the job
+ * @property {Date} jobStart - timestamp for when the job started
+ * @property { Date | null } jobEnd - timestamp for when the job ended
+ * @property { Date | null } lastSuccessfulRunDate - timestamp for when the last successful run started
+ * @property {string} lastRunResult - outcome of last run
+ * @property {Date} updatedAt - last updated timestamp
  */
 
 const managerUrl = config.get('managerUrl')
@@ -303,10 +315,16 @@ export async function collectTimelineMetricsFromAudit(reportingDate, session) {
  * @param {FormTimelineMetric} metric
  * @param { Record<string, { count?: number }> | undefined } period
  * @param {string} calculationType
+ * @param {boolean} [saveDrilldown]
  */
-export function handleMetricValue(metric, period, calculationType) {
+export function handleMetricValue(
+  metric,
+  period,
+  calculationType,
+  saveDrilldown
+) {
   if (calculationType === CalculationTypes.AccumulationWithDrilldown) {
-    updateMetricTotal(metric, period, true)
+    updateMetricTotal(metric, period, saveDrilldown)
   }
   if (calculationType === CalculationTypes.Accumulation) {
     updateMetricTotal(metric, period)
@@ -466,7 +484,7 @@ export async function recalcMetrics(reportingDate, session, formId) {
     const createdAt = new Date(metric.createdAt)
     // Last 7 days
     // prettier-ignore
-    handleTimeslot(metric, totals.last7Days, metricCalcType, createdAt, sevenDaysAgo, reportMorning)
+    handleTimeslot(metric, totals.last7Days, metricCalcType, createdAt, sevenDaysAgo, reportMorning, true)
 
     // Previous 7 days
     // prettier-ignore
@@ -474,7 +492,7 @@ export async function recalcMetrics(reportingDate, session, formId) {
 
     // Last 30 days
     // prettier-ignore
-    handleTimeslot(metric, totals.last30Days, metricCalcType, createdAt, thirtyDaysAgo, reportMorning)
+    handleTimeslot(metric, totals.last30Days, metricCalcType, createdAt, thirtyDaysAgo, reportMorning, true)
 
     // Previous 30 days
     // prettier-ignore
@@ -489,7 +507,7 @@ export async function recalcMetrics(reportingDate, session, formId) {
     handleTimeslot(metric, totals.prevYear, metricCalcType, createdAt, twoYearsAgo, oneYearAgo)
 
     // All time
-    handleMetricValue(metric, totals.allTime, metricCalcType)
+    handleMetricValue(metric, totals.allTime, metricCalcType, true)
   }
   totals.liveSubmissions = Object.fromEntries(maps.formSubmissionsMapLive)
   totals.draftSubmissions = Object.fromEntries(maps.formSubmissionsMapDraft)
@@ -530,6 +548,7 @@ function handleDraftSubmissions(metric, map) {
  * @param {Date} createdAt
  * @param {Date} startOfSlot
  * @param {Date} endOfSlot
+ * @param {boolean} [saveDrilldown]
  */
 function handleTimeslot(
   metric,
@@ -537,10 +556,11 @@ function handleTimeslot(
   metricCalcType,
   createdAt,
   startOfSlot,
-  endOfSlot
+  endOfSlot,
+  saveDrilldown
 ) {
   if (dateFallsInsideTimeslot(createdAt, startOfSlot, endOfSlot)) {
-    handleMetricValue(metric, period, metricCalcType)
+    handleMetricValue(metric, period, metricCalcType, saveDrilldown)
   }
 }
 
@@ -639,6 +659,24 @@ export async function generateReportForForm(formId) {
 
     return {
       totals
+    }
+  } finally {
+    await session.endSession()
+  }
+}
+
+/**
+ * Generates a drilldown report (sub-details of a tile)
+ * @param {string} period
+ * @param {FormMetricName} metricName
+ */
+export async function generateDrilldownReport(period, metricName) {
+  const session = client.startSession()
+
+  try {
+    const drilldownRows = await getDrilldownRecords(period, metricName, session)
+    return {
+      drilldownRows
     }
   } finally {
     await session.endSession()

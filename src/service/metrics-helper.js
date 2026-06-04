@@ -30,6 +30,8 @@ export const metricConfig =
     }
   }
 
+export const metricDrilldownPeriods = ['last7Days', 'last30Days', 'allTime']
+
 /**
  * @typedef {object} CollectionJobResult
  * @property {boolean} success - true if job was successful
