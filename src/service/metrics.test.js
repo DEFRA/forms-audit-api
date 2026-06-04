@@ -195,7 +195,7 @@ describe('runMetricsCollectionJob', () => {
       .mocked(getJson)
       .mockResolvedValueOnce({
         response: {},
-        body: { data: { draft: {}, live: {} } }
+        body: { data: [] }
       })
       .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
       .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
@@ -264,10 +264,12 @@ describe('runMetricsCollectionJob', () => {
       jest.mocked(getJson).mockResolvedValueOnce({
         response: {},
         body: {
-          data: {
-            draft: [{ draftProperty: 123 }],
-            live: [{ liveProperty: 123 }]
-          },
+          data: [
+            {
+              draft: [{ draftProperty: 123 }],
+              live: [{ liveProperty: 123 }]
+            }
+          ],
           totalItems: 2
         }
       })
@@ -277,25 +279,33 @@ describe('runMetricsCollectionJob', () => {
     })
 
     it('should save each metric as multiple batches when more than 20 in size', async () => {
+      const mockDataPage1 = []
+      for (let i = 0; i < 20; i++) {
+        mockDataPage1.push({ draft: { draftProperty: 123 } })
+      }
+      // @ts-expect-error - partial mock of data
+      mockDataPage1[3].live = { liveProperty: 123 }
+
+      const mockDataPage2 = []
+      for (let i = 0; i < 5; i++) {
+        mockDataPage2.push({ draft: { draftProperty: 123 } })
+      }
+      // @ts-expect-error - partial mock of data
+      mockDataPage2[1].live = { liveProperty: 123 }
+
       jest
         .mocked(getJson)
         .mockResolvedValueOnce({
           response: {},
           body: {
-            data: {
-              draft: Array(20).fill({ draftProperty: 123 }),
-              live: [{ liveProperty: 123 }]
-            },
+            data: mockDataPage1,
             totalItems: 25
           }
         })
         .mockResolvedValueOnce({
           response: {},
           body: {
-            data: {
-              draft: Array(5).fill({ draftProperty: 123 }),
-              live: [{ liveProperty: 123 }]
-            },
+            data: mockDataPage2,
             totalItems: 25
           }
         })
@@ -949,7 +959,7 @@ describe('runMetricsCollectionJob', () => {
         .mocked(getJson)
         .mockResolvedValueOnce({
           response: {},
-          body: { data: { draft: {}, live: {} }, totalItems: 0 }
+          body: { data: [], totalItems: 0 }
         })
         .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
 
@@ -1013,7 +1023,7 @@ describe('runMetricsCollectionJob', () => {
         .mocked(getJson)
         .mockResolvedValueOnce({
           response: {},
-          body: { data: { draft: {}, live: {} } }
+          body: { data: [] }
         })
         .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
         .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })

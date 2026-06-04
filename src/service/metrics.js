@@ -159,12 +159,23 @@ export async function collectManagerOverviewMetrics(session) {
 async function processMetricsBatch(page, perPage, session) {
   const metricsData = await getOverviewMetricsForForms(page, perPage)
 
-  for (const [formId, metrics] of Object.entries(metricsData.data.draft)) {
-    await saveFormOverviewMetrics(formId, FormStatus.Draft, metrics, session)
-  }
-
-  for (const [formId, metrics] of Object.entries(metricsData.data.live)) {
-    await saveFormOverviewMetrics(formId, FormStatus.Live, metrics, session)
+  for (const { draft, live } of metricsData.data) {
+    if (draft) {
+      await saveFormOverviewMetrics(
+        draft.formId,
+        FormStatus.Draft,
+        draft,
+        session
+      )
+    }
+    if (live) {
+      await saveFormOverviewMetrics(
+        live.formId,
+        FormStatus.Draft,
+        live,
+        session
+      )
+    }
   }
 
   return metricsData
@@ -181,7 +192,7 @@ export async function getOverviewMetricsForForms(page, perPage) {
 
   const { body } = await getJson(requestUrl, {})
 
-  return /** @type {{ data: { draft: Record<string, FormOverviewMetric>, live: Record<string, FormOverviewMetric>}, totalItems: number, filters: FilterOptions }} */ (
+  return /** @type {{ data: { draft: FormOverviewMetric | undefined, live: FormOverviewMetric | undefined}[], totalItems: number, filters: FilterOptions }} */ (
     body
   )
 }
