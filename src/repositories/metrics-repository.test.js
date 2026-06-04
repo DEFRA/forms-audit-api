@@ -780,8 +780,8 @@ describe('metrics-repository', () => {
       mockCollection.insertMany.mockImplementationOnce(() => {
         throw new Error('bad db call')
       })
-      // @ts-expect-error - partial mock of data
       await expect(() =>
+        // @ts-expect-error - partial mock of data
         saveDrilldown(totalsCopy, mockSession)
       ).rejects.toThrow('bad db call')
     })
