@@ -14,7 +14,6 @@ import {
 } from 'date-fns'
 
 import { config } from '~/src/config/index.js'
-import { getErrorMessage } from '~/src/helpers/error-message.js'
 import { logger } from '~/src/helpers/logging/logger.js'
 import { getJson } from '~/src/lib/fetch.js'
 import { client } from '~/src/mongo.js'
@@ -28,9 +27,7 @@ import {
   getFormTimelineMetricsCursor,
   getMetricTotals,
   getNumberOfFormsInDraft,
-  grabLock,
   isFirstPublish,
-  releaseLock,
   saveFormOverviewMetrics,
   saveFormTimelineMetrics,
   updateMetricTotals
@@ -56,11 +53,11 @@ import {
 const managerUrl = config.get('managerUrl')
 const submissionUrl = config.get('submissionUrl')
 
-const MAX_DAYS_PER_BATCH = 30
 const EARLIEST_REPORT_DATE_AS_STRING = '2025-07-01'
+const METRICS_FORM_BATCH_SIZE = 20
 
 /**
- * Delete all metrics records from teh database (apart from the control record)
+ * Delete all metrics records from the database (apart from the control record)
  */
 export async function clearMetricsDatabase() {
   const session = client.startSession()
@@ -71,63 +68,6 @@ export async function clearMetricsDatabase() {
   } finally {
     await session.endSession()
   }
-}
-
-/**
- * Collect metrics (this may involve multiple batches being collected)
- */
-export async function runMetricsCollectionJob() {
-  let continueProcessingBatches = true
-  do {
-    continueProcessingBatches = await runMetricsCollectionBatch()
-  } while (continueProcessingBatches)
-}
-
-/**
- * Collect a batch of metrics
- * @returns {Promise<boolean>} continueBatches
- */
-export async function runMetricsCollectionBatch() {
-  logger.info('[metrics] metrics job started')
-
-  let result = /* @type {CollectionJobResult} */ {
-    success: false,
-    processMoreBatches: false,
-    message: '',
-    endDate: /** @type { Date | undefined } */ (undefined)
-  }
-
-  const session = client.startSession()
-  try {
-    const jobStart = new Date()
-    const lockResult = await grabLock(session)
-    if (!lockResult.lockSuccess) {
-      logger.info(
-        '[metrics] metrics job aborting as another container already has a lock'
-      )
-      logger.info('[metrics] metrics job finished')
-      return false
-    }
-
-    await session.withTransaction(async () => {
-      result = await collectMetrics(
-        jobStart,
-        lockResult.lastSuccessfulRun,
-        MAX_DAYS_PER_BATCH,
-        session
-      )
-    })
-  } catch (err) {
-    const message = getErrorMessage(err)
-    logger.error(err, `[metrics] metrics job failed - ${message}`)
-    result.message = message
-  } finally {
-    await releaseLock(result, session)
-    await session.endSession()
-  }
-
-  logger.info('[metrics] metrics job finished')
-  return result.processMoreBatches
 }
 
 /**
@@ -169,7 +109,7 @@ export async function collectMetrics(
   }
 
   logger.info('[metrics] getting overview metrics')
-  await collectManagerOverviewMetrics(jobStart, session)
+  await collectManagerOverviewMetrics(session)
 
   while (formatDateOnly(reportDate) <= formatDateOnly(reportEndDate)) {
     logger.info(
@@ -192,30 +132,69 @@ export async function collectMetrics(
 
 /**
  * Collect overview metrics
- * @param {Date} reportingDate
  * @param {ClientSession} session
  */
-export async function collectManagerOverviewMetrics(reportingDate, session) {
-  const { body } = await getJson(
-    new URL(
-      `${managerUrl}/report/overview?date=${reportingDate.toISOString()}`
-    ),
-    {}
-  )
-  const metricsMap =
-    /** @type {{ draft: Record<string, FormOverviewMetric>, live: Record<string, FormOverviewMetric>}} */ (
-      body
-    )
-
+export async function collectManagerOverviewMetrics(session) {
   await deleteFormOverviewMetrics(session)
 
-  for (const [formId, metrics] of Object.entries(metricsMap.draft)) {
-    await saveFormOverviewMetrics(formId, FormStatus.Draft, metrics, session)
+  // Batch up requests into pages (say 20 forms at a time) to ensure the
+  // API calls to forms-manager never take over 1 second to process (over 1 second response triggers an alert)
+  let currentPage = 0
+  let pageInfo = /** @type {{totalItems: number}} */ ({})
+  do {
+    currentPage++
+    pageInfo = await processMetricsBatch(
+      currentPage,
+      METRICS_FORM_BATCH_SIZE,
+      session
+    )
+  } while (pageInfo.totalItems > currentPage * METRICS_FORM_BATCH_SIZE)
+}
+
+/**
+ * @param {number} page
+ * @param {number} perPage
+ * @param {ClientSession} session
+ */
+async function processMetricsBatch(page, perPage, session) {
+  const metricsData = await getOverviewMetricsForForms(page, perPage)
+
+  for (const { draft, live } of metricsData.data) {
+    if (draft) {
+      await saveFormOverviewMetrics(
+        draft.formId,
+        FormStatus.Draft,
+        draft,
+        session
+      )
+    }
+    if (live) {
+      await saveFormOverviewMetrics(
+        live.formId,
+        FormStatus.Draft,
+        live,
+        session
+      )
+    }
   }
 
-  for (const [formId, metrics] of Object.entries(metricsMap.live)) {
-    await saveFormOverviewMetrics(formId, FormStatus.Live, metrics, session)
-  }
+  return metricsData
+}
+
+/**
+ * @param {number} page
+ * @param {number} perPage
+ */
+export async function getOverviewMetricsForForms(page, perPage) {
+  const requestUrl = new URL(
+    `${managerUrl}/report/overview?page=${page}&perPage=${perPage}`
+  )
+
+  const { body } = await getJson(requestUrl, {})
+
+  return /** @type {{ data: { draft: FormOverviewMetric | undefined, live: FormOverviewMetric | undefined}[], totalItems: number, filters: FilterOptions }} */ (
+    body
+  )
 }
 
 /**
@@ -705,7 +684,7 @@ export function applyExtraColumns(metrics) {
 }
 
 /**
- * @import { ClientSession, FindCursor, WithId } from 'mongodb'
- * @import { AuditRecordInput, FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
+ * @import { ClientSession } from 'mongodb'
+ * @import { FilterOptions, FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
  * @import { CollectionJobResult } from '~/src/service/metrics-helper.js'
  */

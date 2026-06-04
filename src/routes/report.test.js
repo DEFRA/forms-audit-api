@@ -1,12 +1,10 @@
 import { createServer } from '~/src/api/server.js'
-import {
-  generateReport,
-  generateReportForForm,
-  runMetricsCollectionJob
-} from '~/src/service/metrics.js'
+import { runMetricsCollectionJob } from '~/src/service/metrics-job.js'
+import { generateReport, generateReportForForm } from '~/src/service/metrics.js'
 import { authSuperAdmin as auth } from '~/test/fixtures/auth.js'
 
 jest.mock('~/src/service/metrics.js')
+jest.mock('~/src/service/metrics-job.js')
 jest.mock('~/src/mongo.js')
 jest.mock('~/src/plugins/audit-cache.js')
 

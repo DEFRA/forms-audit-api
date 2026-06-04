@@ -3,7 +3,7 @@ import cron from 'node-cron'
 
 import { config } from '~/src/config/index.js'
 import { logger } from '~/src/helpers/logging/logger.js'
-import { runMetricsCollectionJob } from '~/src/service/metrics.js'
+import { runMetricsCollectionJob } from '~/src/service/metrics-job.js'
 
 /**
  * Cron plugin for collecting metrics

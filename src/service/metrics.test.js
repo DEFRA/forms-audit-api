@@ -19,6 +19,7 @@ import {
   saveFormOverviewMetrics,
   saveFormTimelineMetrics
 } from '~/src/repositories/metrics-repository.js'
+import { runMetricsCollectionJob } from '~/src/service/metrics-job.js'
 import {
   applyExtraColumns,
   clearMetricsDatabase,
@@ -28,8 +29,8 @@ import {
   collectTimelineMetricsFromAudit,
   generateReport,
   generateReportForForm,
+  getOverviewMetricsForForms,
   recalcMetrics,
-  runMetricsCollectionJob,
   setMetricTotal,
   updateMetricAverage,
   updateMetricTotal
@@ -192,7 +193,10 @@ describe('runMetricsCollectionJob', () => {
     jest.mocked(client.startSession).mockReturnValue(mockNewSession)
     jest
       .mocked(getJson)
-      .mockResolvedValueOnce({ response: {}, body: { draft: {}, live: {} } })
+      .mockResolvedValueOnce({
+        response: {},
+        body: { data: [] }
+      })
       .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
       .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
 
@@ -212,9 +216,7 @@ describe('runMetricsCollectionJob', () => {
     expect(getJson).toHaveBeenCalledTimes(2)
     expect(getJson).toHaveBeenNthCalledWith(
       1,
-      new URL(
-        'http://localhost:3001/report/overview?date=' + now.toISOString()
-      ),
+      new URL('http://localhost:3001/report/overview?page=1&perPage=20'),
       {}
     )
     expect(getJson).toHaveBeenNthCalledWith(
@@ -258,17 +260,58 @@ describe('runMetricsCollectionJob', () => {
   })
 
   describe('collectManagerOverviewMetrics', () => {
-    it('should save each metric', async () => {
+    it('should save each metric as one batch when batch is less than 20 in size', async () => {
       jest.mocked(getJson).mockResolvedValueOnce({
         response: {},
         body: {
-          draft: [{ draftProperty: 123 }],
-          live: [{ liveProperty: 123 }]
+          data: [
+            {
+              draft: [{ draftProperty: 123 }],
+              live: [{ liveProperty: 123 }]
+            }
+          ],
+          totalItems: 2
         }
       })
 
-      await collectManagerOverviewMetrics(new Date(), mockSession)
+      await collectManagerOverviewMetrics(mockSession)
       expect(saveFormOverviewMetrics).toHaveBeenCalledTimes(2)
+    })
+
+    it('should save each metric as multiple batches when more than 20 in size', async () => {
+      const mockDataPage1 = []
+      for (let i = 0; i < 20; i++) {
+        mockDataPage1.push({ draft: { draftProperty: 123 } })
+      }
+      // @ts-expect-error - partial mock of data
+      mockDataPage1[3].live = { liveProperty: 123 }
+
+      const mockDataPage2 = []
+      for (let i = 0; i < 5; i++) {
+        mockDataPage2.push({ draft: { draftProperty: 123 } })
+      }
+      // @ts-expect-error - partial mock of data
+      mockDataPage2[1].live = { liveProperty: 123 }
+
+      jest
+        .mocked(getJson)
+        .mockResolvedValueOnce({
+          response: {},
+          body: {
+            data: mockDataPage1,
+            totalItems: 25
+          }
+        })
+        .mockResolvedValueOnce({
+          response: {},
+          body: {
+            data: mockDataPage2,
+            totalItems: 25
+          }
+        })
+
+      await collectManagerOverviewMetrics(mockSession)
+      expect(saveFormOverviewMetrics).toHaveBeenCalledTimes(27)
     })
   })
 
@@ -914,7 +957,10 @@ describe('runMetricsCollectionJob', () => {
       jest.mocked(client.startSession).mockReturnValue(mockNewSession)
       jest
         .mocked(getJson)
-        .mockResolvedValueOnce({ response: {}, body: { draft: {}, live: {} } })
+        .mockResolvedValueOnce({
+          response: {},
+          body: { data: [], totalItems: 0 }
+        })
         .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
 
       jest
@@ -955,7 +1001,7 @@ describe('runMetricsCollectionJob', () => {
       expect(getJson).toHaveBeenCalledTimes(2)
       const calls = jest.mocked(getJson).mock.calls
       expect(calls[0][0].href).toBe(
-        'http://localhost:3001/report/overview?date=2026-05-13T03:00:00.000Z'
+        'http://localhost:3001/report/overview?page=1&perPage=20'
       )
       expect(calls[1][0].href).toBe(
         'http://localhost:3002/report/timeline?date=2026-05-12T15:56:04.364Z'
@@ -975,7 +1021,10 @@ describe('runMetricsCollectionJob', () => {
       jest.mocked(client.startSession).mockReturnValue(mockNewSession)
       jest
         .mocked(getJson)
-        .mockResolvedValueOnce({ response: {}, body: { draft: {}, live: {} } })
+        .mockResolvedValueOnce({
+          response: {},
+          body: { data: [] }
+        })
         .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
         .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
         .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
@@ -1044,7 +1093,7 @@ describe('runMetricsCollectionJob', () => {
       expect(getJson).toHaveBeenCalledTimes(4)
       const calls = jest.mocked(getJson).mock.calls
       expect(calls[0][0].href).toBe(
-        'http://localhost:3001/report/overview?date=2026-03-10T03:00:00.000Z'
+        'http://localhost:3001/report/overview?page=1&perPage=20'
       )
       expect(calls[1][0].href).toBe(
         'http://localhost:3002/report/timeline?date=2026-03-07T04:00:00.000Z'
@@ -1054,6 +1103,20 @@ describe('runMetricsCollectionJob', () => {
       )
       expect(calls[3][0].href).toBe(
         'http://localhost:3002/report/timeline?date=2026-03-09T04:00:00.000Z'
+      )
+    })
+  })
+
+  describe('getOverviewMetricsForForms', () => {
+    it('should call correct URL with correct query params', async () => {
+      jest
+        .mocked(getJson)
+        .mockResolvedValueOnce({ body: ['res1'], response: {} })
+      const res = await getOverviewMetricsForForms(1, 20)
+      expect(res).toEqual(['res1'])
+      expect(getJson).toHaveBeenCalledWith(
+        new URL('http://localhost:3001/report/overview?page=1&perPage=20'),
+        {}
       )
     })
   })
