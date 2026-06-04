@@ -375,18 +375,20 @@ export async function saveDrilldownRecords(
 ) {
   const coll = getMetricCollection()
 
+  if (details.length === 0) {
+    return
+  }
+
   try {
-    for (const detail of details) {
-      await coll.insertOne(
-        {
-          ...detail,
-          metricName,
-          periodName,
-          type: FormMetricType.DrilldownMetric
-        },
-        { session }
-      )
-    }
+    await coll.insertMany(
+      details.map((detail) => ({
+        ...detail,
+        metricName,
+        periodName,
+        type: FormMetricType.DrilldownMetric
+      })),
+      { session }
+    )
   } catch (err) {
     logger.error(
       err,

@@ -691,96 +691,99 @@ describe('metrics-repository', () => {
   })
 
   describe('saveDrilldown', () => {
-    it('should save a batch of drilldown records', async () => {
-      const totals = {
-        last7Days: {
-          NewFormsCreated: {
-            count: 2,
-            details: [
-              {
-                formId: 'form-id-1',
-                createdAt: new Date('2026-01-01T14:00:00.000Z'),
-                metricValue: 1
-              },
-              {
-                formId: 'form-id-2',
-                createdAt: new Date('2026-01-02T14:00:00.000Z'),
-                metricValue: 1
-              }
-            ]
-          },
-          NoDetails: {
-            count: 17
-          }
+    const totals = {
+      last7Days: {
+        NewFormsCreated: {
+          count: 2,
+          details: [
+            {
+              formId: 'form-id-1',
+              createdAt: new Date('2026-01-01T14:00:00.000Z'),
+              metricValue: 1
+            },
+            {
+              formId: 'form-id-2',
+              createdAt: new Date('2026-01-02T14:00:00.000Z'),
+              metricValue: 1
+            }
+          ]
         },
-        last30Days: {
-          NewFormsCreated: {
-            count: 3,
-            details: [
-              {
-                formId: 'form-id-1',
-                createdAt: new Date('2026-01-01T14:00:00.000Z'),
-                metricValue: 1
-              },
-              {
-                formId: 'form-id-2',
-                createdAt: new Date('2026-01-02T14:00:00.000Z'),
-                metricValue: 1
-              },
-              {
-                formId: 'form-id-3',
-                createdAt: new Date('2025-12-02T14:00:00.000Z'),
-                metricValue: 1
-              }
-            ]
-          }
-        },
-        allTime: {
-          NewFormsCreated: {
-            count: 5,
-            details: [
-              {
-                formId: 'form-id-1',
-                createdAt: new Date('2026-01-01T14:00:00.000Z'),
-                metricValue: 1
-              },
-              {
-                formId: 'form-id-2',
-                createdAt: new Date('2026-01-02T14:00:00.000Z'),
-                metricValue: 1
-              },
-              {
-                formId: 'form-id-3',
-                createdAt: new Date('2025-12-02T14:00:00.000Z'),
-                metricValue: 1
-              },
-              {
-                formId: 'form-id-4',
-                createdAt: new Date('2025-11-02T14:00:00.000Z'),
-                metricValue: 1
-              },
-              {
-                formId: 'form-id-5',
-                createdAt: new Date('2025-10-02T14:00:00.000Z'),
-                metricValue: 1
-              }
-            ]
-          }
+        NoDetails: {
+          count: 17
+        }
+      },
+      last30Days: {
+        NewFormsCreated: {
+          count: 3,
+          details: [
+            {
+              formId: 'form-id-1',
+              createdAt: new Date('2026-01-01T14:00:00.000Z'),
+              metricValue: 1
+            },
+            {
+              formId: 'form-id-2',
+              createdAt: new Date('2026-01-02T14:00:00.000Z'),
+              metricValue: 1
+            },
+            {
+              formId: 'form-id-3',
+              createdAt: new Date('2025-12-02T14:00:00.000Z'),
+              metricValue: 1
+            }
+          ]
+        }
+      },
+      allTime: {
+        NewFormsCreated: {
+          count: 5,
+          details: [
+            {
+              formId: 'form-id-1',
+              createdAt: new Date('2026-01-01T14:00:00.000Z'),
+              metricValue: 1
+            },
+            {
+              formId: 'form-id-2',
+              createdAt: new Date('2026-01-02T14:00:00.000Z'),
+              metricValue: 1
+            },
+            {
+              formId: 'form-id-3',
+              createdAt: new Date('2025-12-02T14:00:00.000Z'),
+              metricValue: 1
+            },
+            {
+              formId: 'form-id-4',
+              createdAt: new Date('2025-11-02T14:00:00.000Z'),
+              metricValue: 1
+            },
+            {
+              formId: 'form-id-5',
+              createdAt: new Date('2025-10-02T14:00:00.000Z'),
+              metricValue: 1
+            }
+          ]
         }
       }
+    }
+    it('should save a batch of drilldown records', async () => {
+      const totalsCopy = structuredClone(totals)
       // @ts-expect-error - partial mock of data
-      await saveDrilldown(totals, mockSession)
+      await saveDrilldown(totalsCopy, mockSession)
 
-      expect(mockCollection.insertOne).toHaveBeenCalledTimes(10)
+      expect(mockCollection.insertMany).toHaveBeenCalledTimes(3)
     })
 
     it('should throw if error', async () => {
-      mockCollection.deleteMany.mockImplementationOnce(() => {
+      const totalsCopy = structuredClone(totals)
+      mockCollection.insertMany.mockImplementationOnce(() => {
         throw new Error('bad db call')
       })
-      await expect(() => clearMetricsData(mockSession)).rejects.toThrow(
-        'bad db call'
-      )
+      // @ts-expect-error - partial mock of data
+      await expect(() =>
+        saveDrilldown(totalsCopy, mockSession)
+      ).rejects.toThrow('bad db call')
     })
   })
 
@@ -795,11 +798,11 @@ describe('metrics-repository', () => {
         details,
         mockSession
       )
-      expect(mockCollection.insertOne).toHaveBeenCalledTimes(3)
+      expect(mockCollection.insertMany).toHaveBeenCalledTimes(1)
     })
 
     it('should throw if error', async () => {
-      mockCollection.insertOne.mockImplementationOnce(() => {
+      mockCollection.insertMany.mockImplementationOnce(() => {
         throw new Error('bad db call')
       })
       await expect(() =>
