@@ -118,6 +118,7 @@ export default [
       ],
 
       // JSDoc @param types are mandatory for JavaScript
+      'jsdoc/reject-any-type': 'off',
       'jsdoc/require-param-description': 'off',
       'jsdoc/require-param-type': 'error',
       'jsdoc/require-param': 'off',
@@ -149,6 +150,7 @@ export default [
       ...jsdocPlugin.configs['flat/recommended-typescript-flavor'].rules,
 
       // Preserve base rule overrides
+      'jsdoc/reject-any-type': 'off',
       'jsdoc/require-param-description': 'off',
       'jsdoc/require-param': 'off',
       'jsdoc/require-returns-description': 'off',
