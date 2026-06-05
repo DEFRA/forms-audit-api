@@ -16,7 +16,6 @@
   },
   "include": [
     "**/*.cjs",
-    "**/*.d.ts",
     "**/*.js",
     "**/*.mjs",
     "eslint.config.*",

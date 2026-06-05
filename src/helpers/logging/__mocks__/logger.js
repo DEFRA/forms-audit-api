@@ -1,8 +1,5 @@
 /* istanbul ignore file */
-/**
- * @type {import('pino').Logger}
- */
-export const logger = {
+export const logger = /** @type {any} */ ({
   info: jest.fn(),
   error: jest.fn(),
   warn: jest.fn(),
@@ -10,4 +7,4 @@ export const logger = {
   trace: jest.fn(),
   fatal: jest.fn(),
   child: jest.fn().mockReturnThis()
-}
+})

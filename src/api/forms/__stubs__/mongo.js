@@ -1,5 +1,5 @@
 export const buildMockCollection = () => {
-  return {
+  return /** @type {any} */ ({
     bulkWrite: jest.fn(),
     count: jest.fn(),
     countDocuments: jest.fn(),
@@ -69,5 +69,5 @@ export const buildMockCollection = () => {
     get timeoutMS() {
       return undefined
     }
-  }
+  })
 }
