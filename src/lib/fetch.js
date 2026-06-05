@@ -5,7 +5,7 @@ const MIN_OK_STATUS = 200
 const MAX_OK_STATUS = 299
 
 /**
- * Base request function using @hapi/wreck
+ * Base request function using `@hapi/wreck`
  * @param {string} method - HTTP method
  * @param {URL} url - URL object
  * @param {object} options - Request options

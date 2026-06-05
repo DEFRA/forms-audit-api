@@ -117,6 +117,9 @@ export default [
         }
       ],
 
+      // jsdoc v63 introduces reject-any-type; codebase uses `any` in JSDoc
+      'jsdoc/reject-any-type': 'off',
+
       // JSDoc @param types are mandatory for JavaScript
       'jsdoc/require-param-description': 'off',
       'jsdoc/require-param-type': 'error',
@@ -149,6 +152,7 @@ export default [
       ...jsdocPlugin.configs['flat/recommended-typescript-flavor'].rules,
 
       // Preserve base rule overrides
+      'jsdoc/reject-any-type': 'off',
       'jsdoc/require-param-description': 'off',
       'jsdoc/require-param': 'off',
       'jsdoc/require-returns-description': 'off',
