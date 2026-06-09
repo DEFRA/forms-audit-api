@@ -9,7 +9,7 @@ module.exports = {
     [
       '@babel/preset-env',
       {
-        modules: NODE_ENV === 'test' ? 'auto' : false
+        modules: NODE_ENV === 'test' ? 'commonjs' : false
       }
     ]
   ],
