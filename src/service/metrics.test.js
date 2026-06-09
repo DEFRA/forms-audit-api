@@ -1087,6 +1087,62 @@ describe('runMetricsCollectionJob', () => {
         'http://localhost:3002/report/timeline?date=2026-03-09T04:00:00.000Z'
       )
     })
+
+    // Regression guard: the processMoreBatches comparison MUST remain '<='
+    // (inclusive) and must NOT be reverted to '<'. After the while loop,
+    // reportDate is one day ahead of the last processed date. With a one-day
+    // batch that ends on the day before yesterday, reportDate lands exactly
+    // on 'yesterday' - which still needs collecting. '<=' correctly schedules
+    // another batch; '<' would stop here and 'yesterday' would never be
+    // collected.
+    it('should request more batches when the next report date is exactly yesterday (inclusive boundary)', async () => {
+      const lastRunDate = new Date('2026-03-06T04:00:00.000Z')
+      const currentRunDate = new Date('2026-03-10T03:00:00.000Z')
+
+      const mockNewSession = /** @type {any} */ ({
+        withTransaction: jest.fn().mockImplementation(async (callback) => {
+          return await callback()
+        }),
+        endSession: jest.fn().mockResolvedValue(undefined)
+      })
+      jest.mocked(client.startSession).mockReturnValue(mockNewSession)
+      jest
+        .mocked(getJson)
+        .mockResolvedValueOnce({ response: {}, body: { data: [] } })
+        .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
+        .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
+
+      const blankSet = /** @type {AuditRecordInput[]} */ ([])
+      const mockAsyncIteratorBlankSet = {
+        [Symbol.asyncIterator]: function* () {
+          for (const metric of blankSet) {
+            yield metric
+          }
+        }
+      }
+      jest
+        .mocked(getAuditRecordsOfType)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValue(mockAsyncIteratorBlankSet)
+      jest
+        .mocked(getAllTimelineMetrics)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValue(mockAsyncIteratorBlankSet)
+
+      // One-day batch ending on 2026-03-08 (the day before yesterday), so the
+      // next report date is 2026-03-09 - exactly yesterday relative to the
+      // 2026-03-10 run date.
+      const res = await collectMetrics(
+        currentRunDate,
+        lastRunDate,
+        1,
+        mockSession
+      )
+
+      // Must be true. A '<' comparison would (incorrectly) yield false here.
+      expect(res.processMoreBatches).toBe(true)
+      expect(res.endDate).toEqual(new Date('2026-03-08T04:00:00.000Z'))
+    })
   })
 
   describe('getOverviewMetricsForForms', () => {

@@ -137,6 +137,8 @@ export async function collectMetrics(
   return {
     success: true,
     message: 'Completed ok',
+    // reportDate is actually a day ahead of the last processed date (see while loop above)
+    // so the '<=' comparison is correct here.
     processMoreBatches: formatDateOnly(reportDate) <= formatDateOnly(yesterday),
     endDate: reportEndDate
   }
