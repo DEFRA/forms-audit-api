@@ -137,7 +137,7 @@ export async function collectMetrics(
   return {
     success: true,
     message: 'Completed ok',
-    processMoreBatches: formatDateOnly(reportDate) < formatDateOnly(yesterday),
+    processMoreBatches: formatDateOnly(reportDate) <= formatDateOnly(yesterday),
     endDate: reportEndDate
   }
 }
