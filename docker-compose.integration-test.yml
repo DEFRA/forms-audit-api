@@ -22,7 +22,7 @@ services:
 
   oidc:
     image: ghcr.io/soluto/oidc-server-mock:0.6.0
-    container_name: oidc-mock-test
+    container_name: oidc-mock-test-audit
     ports:
       - '5556:80'
     environment:
@@ -69,13 +69,38 @@ services:
     ports:
       - '3003:3003'
     environment:
-      MONGO_URI: mongodb://mongo_test:27017/forms-audit-api-test?replicaSet=rs0&directConnection=true
+      HOST: 0.0.0.0
       PORT: 3003
       NODE_ENV: production
+      SERVICE_VERSION: integration-test
+      ENVIRONMENT: local
+      LOG_ENABLED: true
+      LOG_LEVEL: info
+      LOG_FORMAT: ecs
+      MONGO_URI: mongodb://mongo_test:27017/forms-audit-api-test?replicaSet=rs0&directConnection=true
+      MONGO_DATABASE: forms-audit-api
+      HTTP_PROXY: ''
+      CDP_HTTPS_PROXY: ''
+      ENABLE_SECURE_CONTEXT: false
+      ENABLE_METRICS: false
+      CACHE_ENABLED: false
       OIDC_JWKS_URI: 'http://oidc:80/.well-known/openid-configuration/jwks'
       OIDC_VERIFY_AUD: 'newman-test-client'
       OIDC_VERIFY_ISS: 'http://oidc:80'
-      ROLE_EDITOR_GROUP_ID: '7049296f-2156-4d61-8ac3-349276438ef9'
+      ENTITLEMENT_URL: http://forms-entitlement-api-test:3004
+      MANAGER_URL: http://forms-manager-api-test:3001
+      SUBMISSION_URL: http://forms-submission-api-test:3002
+      TRACING_HEADER: x-trace-id
+      AWS_REGION: eu-west-2
+      SQS_ENDPOINT: http://localhost:4566
+      EVENTS_SQS_QUEUE_URL: http://sqs.eu-west-2.127.0.0.1:4566/000000000000/forms_audit_events
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      RECEIVE_MESSAGE_TIMEOUT_MS: 5000
+      SQS_MAX_NUMBER_OF_MESSAGES: 10
+      SQS_VISIBILITY_TIMEOUT: 1
+      EVENTS_SQS_DLQ_ARN: arn:aws:sqs:eu-west-2:000000000000:forms_audit_events-deadletter
+      METRICS_CRONTAB: 0 3 * * *
     depends_on:
       mongo_test:
         condition: service_healthy
