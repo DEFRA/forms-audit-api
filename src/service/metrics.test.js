@@ -375,10 +375,18 @@ describe('runMetricsCollectionJob', () => {
         {
           type: FormMetricType.TimelineMetric,
           formId: 'form-id',
-          formStatus: FormStatus.Draft,
+          formStatus: FormStatus.Live,
+          metricName: FormMetricName.Submissions,
+          metricValue: 5,
+          createdAt: new Date('2025-12-10T10:00:00.000Z')
+        },
+        {
+          type: FormMetricType.TimelineMetric,
+          formId: 'form-id',
+          formStatus: FormStatus.Live,
           metricName: FormMetricName.Submissions,
           metricValue: 1,
-          createdAt: new Date('2025-12-28')
+          createdAt: new Date('2026-01-01T10:00:00.000Z')
         },
         {
           type: FormMetricType.TimelineMetric,
@@ -386,7 +394,23 @@ describe('runMetricsCollectionJob', () => {
           formStatus: FormStatus.Live,
           metricName: FormMetricName.Submissions,
           metricValue: 6,
-          createdAt: new Date('2025-12-29')
+          createdAt: new Date('2025-12-29T10:00:00.000Z')
+        },
+        {
+          type: FormMetricType.TimelineMetric,
+          formId: 'form-id',
+          formStatus: FormStatus.Live,
+          metricName: FormMetricName.Submissions,
+          metricValue: 4,
+          createdAt: new Date('2025-12-30T10:00:00.000Z')
+        },
+        {
+          type: FormMetricType.TimelineMetric,
+          formId: 'form-id',
+          formStatus: FormStatus.Live,
+          metricName: FormMetricName.Submissions,
+          metricValue: 3,
+          createdAt: new Date('2025-12-31T10:00:00.000Z')
         },
         {
           type: FormMetricType.TimelineMetric,
@@ -394,7 +418,7 @@ describe('runMetricsCollectionJob', () => {
           formStatus: FormStatus.Live,
           metricName: FormMetricName.Submissions,
           metricValue: 1,
-          createdAt: new Date('2025-11-20')
+          createdAt: new Date('2025-11-20T10:00:00.000Z')
         },
         {
           type: FormMetricType.TimelineMetric,
@@ -402,7 +426,7 @@ describe('runMetricsCollectionJob', () => {
           formStatus: FormStatus.Draft,
           metricName: FormMetricName.Submissions,
           metricValue: 2,
-          createdAt: new Date('2025-11-02')
+          createdAt: new Date('2025-11-02T10:00:00.000Z')
         },
         // Within last 7 days
         createTimelineMetric(
@@ -494,7 +518,7 @@ describe('runMetricsCollectionJob', () => {
       const totals = await recalcMetrics(new Date('2026-01-01'), mockSession)
 
       expect(totals.last7Days?.NewFormsCreated.details).toHaveLength(3)
-      expect(totals.last7Days?.Submissions.details).toHaveLength(1)
+      expect(totals.last7Days?.Submissions.details).toHaveLength(4)
       // Remove 'details' attributes for comparison
       delete totals.last7Days?.NewFormsCreated.details
       delete totals.last7Days?.Submissions.details
@@ -503,7 +527,7 @@ describe('runMetricsCollectionJob', () => {
           count: 6
         },
         Submissions: {
-          count: 6
+          count: 14
         }
       })
       expect(totals.prev7Days).toEqual({
@@ -512,7 +536,7 @@ describe('runMetricsCollectionJob', () => {
         }
       })
       expect(totals.last30Days?.NewFormsCreated.details).toHaveLength(5)
-      expect(totals.last30Days?.Submissions.details).toHaveLength(1)
+      expect(totals.last30Days?.Submissions.details).toHaveLength(5)
       // Remove 'details' attributes for comparison
       delete totals.last30Days?.NewFormsCreated.details
       delete totals.last30Days?.Submissions.details
@@ -521,7 +545,7 @@ describe('runMetricsCollectionJob', () => {
           count: 15
         },
         Submissions: {
-          count: 6
+          count: 19
         }
       })
       expect(totals.prev30Days).toEqual({
@@ -537,7 +561,7 @@ describe('runMetricsCollectionJob', () => {
           count: 19
         },
         Submissions: {
-          count: 7
+          count: 20
         }
       })
       expect(totals.prevYear).toEqual({
@@ -557,7 +581,7 @@ describe('runMetricsCollectionJob', () => {
       expect(totals.allTime?.NewFormsCreated.details).toHaveLength(8)
       expect(totals.allTime?.FormsFirstPublished.details).toHaveLength(1)
       expect(totals.allTime?.FormsRePublished.details).toHaveLength(1)
-      expect(totals.allTime?.Submissions.details).toHaveLength(2)
+      expect(totals.allTime?.Submissions.details).toHaveLength(6)
       // Remove 'details' attributes for comparison
       delete totals.allTime?.NewFormsCreated.details
       delete totals.allTime?.FormsFirstPublished.details
@@ -565,7 +589,7 @@ describe('runMetricsCollectionJob', () => {
       delete totals.allTime?.Submissions.details
       expect(totals.allTime).toEqual({
         Submissions: {
-          count: 7
+          count: 20
         },
         FormsFirstPublished: {
           count: 1
@@ -581,10 +605,10 @@ describe('runMetricsCollectionJob', () => {
         }
       })
       expect(totals.draftSubmissions).toEqual({
-        'form-id': 3
+        'form-id': 2
       })
       expect(totals.liveSubmissions).toEqual({
-        'form-id': 7
+        'form-id': 20
       })
       expect(totals.republished).toEqual({
         'form-id-1': 1
