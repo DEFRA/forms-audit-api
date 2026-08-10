@@ -6,6 +6,7 @@ import {
 import {
   add,
   differenceInDays,
+  endOfDay,
   min,
   startOfDay,
   sub,
@@ -561,7 +562,8 @@ function handleTimeslot(
   endOfSlot,
   saveDrilldown
 ) {
-  if (dateFallsInsideTimeslot(createdAt, startOfSlot, endOfSlot)) {
+  const endOfDaySlot = endOfDay(endOfSlot)
+  if (dateFallsInsideTimeslot(createdAt, startOfSlot, endOfDaySlot)) {
     handleMetricValue(metric, period, metricCalcType, saveDrilldown)
   }
 }
