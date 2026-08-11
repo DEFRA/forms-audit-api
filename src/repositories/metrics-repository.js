@@ -174,6 +174,10 @@ export function getAllOverviewMetrics(filter, session) {
     ? { 'summaryMetrics.organisation': { $in: filter.org } }
     : {}
 
+  const filterPart4 = filter.features
+    ? { 'summaryMetrics.features': { $in: filter.features } }
+    : {}
+
   try {
     const cursor = /** @type {FindCursor<WithId<FormOverviewMetric>>} */ (
       coll
@@ -182,7 +186,8 @@ export function getAllOverviewMetrics(filter, session) {
             type: FormMetricType.OverviewMetric,
             ...filterPart1,
             ...filterPart2,
-            ...filterPart3
+            ...filterPart3,
+            ...filterPart4
           },
           { session }
         )

@@ -50,6 +50,7 @@ import {
  * @property {string} [searchText] - text to search within a form name
  * @property {string[]} [status] - array of statuses
  * @property {string[]} [org] - arrays of organisations
+ * @property {string[]} [features] - array of features (such as 'Welsh translation' or 'Email confirmation')
  */
 
 /**

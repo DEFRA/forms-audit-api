@@ -17,7 +17,8 @@ const filteringSchema = Joi.object({
     .items(Joi.string().valid('draft', 'live'))
     .single()
     .optional(),
-  org: Joi.array().items(Joi.string()).single().optional()
+  org: Joi.array().items(Joi.string()).single().optional(),
+  features: Joi.array().items(Joi.string()).single().optional()
 })
 
 const paramSchema = Joi.object({
