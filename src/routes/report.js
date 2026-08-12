@@ -1,6 +1,7 @@
 import { FormMetricName, Scopes } from '@defra/forms-model'
 import Joi from 'joi'
 
+import { CY } from '~/src/constants.js'
 import { runMetricsCollectionJob } from '~/src/service/metrics-job.js'
 import {
   clearMetricsDatabase,
@@ -18,18 +19,23 @@ const filteringSchema = Joi.object({
     .single()
     .optional(),
   org: Joi.array().items(Joi.string()).single().optional(),
-  features: Joi.array().items(Joi.string()).single().optional()
+  language: Joi.string().allow(CY).optional()
 })
 
 const paramSchema = Joi.object({
   formId: Joi.string().required()
 })
 
+const querySchema = Joi.object({
+  language: Joi.string().allow(CY).optional()
+})
+
 const drilldownSchema = Joi.object({
   period: Joi.string().valid('last7Days', 'last30Days', 'allTime').required(),
   metricName: Joi.string()
     .valid(...Object.values(FormMetricName))
-    .required()
+    .required(),
+  language: Joi.string().allow(CY).optional()
 })
 
 export default [
@@ -54,36 +60,38 @@ export default [
   }),
 
   /**
-   * @satisfies {ServerRoute}
+   * @satisfies {ServerRoute< { Param: { formId: string }, Query: { language?: string } }>}
    */
   ({
     method: 'GET',
     path: '/report/{formId}',
     async handler(request, h) {
-      const { params } = request
-      const metrics = await generateReportForForm(params.formId)
+      const { params, query } = request
+      const metrics = await generateReportForForm(params.formId, query.language)
 
       return h.response(metrics).code(HTTP_OK)
     },
     options: {
       auth: false,
       validate: {
-        params: paramSchema
+        params: paramSchema,
+        query: querySchema
       }
     }
   }),
 
   /**
-   * @satisfies {ServerRoute<{ Params: { period: string, metricName: FormMetricName } }>}
+   * @satisfies {ServerRoute<{ Params: { period: string, metricName: FormMetricName, language?: string }, Query: { language?: string } }>}
    */
   ({
     method: 'GET',
-    path: '/report/{period}/{metricName}',
+    path: '/report/{period}/{metricName}/{language?}',
     async handler(request, h) {
       const { params } = request
       const metrics = await generateDrilldownReport(
         params.period,
-        params.metricName
+        params.metricName,
+        params.language
       )
 
       return h.response(metrics).code(HTTP_OK)
@@ -91,7 +99,8 @@ export default [
     options: {
       auth: false,
       validate: {
-        params: drilldownSchema
+        params: drilldownSchema,
+        query: querySchema
       }
     }
   }),

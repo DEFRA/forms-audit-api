@@ -206,7 +206,11 @@ describe('metrics-repository', () => {
         })
       })
 
-      const result = await getFormTimelineMetrics(formId, mockSession)
+      const result = await getFormTimelineMetrics(
+        formId,
+        undefined,
+        mockSession
+      )
 
       expect(result).toEqual([draftDoc, liveDoc])
     })
@@ -217,7 +221,7 @@ describe('metrics-repository', () => {
       })
 
       await expect(() =>
-        getFormTimelineMetrics(formId, mockSession)
+        getFormTimelineMetrics(formId, undefined, mockSession)
       ).rejects.toThrow('db error')
     })
   })
@@ -472,7 +476,7 @@ describe('metrics-repository', () => {
           return { cursor: {} }
         })
       })
-      const res = getAllTimelineMetrics(mockSession)
+      const res = getAllTimelineMetrics(undefined, mockSession)
       expect(res).toEqual({ cursor: {} })
     })
 
@@ -482,12 +486,14 @@ describe('metrics-repository', () => {
           throw new Error('bad find')
         })
       })
-      expect(() => getAllTimelineMetrics(mockSession)).toThrow('bad find')
+      expect(() => getAllTimelineMetrics(undefined, mockSession)).toThrow(
+        'bad find'
+      )
     })
 
     it('should get metrics totals', () => {
       mockCollection.findOne.mockReturnValueOnce({ cursor: {} })
-      const res = getMetricTotals(mockSession)
+      const res = getMetricTotals(undefined, mockSession)
       expect(res).toEqual({ cursor: {} })
     })
 
@@ -495,7 +501,9 @@ describe('metrics-repository', () => {
       mockCollection.findOne.mockImplementationOnce(() => {
         throw new Error('Bad cursor')
       })
-      expect(() => getMetricTotals(mockSession)).toThrow('Bad cursor')
+      expect(() => getMetricTotals(undefined, mockSession)).toThrow(
+        'Bad cursor'
+      )
     })
   })
 
@@ -593,6 +601,7 @@ describe('metrics-repository', () => {
       const res = await getDrilldownRecords(
         'last7Days',
         FormMetricName.NewFormsCreated,
+        undefined,
         mockSession
       )
       expect(res).toEqual([{ drill1: 123 }, { drill2: 456 }])
@@ -614,6 +623,7 @@ describe('metrics-repository', () => {
         getDrilldownRecords(
           'last7Days',
           FormMetricName.NewFormsCreated,
+          undefined,
           mockSession
         )
       ).rejects.toThrow('bad db call')
@@ -625,7 +635,11 @@ describe('metrics-repository', () => {
 
     it('should return number from specific date', async () => {
       mockCollection.findOne.mockResolvedValueOnce({ metricValue: 5 })
-      const res = await getNumberOfFormsInDraft(testDate, mockSession)
+      const res = await getNumberOfFormsInDraft(
+        testDate,
+        undefined,
+        mockSession
+      )
       expect(res).toBe(5)
       expect(mockCollection.findOne).toHaveBeenCalledWith(
         {
@@ -642,7 +656,11 @@ describe('metrics-repository', () => {
 
     it('should return zero if not found', async () => {
       mockCollection.findOne.mockResolvedValueOnce({})
-      const res = await getNumberOfFormsInDraft(testDate, mockSession)
+      const res = await getNumberOfFormsInDraft(
+        testDate,
+        undefined,
+        mockSession
+      )
       expect(res).toBe(0)
       expect(mockCollection.findOne).toHaveBeenCalledWith(
         {
@@ -662,7 +680,7 @@ describe('metrics-repository', () => {
         throw new Error('bad db call')
       })
       await expect(() =>
-        getNumberOfFormsInDraft(testDate, mockSession)
+        getNumberOfFormsInDraft(testDate, undefined, mockSession)
       ).rejects.toThrow('bad db call')
     })
   })

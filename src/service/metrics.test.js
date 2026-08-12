@@ -329,6 +329,7 @@ describe('runMetricsCollectionJob', () => {
       await collectTimelineMetrics(
         'http://localhost/base-url',
         new Date(),
+        undefined,
         mockSession
       )
       expect(saveFormTimelineMetrics).toHaveBeenCalledTimes(2)
@@ -515,7 +516,11 @@ describe('runMetricsCollectionJob', () => {
       // @ts-expect-error - resolves to an async iterator like FindCursor<FormSubmissionDocument>
       jest.mocked(getAllTimelineMetrics).mockReturnValueOnce(mockAsyncIterator)
 
-      const totals = await recalcMetrics(new Date('2026-01-01'), mockSession)
+      const totals = await recalcMetrics(
+        new Date('2026-01-01'),
+        undefined,
+        mockSession
+      )
 
       expect(totals.last7Days?.NewFormsCreated.details).toHaveLength(3)
       expect(totals.last7Days?.Submissions.details).toHaveLength(4)
@@ -642,7 +647,12 @@ describe('runMetricsCollectionJob', () => {
         // @ts-expect-error - partial mock of record
         .mockResolvedValue({ createdAt: new Date('2026-03-30') })
 
-      await collectTimelineMetricsFromAudit(testDate, mockSession)
+      await collectTimelineMetricsFromAudit(
+        testDate,
+        undefined,
+        undefined,
+        mockSession
+      )
       expect(saveFormTimelineMetrics).toHaveBeenCalledTimes(4)
       expect(saveFormTimelineMetrics).toHaveBeenNthCalledWith(
         1,
@@ -1223,7 +1233,7 @@ describe('runMetricsCollectionJob', () => {
         }
       )
 
-      const res = await generateReportForForm('form-id-1')
+      const res = await generateReportForForm('form-id-1', undefined)
       expect(res).toEqual({
         totals: {
           last7Days: {},
@@ -1273,7 +1283,8 @@ describe('runMetricsCollectionJob', () => {
 
       const res = await generateDrilldownReport(
         'last7Days',
-        FormMetricName.NewFormsCreated
+        FormMetricName.NewFormsCreated,
+        undefined
       )
       expect(res).toEqual({
         drilldownRows: [

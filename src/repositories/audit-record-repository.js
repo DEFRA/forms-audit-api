@@ -117,16 +117,27 @@ export async function getConsolidatedAuditRecords(filter, pagination) {
  * Retrieve all the audit records of the particular type, from the specified date
  * @param {AuditEventMessageType} type
  * @param {Date} reportDate
+ * @param { Set<string> | undefined } formIdSet - optional list of form ids for restriction
  * @param {ClientSession} session
  * @param {Sort} [sort]
  * @returns {FindCursor<WithId<AuditRecordInput>>}
  */
-export function getAuditRecordsOfType(type, reportDate, session, sort) {
+export function getAuditRecordsOfType(
+  type,
+  reportDate,
+  formIdSet,
+  session,
+  sort
+) {
   const coll = getCollection()
 
   const withoutTime = reportDate.toISOString().substring(0, 10)
   const startOfDay = `${withoutTime}T00:00:00.000Z`
   const endOfDay = `${withoutTime}T23:59:59.999Z`
+
+  const formIdFilter = formIdSet
+    ? { entityId: { $in: Array.from(formIdSet) } }
+    : {}
 
   try {
     const cursor = /** @type {FindCursor<WithId<AuditRecordInput>>} */ (
@@ -137,7 +148,8 @@ export function getAuditRecordsOfType(type, reportDate, session, sort) {
             createdAt: {
               $gte: new Date(startOfDay),
               $lte: new Date(endOfDay)
-            }
+            },
+            ...formIdFilter
           },
           { session }
         )
