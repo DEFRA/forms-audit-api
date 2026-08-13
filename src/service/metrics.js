@@ -15,7 +15,7 @@ import {
 } from 'date-fns'
 
 import { config } from '~/src/config/index.js'
-import { CY } from '~/src/constants.js'
+import { WELSH } from '~/src/constants.js'
 import { logger } from '~/src/helpers/logging/logger.js'
 import { getJson } from '~/src/lib/fetch.js'
 import { client } from '~/src/mongo.js'
@@ -28,6 +28,7 @@ import {
   getDrilldownRecords,
   getFirstDraft,
   getFormTimelineMetricsCursor,
+  getLanguageFilter,
   getMetricTotals,
   getNumberOfFormsInDraft,
   isFirstPublish,
@@ -135,7 +136,7 @@ export async function collectMetrics(
     // All languages
     await collectTimelineMetrics(submissionUrl, reportDate, undefined, session)
     // Welsh-only
-    await collectTimelineMetrics(submissionUrl, reportDate, CY, session)
+    await collectTimelineMetrics(submissionUrl, reportDate, WELSH, session)
 
     // All languages
     await collectTimelineMetricsFromAudit(
@@ -147,7 +148,7 @@ export async function collectMetrics(
     // Welsh-only
     await collectTimelineMetricsFromAudit(
       reportDate,
-      CY,
+      WELSH,
       languageFormIds,
       session
     )
@@ -156,10 +157,14 @@ export async function collectMetrics(
   }
 
   const totals = [
+    // All languages
     await recalcMetrics(reportEndDate, undefined, session),
-    await recalcMetrics(reportEndDate, CY, session)
+    // Welsh-only
+    await recalcMetrics(reportEndDate, WELSH, session)
   ]
+
   await updateMetricTotals(reportEndDate, totals, session)
+
   return {
     success: true,
     message: 'Completed ok',
@@ -290,7 +295,7 @@ export async function collectTimelineMetricsFromAudit(
   languageFormIds,
   session
 ) {
-  const languageProp = language ? { language } : {}
+  const languageProp = getLanguageFilter(language)
 
   // Read 'forms in draft without a live form' so far from previous day
   let numOfFormsNotLive = await getNumberOfFormsInDraft(
@@ -329,9 +334,10 @@ export async function collectTimelineMetricsFromAudit(
   )
   for await (const publish of publishCursor) {
     // Check if first publish
-    const firstPublish = languageFormIds?.liveIds?.has(publish.entityId)
-      ? await isFirstPublish(publish.entityId, session)
-      : undefined
+    const firstPublish =
+      !languageFormIds || languageFormIds.liveIds?.has(publish.entityId)
+        ? await isFirstPublish(publish.entityId, session)
+        : undefined
     if (firstPublish) {
       // Time to first publish
       numOfFormsNotLive--
@@ -345,9 +351,10 @@ export async function collectTimelineMetricsFromAudit(
       })
       await saveFormTimelineMetrics(publish.entityId, metricPublish, session)
 
-      const firstDraft = languageFormIds?.draftIds?.has(publish.entityId)
-        ? await getFirstDraft(publish.entityId, session)
-        : undefined
+      const firstDraft =
+        !languageFormIds || languageFormIds.draftIds?.has(publish.entityId)
+          ? await getFirstDraft(publish.entityId, session)
+          : undefined
       if (firstDraft) {
         const metricTimeToPublish = /** @type {FormTimelineMetric} */ ({
           formStatus: FormStatus.Live,

@@ -215,7 +215,7 @@ describe('runMetricsCollectionJob', () => {
     jest.mocked(getAllTimelineMetrics).mockReturnValueOnce(mockAsyncIterator)
 
     await runMetricsCollectionJob()
-    expect(getJson).toHaveBeenCalledTimes(2)
+    expect(getJson).toHaveBeenCalledTimes(3)
     expect(getJson).toHaveBeenNthCalledWith(
       1,
       new URL('http://localhost:3001/report/overview?page=1&perPage=20'),
@@ -225,6 +225,15 @@ describe('runMetricsCollectionJob', () => {
       2,
       new URL(
         'http://localhost:3002/report/timeline?date=' + twoDaysAgo.toISOString()
+      ),
+      {}
+    )
+    expect(getJson).toHaveBeenNthCalledWith(
+      3,
+      new URL(
+        'http://localhost:3002/report/timeline?date=' +
+          twoDaysAgo.toISOString() +
+          '&language=cy'
       ),
       {}
     )
@@ -978,9 +987,16 @@ describe('runMetricsCollectionJob', () => {
           body: { data: [], totalItems: 0 }
         })
         .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
+        .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
 
       jest
         .mocked(getAuditRecordsOfType)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorFirstCreated)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorDraftCreatedFromLive)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorFirstPublished)
         // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
         .mockReturnValueOnce(mockAsyncIteratorFirstCreated)
         // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
@@ -1001,6 +1017,8 @@ describe('runMetricsCollectionJob', () => {
         .mocked(getAllTimelineMetrics)
         // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
         .mockReturnValueOnce(mockAsyncIteratorBlankSet)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValueOnce(mockAsyncIteratorBlankSet)
 
       const res = await collectMetrics(
         currentRunDate,
@@ -1014,13 +1032,16 @@ describe('runMetricsCollectionJob', () => {
         endDate: new Date('2026-05-12T03:00:00.000Z'),
         processMoreBatches: false
       })
-      expect(getJson).toHaveBeenCalledTimes(2)
+      expect(getJson).toHaveBeenCalledTimes(3)
       const calls = jest.mocked(getJson).mock.calls
       expect(calls[0][0].href).toBe(
         'http://localhost:3001/report/overview?page=1&perPage=20'
       )
       expect(calls[1][0].href).toBe(
         'http://localhost:3002/report/timeline?date=2026-05-12T15:56:04.364Z'
+      )
+      expect(calls[2][0].href).toBe(
+        'http://localhost:3002/report/timeline?date=2026-05-12T15:56:04.364Z&language=cy'
       )
     })
 
@@ -1041,6 +1062,10 @@ describe('runMetricsCollectionJob', () => {
           response: {},
           body: { data: [] }
         })
+        .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
+        .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
+        .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
+        .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
         .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
         .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
         .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
@@ -1106,7 +1131,7 @@ describe('runMetricsCollectionJob', () => {
         endDate: new Date('2026-03-09T03:00:00.000Z'),
         processMoreBatches: false
       })
-      expect(getJson).toHaveBeenCalledTimes(4)
+      expect(getJson).toHaveBeenCalledTimes(7)
       const calls = jest.mocked(getJson).mock.calls
       expect(calls[0][0].href).toBe(
         'http://localhost:3001/report/overview?page=1&perPage=20'
@@ -1115,10 +1140,19 @@ describe('runMetricsCollectionJob', () => {
         'http://localhost:3002/report/timeline?date=2026-03-07T04:00:00.000Z'
       )
       expect(calls[2][0].href).toBe(
-        'http://localhost:3002/report/timeline?date=2026-03-08T04:00:00.000Z'
+        'http://localhost:3002/report/timeline?date=2026-03-07T04:00:00.000Z&language=cy'
       )
       expect(calls[3][0].href).toBe(
+        'http://localhost:3002/report/timeline?date=2026-03-08T04:00:00.000Z'
+      )
+      expect(calls[4][0].href).toBe(
+        'http://localhost:3002/report/timeline?date=2026-03-08T04:00:00.000Z&language=cy'
+      )
+      expect(calls[5][0].href).toBe(
         'http://localhost:3002/report/timeline?date=2026-03-09T04:00:00.000Z'
+      )
+      expect(calls[6][0].href).toBe(
+        'http://localhost:3002/report/timeline?date=2026-03-09T04:00:00.000Z&language=cy'
       )
     })
 
@@ -1143,6 +1177,8 @@ describe('runMetricsCollectionJob', () => {
       jest
         .mocked(getJson)
         .mockResolvedValueOnce({ response: {}, body: { data: [] } })
+        .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
+        .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
         .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
         .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
 

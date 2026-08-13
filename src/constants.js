@@ -1,1 +1,1 @@
-export const CY = 'cy'
+export const WELSH = 'cy'

@@ -263,7 +263,7 @@ describe('metrics-repository', () => {
       mockCollection.insertOne.mockResolvedValueOnce({})
 
       // @ts-expect-error - partial data mocked
-      await updateMetricTotals(new Date(), totals, mockSession)
+      await updateMetricTotals(new Date(), [totals], mockSession)
 
       expect(mockCollection.insertOne).toHaveBeenCalledWith(
         {
@@ -291,7 +291,7 @@ describe('metrics-repository', () => {
 
       await expect(() =>
         // @ts-expect-error - partial data mocked
-        updateMetricTotals(new Date(), totals, mockSession)
+        updateMetricTotals(new Date(), [totals], mockSession)
       ).rejects.toThrow('db error')
     })
   })
@@ -648,6 +648,9 @@ describe('metrics-repository', () => {
           createdAt: {
             $gte: new Date('2026-04-01T00:00:00.000Z'),
             $lte: new Date('2026-04-01T23:59:59.999Z')
+          },
+          language: {
+            $exists: false
           }
         },
         { session: {} }
@@ -669,6 +672,9 @@ describe('metrics-repository', () => {
           createdAt: {
             $gte: new Date('2026-04-01T00:00:00.000Z'),
             $lte: new Date('2026-04-01T23:59:59.999Z')
+          },
+          language: {
+            $exists: false
           }
         },
         { session: {} }

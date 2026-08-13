@@ -1,7 +1,7 @@
 import { FormMetricName, Scopes } from '@defra/forms-model'
 import Joi from 'joi'
 
-import { CY } from '~/src/constants.js'
+import { WELSH } from '~/src/constants.js'
 import { runMetricsCollectionJob } from '~/src/service/metrics-job.js'
 import {
   clearMetricsDatabase,
@@ -19,7 +19,7 @@ const filteringSchema = Joi.object({
     .single()
     .optional(),
   org: Joi.array().items(Joi.string()).single().optional(),
-  language: Joi.string().allow(CY).optional()
+  language: Joi.string().allow(WELSH).optional()
 })
 
 const paramSchema = Joi.object({
@@ -27,7 +27,7 @@ const paramSchema = Joi.object({
 })
 
 const querySchema = Joi.object({
-  language: Joi.string().allow(CY).optional()
+  language: Joi.string().allow(WELSH).optional()
 })
 
 const drilldownSchema = Joi.object({
@@ -35,7 +35,7 @@ const drilldownSchema = Joi.object({
   metricName: Joi.string()
     .valid(...Object.values(FormMetricName))
     .required(),
-  language: Joi.string().allow(CY).optional()
+  language: Joi.string().allow(WELSH).optional()
 })
 
 export default [

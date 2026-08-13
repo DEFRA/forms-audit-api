@@ -191,7 +191,7 @@ export function getAllOverviewMetrics(filter, session) {
     ? { 'summaryMetrics.organisation': { $in: filter.org } }
     : {}
 
-  const filterPart4 = filter.language ? { language: filter.language } : {}
+  const filterPart4 = getLanguageFilter(filter.language)
 
   try {
     const cursor = /** @type {FindCursor<WithId<FormOverviewMetric>>} */ (
