@@ -16,6 +16,14 @@ export function getLanguageFilter(language) {
 }
 
 /**
+ * Creates a filter to query records with a specific language (or ONLY records that do NOT have a  language property)
+ * @param { string | undefined } language
+ */
+export function getLanguageNoPropertyFilter(language) {
+  return language ? { language } : { language: { $exists: false } }
+}
+
+/**
  * Gets the metric collection
  * @returns {Collection<FormOverviewMetric | FormTimelineMetric | FormTotalsMetric | FormDrilldownMetric | FormMetricControl>}
  */
@@ -523,9 +531,7 @@ export async function getNumberOfFormsInDraft(
   const startOfDay = `${withoutTime}T00:00:00.000Z`
   const endOfDay = `${withoutTime}T23:59:59.999Z`
 
-  const languageFilter = language
-    ? { language }
-    : { language: { $exists: false } }
+  const languageFilter = getLanguageNoPropertyFilter(language)
 
   try {
     const numberOfDrafts =

@@ -11,6 +11,8 @@ import {
   getFirstDraft,
   getFormOverviewMetrics,
   getFormTimelineMetrics,
+  getLanguageFilter,
+  getLanguageNoPropertyFilter,
   getMetricTotals,
   getNumberOfFormsInDraft,
   grabLock,
@@ -838,6 +840,26 @@ describe('metrics-repository', () => {
           mockSession
         )
       ).rejects.toThrow('bad db call')
+    })
+  })
+
+  describe('getLanguageFilter', () => {
+    it('should return filter to restrict to specific language', () => {
+      expect(getLanguageFilter('cy')).toEqual({ language: 'cy' })
+    })
+    it('should return empty filter', () => {
+      expect(getLanguageFilter(undefined)).toEqual({})
+    })
+  })
+
+  describe('getLanguageNoPropertyFilter', () => {
+    it('should return filter to restrict to specific language', () => {
+      expect(getLanguageNoPropertyFilter('cy')).toEqual({ language: 'cy' })
+    })
+    it('should return filter to look for records witout a language property', () => {
+      expect(getLanguageNoPropertyFilter(undefined)).toEqual({
+        language: { $exists: false }
+      })
     })
   })
 })
