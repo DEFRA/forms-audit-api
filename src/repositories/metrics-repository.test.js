@@ -3,6 +3,10 @@ import { FormMetricName, FormMetricType, FormStatus } from '@defra/forms-model'
 import { buildMockCollection } from '~/src/api/forms/__stubs__/mongo.js'
 import { db } from '~/src/mongo.js'
 import {
+  getLanguageFilter,
+  getLanguageNoPropertyFilter
+} from '~/src/repositories/metrics-repository-helper.js'
+import {
   clearMetricsData,
   deleteFormOverviewMetrics,
   getAllOverviewMetrics,
@@ -11,8 +15,6 @@ import {
   getFirstDraft,
   getFormOverviewMetrics,
   getFormTimelineMetrics,
-  getLanguageFilter,
-  getLanguageNoPropertyFilter,
   getMetricTotals,
   getNumberOfFormsInDraft,
   grabLock,
@@ -801,6 +803,40 @@ describe('metrics-repository', () => {
       expect(mockCollection.insertMany).toHaveBeenCalledTimes(3)
     })
 
+    it('should save a batch of drilldown records with language property', async () => {
+      const totalsCopy = /** @type {FormTotalsMetric} */ (
+        /** @type {unknown} */ (structuredClone(totals))
+      )
+      totalsCopy.language = 'cy'
+      await saveDrilldown(totalsCopy, mockSession)
+
+      expect(mockCollection.insertMany).toHaveBeenCalledTimes(3)
+      expect(mockCollection.insertMany).toHaveBeenNthCalledWith(
+        1,
+        [
+          {
+            createdAt: expect.anything(),
+            formId: 'form-id-1',
+            language: 'cy',
+            metricName: 'NewFormsCreated',
+            metricValue: 1,
+            periodName: 'last7Days',
+            type: 'drilldown-metric'
+          },
+          {
+            createdAt: expect.anything(),
+            formId: 'form-id-2',
+            language: 'cy',
+            metricName: 'NewFormsCreated',
+            metricValue: 1,
+            periodName: 'last7Days',
+            type: 'drilldown-metric'
+          }
+        ],
+        expect.anything()
+      )
+    })
+
     it('should throw if error', async () => {
       const totalsCopy = structuredClone(totals)
       mockCollection.insertMany.mockImplementationOnce(() => {
@@ -865,5 +901,5 @@ describe('metrics-repository', () => {
 })
 
 /**
- * @import { FormOverviewMetric, FormTimelineMetric } from '@defra/forms-model'
+ * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
  */

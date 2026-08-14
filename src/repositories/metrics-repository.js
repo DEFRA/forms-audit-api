@@ -3,25 +3,13 @@ import { FormMetricName, FormMetricType, FormStatus } from '@defra/forms-model'
 import { getErrorMessage } from '~/src/helpers/error-message.js'
 import { logger } from '~/src/helpers/logging/logger.js'
 import { METRICS_COLLECTION_NAME, db } from '~/src/mongo.js'
+import {
+  getLanguageFilter,
+  getLanguageNoPropertyFilter
+} from '~/src/repositories/metrics-repository-helper.js'
 import { metricDrilldownPeriods } from '~/src/service/metrics-helper.js'
 
 const FORM_METRIC_CONTROL = 'form-metric-control'
-
-/**
- * Creates a filter to query records with a specific language (or all records if language not provided)
- * @param { string | undefined } language
- */
-export function getLanguageFilter(language) {
-  return language ? { language } : {}
-}
-
-/**
- * Creates a filter to query records with a specific language (or ONLY records that do NOT have a  language property)
- * @param { string | undefined } language
- */
-export function getLanguageNoPropertyFilter(language) {
-  return language ? { language } : { language: { $exists: false } }
-}
 
 /**
  * Gets the metric collection
@@ -395,8 +383,8 @@ export async function saveDrilldown(totals, session) {
         const details = /** @type {FormDrilldownMetric[]} */ (detail.details)
         // Add 'language' property if supplied in the 'totals' record
         if (totals.language) {
-          details.forEach((detail) => {
-            detail.language = totals.language
+          details.forEach((det) => {
+            det.language = totals.language
           })
         }
         await saveDrilldownRecords(

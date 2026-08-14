@@ -20,6 +20,11 @@ import {
   saveFormOverviewMetrics,
   saveFormTimelineMetrics
 } from '~/src/repositories/metrics-repository.js'
+import {
+  setMetricTotal,
+  updateMetricAverage,
+  updateMetricTotal
+} from '~/src/service/metrics-helper.js'
 import { runMetricsCollectionJob } from '~/src/service/metrics-job.js'
 import {
   applyExtraColumns,
@@ -32,10 +37,7 @@ import {
   generateReport,
   generateReportForForm,
   getOverviewMetricsForForms,
-  recalcMetrics,
-  setMetricTotal,
-  updateMetricAverage,
-  updateMetricTotal
+  recalcMetrics
 } from '~/src/service/metrics.js'
 
 jest.mock('~/src/lib/fetch.js')
@@ -359,6 +361,41 @@ describe('runMetricsCollectionJob', () => {
 
       await collectManagerOverviewMetrics(mockSession)
       expect(saveFormOverviewMetrics).toHaveBeenCalledTimes(2)
+    })
+
+    it('should save each metric and add to language capable forms (if form has language set)', async () => {
+      jest.mocked(getJson).mockResolvedValueOnce({
+        response: {},
+        body: {
+          data: [
+            {
+              draft: {
+                draftProperty: 123,
+                language: 'cy',
+                formId: 'form-1-welsh'
+              },
+              live: {
+                liveProperty: 123,
+                language: 'cy',
+                formId: 'form-1-welsh'
+              }
+            },
+            {
+              draft: {
+                draftProperty: 123,
+                language: 'cy',
+                formId: 'form-2-welsh'
+              },
+              live: {}
+            }
+          ],
+          totalItems: 2
+        }
+      })
+
+      const res = await collectManagerOverviewMetrics(mockSession)
+      expect(Array.from(res.draftIds)).toEqual(['form-1-welsh', 'form-2-welsh'])
+      expect(Array.from(res.liveIds)).toEqual(['form-1-welsh'])
     })
 
     it('should save each metric as multiple batches when more than 20 in size', async () => {
