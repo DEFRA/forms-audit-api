@@ -2,24 +2,14 @@ import { FormMetricName, FormMetricType, FormStatus } from '@defra/forms-model'
 
 import { getErrorMessage } from '~/src/helpers/error-message.js'
 import { logger } from '~/src/helpers/logging/logger.js'
-import { METRICS_COLLECTION_NAME, db } from '~/src/mongo.js'
 import {
   getLanguageFilter,
-  getLanguageNoPropertyFilter
+  getLanguageNoPropertyFilter,
+  getMetricCollection
 } from '~/src/repositories/metrics-repository-helper.js'
 import { metricDrilldownPeriods } from '~/src/service/metrics-helper.js'
 
 const FORM_METRIC_CONTROL = 'form-metric-control'
-
-/**
- * Gets the metric collection
- * @returns {Collection<FormOverviewMetric | FormTimelineMetric | FormTotalsMetric | FormDrilldownMetric | FormMetricControl>}
- */
-function getMetricCollection() {
-  return /** @type {Collection<FormOverviewMetric | FormTimelineMetric | FormTotalsMetric | FormDrilldownMetric | FormMetricControl>} */ (
-    db.collection(METRICS_COLLECTION_NAME)
-  )
-}
 
 /**
  * Gets overview metric records for a form.
