@@ -504,6 +504,7 @@ describe('audit-record-repository', () => {
       getAuditRecordsOfType(
         AuditEventMessageType.FORM_CREATED,
         testDate,
+        undefined,
         mockSession
       )
       expect(mockCollection.find).toHaveBeenCalledWith(
@@ -529,6 +530,7 @@ describe('audit-record-repository', () => {
         getAuditRecordsOfType(
           AuditEventMessageType.FORM_CREATED,
           testDate,
+          undefined,
           mockSession
         )
       ).toThrow('bad db call')

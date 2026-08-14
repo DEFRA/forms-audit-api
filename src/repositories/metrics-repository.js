@@ -2,20 +2,14 @@ import { FormMetricName, FormMetricType, FormStatus } from '@defra/forms-model'
 
 import { getErrorMessage } from '~/src/helpers/error-message.js'
 import { logger } from '~/src/helpers/logging/logger.js'
-import { METRICS_COLLECTION_NAME, db } from '~/src/mongo.js'
+import {
+  getLanguageFilter,
+  getLanguageNoPropertyFilter,
+  getMetricCollection
+} from '~/src/repositories/metrics-repository-helper.js'
 import { metricDrilldownPeriods } from '~/src/service/metrics-helper.js'
 
 const FORM_METRIC_CONTROL = 'form-metric-control'
-
-/**
- * Gets the metric collection
- * @returns {Collection<FormOverviewMetric | FormTimelineMetric | FormTotalsMetric | FormDrilldownMetric | FormMetricControl>}
- */
-function getMetricCollection() {
-  return /** @type {Collection<FormOverviewMetric | FormTimelineMetric | FormTotalsMetric | FormDrilldownMetric | FormMetricControl>} */ (
-    db.collection(METRICS_COLLECTION_NAME)
-  )
-}
 
 /**
  * Gets overview metric records for a form.
@@ -120,17 +114,25 @@ export async function deleteFormOverviewMetrics(session) {
 /**
  * Gets overview metric records for a form.
  * @param {string} formId
+ * @param { string | undefined } language
  * @param {ClientSession} session
  * @returns {FindCursor<WithId<FormTimelineMetric>>}
  */
-export function getFormTimelineMetricsCursor(formId, session) {
+export function getFormTimelineMetricsCursor(formId, language, session) {
   const coll = getMetricCollection()
 
   try {
     const timelineRecords =
       /** @type {FindCursor<WithId<FormTimelineMetric>>} */ (
         coll
-          .find({ formId, type: FormMetricType.TimelineMetric }, { session })
+          .find(
+            {
+              formId,
+              type: FormMetricType.TimelineMetric,
+              ...getLanguageFilter(language)
+            },
+            { session }
+          )
           .sort({ createdAt: -1 })
       )
     return timelineRecords
@@ -146,11 +148,12 @@ export function getFormTimelineMetricsCursor(formId, session) {
 /**
  * Gets overview metric records for a form.
  * @param {string} formId
+ * @param { string | undefined } language
  * @param {ClientSession} session
  * @returns {Promise<WithId<FormTimelineMetric>[]>}
  */
-export async function getFormTimelineMetrics(formId, session) {
-  return getFormTimelineMetricsCursor(formId, session).toArray()
+export async function getFormTimelineMetrics(formId, language, session) {
+  return getFormTimelineMetricsCursor(formId, language, session).toArray()
 }
 
 /**
@@ -174,6 +177,8 @@ export function getAllOverviewMetrics(filter, session) {
     ? { 'summaryMetrics.organisation': { $in: filter.org } }
     : {}
 
+  const filterPart4 = getLanguageFilter(filter.language)
+
   try {
     const cursor = /** @type {FindCursor<WithId<FormOverviewMetric>>} */ (
       coll
@@ -182,7 +187,8 @@ export function getAllOverviewMetrics(filter, session) {
             type: FormMetricType.OverviewMetric,
             ...filterPart1,
             ...filterPart2,
-            ...filterPart3
+            ...filterPart3,
+            ...filterPart4
           },
           { session }
         )
@@ -200,16 +206,23 @@ export function getAllOverviewMetrics(filter, session) {
 
 /**
  * Get all timeline metrics
+ * @param { string | undefined } language
  * @param {ClientSession} session
  * @returns {FindCursor<WithId<FormTimelineMetric>>}
  */
-export function getAllTimelineMetrics(session) {
+export function getAllTimelineMetrics(language, session) {
   const coll = getMetricCollection()
 
   try {
     const cursor = /** @type {FindCursor<WithId<FormTimelineMetric>>} */ (
       coll
-        .find({ type: FormMetricType.TimelineMetric }, { session })
+        .find(
+          {
+            type: FormMetricType.TimelineMetric,
+            ...getLanguageFilter(language)
+          },
+          { session }
+        )
         .sort({ updatedAt: -1 })
     )
     return cursor
@@ -251,14 +264,18 @@ export async function saveFormTimelineMetrics(formId, metricData, session) {
 
 /**
  * Gets metric totals record.
+ * @param { string | undefined } language
  * @param {ClientSession} session
  */
-export function getMetricTotals(session) {
+export function getMetricTotals(language, session) {
   const coll = getMetricCollection()
 
   try {
     return /** @type {Promise<WithId<FormTotalsMetric>>} */ (
-      coll.findOne({ type: FormMetricType.TotalsMetric }, { session })
+      coll.findOne(
+        { type: FormMetricType.TotalsMetric, ...getLanguageFilter(language) },
+        { session }
+      )
     )
   } catch (err) {
     logger.error(err, `Failed to get totals metric - ${getErrorMessage(err)}`)
@@ -270,9 +287,15 @@ export function getMetricTotals(session) {
  * Gets metric drilldown records.
  * @param {string} periodName
  * @param {FormMetricName} metricName
+ * @param { string | undefined } language
  * @param {ClientSession} session
  */
-export async function getDrilldownRecords(periodName, metricName, session) {
+export async function getDrilldownRecords(
+  periodName,
+  metricName,
+  language,
+  session
+) {
   const coll = getMetricCollection()
 
   try {
@@ -282,7 +305,8 @@ export async function getDrilldownRecords(periodName, metricName, session) {
           {
             type: FormMetricType.DrilldownMetric,
             periodName,
-            metricName
+            metricName,
+            ...getLanguageFilter(language)
           },
           { session }
         )
@@ -300,28 +324,30 @@ export async function getDrilldownRecords(periodName, metricName, session) {
 /**
  * Saves snapshot metric records for a form.
  * @param {Date} reportDate
- * @param {FormTotalsMetric} totals
+ * @param {FormTotalsMetric[]} totalsList
  * @param {ClientSession} session
  */
-export async function updateMetricTotals(reportDate, totals, session) {
+export async function updateMetricTotals(reportDate, totalsList, session) {
   const coll = getMetricCollection()
 
   try {
     await coll.deleteMany({ type: FormMetricType.TotalsMetric }, { session })
     await coll.deleteMany({ type: FormMetricType.DrilldownMetric }, { session })
 
-    // Extract drilldown detail from 'totals' data, and save as drilldown records
-    totals = await saveDrilldown(totals, session)
-    totals.updatedAt = reportDate
+    for (let totals of totalsList) {
+      // Extract drilldown detail from 'totals' data, and save as drilldown records
+      totals = await saveDrilldown(totals, session)
+      totals.updatedAt = reportDate
 
-    // Now save 'totals' records with drilldown data removed
-    await coll.insertOne(
-      {
-        ...totals,
-        type: FormMetricType.TotalsMetric
-      },
-      { session }
-    )
+      // Now save 'totals' records with drilldown data removed
+      await coll.insertOne(
+        {
+          ...totals,
+          type: FormMetricType.TotalsMetric
+        },
+        { session }
+      )
+    }
   } catch (err) {
     logger.error(err, `Failed to save totals metric - ${getErrorMessage(err)}`)
     throw err
@@ -345,6 +371,12 @@ export async function saveDrilldown(totals, session) {
       const detail = period[metricName]
       if ('details' in detail) {
         const details = /** @type {FormDrilldownMetric[]} */ (detail.details)
+        // Add 'language' property if supplied in the 'totals' record
+        if (totals.language) {
+          details.forEach((det) => {
+            det.language = totals.language
+          })
+        }
         await saveDrilldownRecords(
           periodName,
           /** @type {FormMetricName} */ (metricName),
@@ -462,15 +494,22 @@ export async function getFirstDraft(formId, session) {
 /**
  * Gets the 'forms in draft' metric for the specified date and returns the value
  * @param {Date} reportingDate
+ * @param { string | undefined } language
  * @param {ClientSession} session
  * @returns {Promise<number>}
  */
-export async function getNumberOfFormsInDraft(reportingDate, session) {
+export async function getNumberOfFormsInDraft(
+  reportingDate,
+  language,
+  session
+) {
   const coll = getMetricCollection()
 
   const withoutTime = reportingDate.toISOString().substring(0, 10)
   const startOfDay = `${withoutTime}T00:00:00.000Z`
   const endOfDay = `${withoutTime}T23:59:59.999Z`
+
+  const languageFilter = getLanguageNoPropertyFilter(language)
 
   try {
     const numberOfDrafts =
@@ -482,7 +521,8 @@ export async function getNumberOfFormsInDraft(reportingDate, session) {
             createdAt: {
               $gte: new Date(startOfDay),
               $lte: new Date(endOfDay)
-            }
+            },
+            ...languageFilter
           },
           { session }
         )

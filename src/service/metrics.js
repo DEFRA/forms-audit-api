@@ -15,10 +15,12 @@ import {
 } from 'date-fns'
 
 import { config } from '~/src/config/index.js'
+import { WELSH } from '~/src/constants.js'
 import { logger } from '~/src/helpers/logging/logger.js'
 import { getJson } from '~/src/lib/fetch.js'
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
+import { getLanguageFilter } from '~/src/repositories/metrics-repository-helper.js'
 import {
   clearMetricsData,
   deleteFormOverviewMetrics,
@@ -35,11 +37,11 @@ import {
   updateMetricTotals
 } from '~/src/repositories/metrics-repository.js'
 import {
-  CalculationTypes,
   createFormMap,
   dateFallsInsideTimeslot,
   formatDateOnly,
   getMetricCalcType,
+  handleMetricValue,
   isDraftSubmission,
   isLiveSubmission,
   setTimeOnDate
@@ -50,6 +52,7 @@ import {
  * @property {string} [searchText] - text to search within a form name
  * @property {string[]} [status] - array of statuses
  * @property {string[]} [org] - arrays of organisations
+ * @property {string} [language] - optional language used at the point of submission
  */
 
 /**
@@ -122,19 +125,46 @@ export async function collectMetrics(
   }
 
   logger.info('[metrics] getting overview metrics')
-  await collectManagerOverviewMetrics(session)
+  // Collects (stores) overview metrics and returns a list of language-capable forms
+  // for filtering in later steps
+  const languageFormIds = await collectManagerOverviewMetrics(session)
 
   while (formatDateOnly(reportDate) <= formatDateOnly(reportEndDate)) {
     logger.info(
       `[metrics] getting timeline metrics for ${reportDate.toISOString()}`
     )
-    await collectTimelineMetrics(submissionUrl, reportDate, session)
-    await collectTimelineMetricsFromAudit(reportDate, session)
+    // All languages
+    await collectTimelineMetrics(submissionUrl, reportDate, undefined, session)
+    // Welsh-only
+    await collectTimelineMetrics(submissionUrl, reportDate, WELSH, session)
+
+    // All languages
+    await collectTimelineMetricsFromAudit(
+      reportDate,
+      undefined,
+      undefined,
+      session
+    )
+    // Welsh-only
+    await collectTimelineMetricsFromAudit(
+      reportDate,
+      WELSH,
+      languageFormIds,
+      session
+    )
+
     reportDate = add(reportDate, { days: 1 })
   }
 
-  const totals = await recalcMetrics(reportEndDate, session)
+  const totals = [
+    // All languages
+    await recalcMetrics(reportEndDate, undefined, session),
+    // Welsh-only
+    await recalcMetrics(reportEndDate, WELSH, session)
+  ]
+
   await updateMetricTotals(reportEndDate, totals, session)
+
   return {
     success: true,
     message: 'Completed ok',
@@ -152,10 +182,15 @@ export async function collectMetrics(
 export async function collectManagerOverviewMetrics(session) {
   await deleteFormOverviewMetrics(session)
 
+  const languageCapableForms = {
+    draftIds: /** @type {Set<string>} */ (new Set()),
+    liveIds: /** @type {Set<string>} */ (new Set())
+  }
+
   // Batch up requests into pages (say 20 forms at a time) to ensure the
   // API calls to forms-manager never take over 1 second to process (over 1 second response triggers an alert)
   let currentPage = 0
-  let pageInfo = /** @type {{totalItems: number}} */ ({})
+  let pageInfo
   do {
     currentPage++
     pageInfo = await processMetricsBatch(
@@ -163,7 +198,17 @@ export async function collectManagerOverviewMetrics(session) {
       METRICS_FORM_BATCH_SIZE,
       session
     )
+    pageInfo.data.forEach((row) => {
+      if (row.draft?.language) {
+        languageCapableForms.draftIds.add(row.draft.formId)
+      }
+      if (row.live?.language) {
+        languageCapableForms.liveIds.add(row.live.formId)
+      }
+    })
   } while (pageInfo.totalItems > currentPage * METRICS_FORM_BATCH_SIZE)
+
+  return languageCapableForms
 }
 
 /**
@@ -211,16 +256,28 @@ export async function getOverviewMetricsForForms(page, perPage) {
  * Collect timeline metrics
  * @param {string} baseUrl
  * @param {Date} reportingDate
+ * @param { string | undefined } language - optional to restrict records to only that language
  * @param {ClientSession} session
  */
-export async function collectTimelineMetrics(baseUrl, reportingDate, session) {
+export async function collectTimelineMetrics(
+  baseUrl,
+  reportingDate,
+  language,
+  session
+) {
+  const languageParam = language ? `&language=${language}` : ''
   const { body } = await getJson(
-    new URL(`${baseUrl}/report/timeline?date=${reportingDate.toISOString()}`),
+    new URL(
+      `${baseUrl}/report/timeline?date=${reportingDate.toISOString()}${languageParam}`
+    ),
     {}
   )
   const metricsArray = /** @type {{ timeline: FormTimelineMetric[] }} */ (body)
 
   for (const metric of metricsArray.timeline) {
+    if (language) {
+      metric.language = language
+    }
     await saveFormTimelineMetrics(metric.formId, metric, session)
   }
 }
@@ -228,12 +285,22 @@ export async function collectTimelineMetrics(baseUrl, reportingDate, session) {
 /**
  * Collect timeline metrics from audit events
  * @param {Date} reportingDate
+ * @param { string | undefined } language - optional to restrict records to only that language
+ * @param {{ draftIds?: Set<string>, liveIds?: Set<string>} | undefined } languageFormIds - optional list of form ids for restriction
  * @param {ClientSession} session
  */
-export async function collectTimelineMetricsFromAudit(reportingDate, session) {
+export async function collectTimelineMetricsFromAudit(
+  reportingDate,
+  language,
+  languageFormIds,
+  session
+) {
+  const languageProp = getLanguageFilter(language)
+
   // Read 'forms in draft without a live form' so far from previous day
   let numOfFormsNotLive = await getNumberOfFormsInDraft(
     subDays(reportingDate, 1),
+    language,
     session
   )
 
@@ -241,6 +308,7 @@ export async function collectTimelineMetricsFromAudit(reportingDate, session) {
   const firstCreatedCursor = getAuditRecordsOfType(
     AuditEventMessageType.FORM_CREATED,
     reportingDate,
+    languageFormIds?.draftIds,
     session
   )
   for await (const created of firstCreatedCursor) {
@@ -248,7 +316,8 @@ export async function collectTimelineMetricsFromAudit(reportingDate, session) {
       formStatus: FormStatus.Draft,
       metricName: FormMetricName.NewFormsCreated,
       metricValue: 1,
-      createdAt: created.createdAt
+      createdAt: created.createdAt,
+      ...languageProp
     })
     await saveFormTimelineMetrics(created.entityId, metric, session)
 
@@ -259,12 +328,16 @@ export async function collectTimelineMetricsFromAudit(reportingDate, session) {
   const publishCursor = getAuditRecordsOfType(
     AuditEventMessageType.FORM_LIVE_CREATED_FROM_DRAFT,
     reportingDate,
+    languageFormIds?.draftIds,
     session,
     { createdAt: 1 } // Sort earliest first in case the first publish (and subsequent published) occur on the same day
   )
   for await (const publish of publishCursor) {
     // Check if first publish
-    const firstPublish = await isFirstPublish(publish.entityId, session)
+    const firstPublish =
+      !languageFormIds || languageFormIds.liveIds?.has(publish.entityId)
+        ? await isFirstPublish(publish.entityId, session)
+        : undefined
     if (firstPublish) {
       // Time to first publish
       numOfFormsNotLive--
@@ -273,11 +346,15 @@ export async function collectTimelineMetricsFromAudit(reportingDate, session) {
         formStatus: FormStatus.Live,
         metricName: FormMetricName.FormsFirstPublished,
         metricValue: 1,
-        createdAt: publish.createdAt
+        createdAt: publish.createdAt,
+        ...languageProp
       })
       await saveFormTimelineMetrics(publish.entityId, metricPublish, session)
 
-      const firstDraft = await getFirstDraft(publish.entityId, session)
+      const firstDraft =
+        !languageFormIds || languageFormIds.draftIds?.has(publish.entityId)
+          ? await getFirstDraft(publish.entityId, session)
+          : undefined
       if (firstDraft) {
         const metricTimeToPublish = /** @type {FormTimelineMetric} */ ({
           formStatus: FormStatus.Live,
@@ -286,7 +363,8 @@ export async function collectTimelineMetricsFromAudit(reportingDate, session) {
             publish.createdAt,
             firstDraft.createdAt
           ),
-          createdAt: publish.createdAt
+          createdAt: publish.createdAt,
+          ...languageProp
         })
         await saveFormTimelineMetrics(
           publish.entityId,
@@ -299,7 +377,8 @@ export async function collectTimelineMetricsFromAudit(reportingDate, session) {
         formStatus: FormStatus.Live,
         metricName: FormMetricName.FormsRePublished,
         metricValue: 1,
-        createdAt: publish.createdAt
+        createdAt: publish.createdAt,
+        ...languageProp
       })
       await saveFormTimelineMetrics(publish.entityId, metricPublish, session)
     }
@@ -309,121 +388,21 @@ export async function collectTimelineMetricsFromAudit(reportingDate, session) {
     metricName: FormMetricName.FormsInDraft,
     metricValue: numOfFormsNotLive,
     formStatus: FormStatus.Draft,
-    createdAt: reportingDate
+    createdAt: reportingDate,
+    ...languageProp
   })
   await saveFormTimelineMetrics('n/a', draftCount, session)
 }
 
 /**
- * @param {FormTimelineMetric} metric
- * @param { Record<string, { count?: number }> | undefined } period
- * @param {string} calculationType
- * @param {boolean} [saveDrilldown]
- */
-export function handleMetricValue(
-  metric,
-  period,
-  calculationType,
-  saveDrilldown
-) {
-  if (calculationType === CalculationTypes.AccumulationWithDrilldown) {
-    updateMetricTotal(metric, period, saveDrilldown)
-  }
-  if (calculationType === CalculationTypes.Accumulation) {
-    updateMetricTotal(metric, period)
-  }
-  if (calculationType === CalculationTypes.Snapshot) {
-    setMetricTotal(metric, period)
-  }
-  if (calculationType === CalculationTypes.Average) {
-    updateMetricAverage(metric, period)
-  }
-}
-
-/**
- * @param {FormTimelineMetric} metric
- * @param { Record<string, { count?: number, details?: FormTimelineMetric[] }> | undefined } period
- * @param {boolean} [drillDown]
- */
-export function updateMetricTotal(metric, period, drillDown) {
-  const metricName = metric.metricName
-  if (
-    !period ||
-    (metric.metricName === FormMetricName.Submissions &&
-      metric.formStatus !== FormStatus.Live)
-  ) {
-    return
-  }
-  if (metricName in period && 'count' in period[metricName]) {
-    const currentTotal = period[metricName].count ?? 0
-    const newTotal = currentTotal + metric.metricValue
-    const detail = drillDown
-      ? {
-          details: [...(period[metricName].details ?? []), mapToMinimal(metric)]
-        }
-      : {}
-    period[metricName] = { count: newTotal, ...detail }
-  } else {
-    const detail = drillDown ? { details: [mapToMinimal(metric)] } : {}
-    period[metricName] = { count: metric.metricValue, ...detail }
-  }
-}
-
-/**
- * Remove unwanted properties (reduces the overall document size)
- * @param {FormTimelineMetric} detail
- */
-function mapToMinimal(detail) {
-  return /** @type {FormTimelineMetric} */ ({
-    formId: detail.formId,
-    metricValue: detail.metricValue,
-    createdAt: detail.createdAt
-  })
-}
-
-/**
- * @param {FormTimelineMetric} metric
- * @param { Record<string, { count?: number }> | undefined } period
- */
-export function setMetricTotal(metric, period) {
-  if (!period) {
-    return
-  }
-  const metricName = metric.metricName
-  period[metricName] = { count: metric.metricValue }
-}
-
-/**
- * @param {FormTimelineMetric} metric
- * @param { Record<string, { count?: number, avgTotal?: number, avgCount?: number }> | undefined } period
- */
-export function updateMetricAverage(metric, period) {
-  const metricName = metric.metricName
-  if (!period) {
-    return
-  }
-  if (
-    metricName in period &&
-    'avgTotal' in period[metricName] &&
-    'avgCount' in period[metricName]
-  ) {
-    const currentAvgTotal = period[metricName].avgTotal ?? 0
-    const currentAvgCount = period[metricName].avgCount ?? 0
-    period[metricName].avgTotal = currentAvgTotal + metric.metricValue
-    period[metricName].avgCount = currentAvgCount + 1
-  } else {
-    period[metricName] = { avgTotal: metric.metricValue, avgCount: 1 }
-  }
-}
-
-/**
  * Update metric totals by summing metrics within given windows
  * @param {Date} reportingDate
+ * @param { string | undefined } language
  * @param {ClientSession} session
  * @param {string} [formId] - supplied if calcs are for a specific form
  * @returns {Promise<FormTotalsMetric>}
  */
-export async function recalcMetrics(reportingDate, session, formId) {
+export async function recalcMetrics(reportingDate, language, session, formId) {
   const reportMorning = startOfDay(reportingDate)
   const sevenDaysAgo = subDays(reportMorning, 7)
   const fourteenDaysAgo = subDays(reportMorning, 14)
@@ -453,10 +432,19 @@ export async function recalcMetrics(reportingDate, session, formId) {
   let earliestDataDate
 
   const metricCursor = formId
-    ? getFormTimelineMetricsCursor(formId, session)
-    : getAllTimelineMetrics(session)
+    ? getFormTimelineMetricsCursor(formId, language, session)
+    : getAllTimelineMetrics(language, session)
 
   for await (const metric of metricCursor) {
+    // FormsInDraft needs special attention since the cursor will return values from 'all' and other languages (e.g. Welsh),
+    // therefore the totals must only use the relevant value for the language (or no language)
+    if (
+      metric.metricName === FormMetricName.FormsInDraft &&
+      language !== metric.language
+    ) {
+      continue
+    }
+
     const metricCalcType = getMetricCalcType(metric)
     if (metric.metricName === FormMetricName.Submissions) {
       // Live submissions
@@ -518,7 +506,11 @@ export async function recalcMetrics(reportingDate, session, formId) {
   totals.republished = Object.fromEntries(maps.formRepublishedMap)
   // Approximate implementation date as fallback if no submissions found
   totals.earliestDate = earliestDataDate ?? new Date('2025-12-01')
+  if (language) {
+    totals.language = language
+  }
   const finalTotals = calcAverages(totals)
+
   return finalTotals
 }
 
@@ -628,7 +620,7 @@ export async function generateReport(filter) {
     const overview = await getAllOverviewMetrics(filter, session).toArray()
 
     // Get summary tiles
-    const totals = await getMetricTotals(session)
+    const totals = await getMetricTotals(filter.language, session)
     // Apply extra columns: submissionsCount, re-published, daysToPublish
     const overviewFull = applyExtraColumns({ overview, totals })
 
@@ -644,20 +636,21 @@ export async function generateReport(filter) {
 /**
  * Generates a report for a single form, based on the stored metrics
  * @param {string} formId
+ * @param { string | undefined } language
  */
-export async function generateReportForForm(formId) {
+export async function generateReportForForm(formId, language) {
   const session = client.startSession()
 
   try {
     const yesterday = sub(new Date(), { days: 1 })
 
-    const totals = await recalcMetrics(yesterday, session, formId)
+    const totals = await recalcMetrics(yesterday, language, session, formId)
 
     // Determine the full date range (from = earliestDate, to = updatedAt)
     // of when submissions have been collected (not just for this for form but
     // across the system), so the user can be shown when the system started
     // storing submissions.
-    const { earliestDate, updatedAt } = await getMetricTotals(session)
+    const { earliestDate, updatedAt } = await getMetricTotals(language, session)
     totals.earliestDate = earliestDate
     totals.updatedAt = updatedAt
 
@@ -673,12 +666,18 @@ export async function generateReportForForm(formId) {
  * Generates a drilldown report (sub-details of a tile)
  * @param {string} period
  * @param {FormMetricName} metricName
+ * @param { string | undefined } language
  */
-export async function generateDrilldownReport(period, metricName) {
+export async function generateDrilldownReport(period, metricName, language) {
   const session = client.startSession()
 
   try {
-    const drilldownRows = await getDrilldownRecords(period, metricName, session)
+    const drilldownRows = await getDrilldownRecords(
+      period,
+      metricName,
+      language,
+      session
+    )
     return {
       drilldownRows
     }

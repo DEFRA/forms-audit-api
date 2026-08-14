@@ -3,6 +3,10 @@ import { FormMetricName, FormMetricType, FormStatus } from '@defra/forms-model'
 import { buildMockCollection } from '~/src/api/forms/__stubs__/mongo.js'
 import { db } from '~/src/mongo.js'
 import {
+  getLanguageFilter,
+  getLanguageNoPropertyFilter
+} from '~/src/repositories/metrics-repository-helper.js'
+import {
   clearMetricsData,
   deleteFormOverviewMetrics,
   getAllOverviewMetrics,
@@ -206,7 +210,11 @@ describe('metrics-repository', () => {
         })
       })
 
-      const result = await getFormTimelineMetrics(formId, mockSession)
+      const result = await getFormTimelineMetrics(
+        formId,
+        undefined,
+        mockSession
+      )
 
       expect(result).toEqual([draftDoc, liveDoc])
     })
@@ -217,7 +225,7 @@ describe('metrics-repository', () => {
       })
 
       await expect(() =>
-        getFormTimelineMetrics(formId, mockSession)
+        getFormTimelineMetrics(formId, undefined, mockSession)
       ).rejects.toThrow('db error')
     })
   })
@@ -259,7 +267,7 @@ describe('metrics-repository', () => {
       mockCollection.insertOne.mockResolvedValueOnce({})
 
       // @ts-expect-error - partial data mocked
-      await updateMetricTotals(new Date(), totals, mockSession)
+      await updateMetricTotals(new Date(), [totals], mockSession)
 
       expect(mockCollection.insertOne).toHaveBeenCalledWith(
         {
@@ -287,7 +295,7 @@ describe('metrics-repository', () => {
 
       await expect(() =>
         // @ts-expect-error - partial data mocked
-        updateMetricTotals(new Date(), totals, mockSession)
+        updateMetricTotals(new Date(), [totals], mockSession)
       ).rejects.toThrow('db error')
     })
   })
@@ -472,7 +480,7 @@ describe('metrics-repository', () => {
           return { cursor: {} }
         })
       })
-      const res = getAllTimelineMetrics(mockSession)
+      const res = getAllTimelineMetrics(undefined, mockSession)
       expect(res).toEqual({ cursor: {} })
     })
 
@@ -482,12 +490,14 @@ describe('metrics-repository', () => {
           throw new Error('bad find')
         })
       })
-      expect(() => getAllTimelineMetrics(mockSession)).toThrow('bad find')
+      expect(() => getAllTimelineMetrics(undefined, mockSession)).toThrow(
+        'bad find'
+      )
     })
 
     it('should get metrics totals', () => {
       mockCollection.findOne.mockReturnValueOnce({ cursor: {} })
-      const res = getMetricTotals(mockSession)
+      const res = getMetricTotals(undefined, mockSession)
       expect(res).toEqual({ cursor: {} })
     })
 
@@ -495,7 +505,9 @@ describe('metrics-repository', () => {
       mockCollection.findOne.mockImplementationOnce(() => {
         throw new Error('Bad cursor')
       })
-      expect(() => getMetricTotals(mockSession)).toThrow('Bad cursor')
+      expect(() => getMetricTotals(undefined, mockSession)).toThrow(
+        'Bad cursor'
+      )
     })
   })
 
@@ -593,6 +605,7 @@ describe('metrics-repository', () => {
       const res = await getDrilldownRecords(
         'last7Days',
         FormMetricName.NewFormsCreated,
+        undefined,
         mockSession
       )
       expect(res).toEqual([{ drill1: 123 }, { drill2: 456 }])
@@ -614,6 +627,7 @@ describe('metrics-repository', () => {
         getDrilldownRecords(
           'last7Days',
           FormMetricName.NewFormsCreated,
+          undefined,
           mockSession
         )
       ).rejects.toThrow('bad db call')
@@ -625,7 +639,11 @@ describe('metrics-repository', () => {
 
     it('should return number from specific date', async () => {
       mockCollection.findOne.mockResolvedValueOnce({ metricValue: 5 })
-      const res = await getNumberOfFormsInDraft(testDate, mockSession)
+      const res = await getNumberOfFormsInDraft(
+        testDate,
+        undefined,
+        mockSession
+      )
       expect(res).toBe(5)
       expect(mockCollection.findOne).toHaveBeenCalledWith(
         {
@@ -634,6 +652,9 @@ describe('metrics-repository', () => {
           createdAt: {
             $gte: new Date('2026-04-01T00:00:00.000Z'),
             $lte: new Date('2026-04-01T23:59:59.999Z')
+          },
+          language: {
+            $exists: false
           }
         },
         { session: {} }
@@ -642,7 +663,11 @@ describe('metrics-repository', () => {
 
     it('should return zero if not found', async () => {
       mockCollection.findOne.mockResolvedValueOnce({})
-      const res = await getNumberOfFormsInDraft(testDate, mockSession)
+      const res = await getNumberOfFormsInDraft(
+        testDate,
+        undefined,
+        mockSession
+      )
       expect(res).toBe(0)
       expect(mockCollection.findOne).toHaveBeenCalledWith(
         {
@@ -651,6 +676,9 @@ describe('metrics-repository', () => {
           createdAt: {
             $gte: new Date('2026-04-01T00:00:00.000Z'),
             $lte: new Date('2026-04-01T23:59:59.999Z')
+          },
+          language: {
+            $exists: false
           }
         },
         { session: {} }
@@ -662,7 +690,7 @@ describe('metrics-repository', () => {
         throw new Error('bad db call')
       })
       await expect(() =>
-        getNumberOfFormsInDraft(testDate, mockSession)
+        getNumberOfFormsInDraft(testDate, undefined, mockSession)
       ).rejects.toThrow('bad db call')
     })
   })
@@ -775,6 +803,40 @@ describe('metrics-repository', () => {
       expect(mockCollection.insertMany).toHaveBeenCalledTimes(3)
     })
 
+    it('should save a batch of drilldown records with language property', async () => {
+      const totalsCopy = /** @type {FormTotalsMetric} */ (
+        /** @type {unknown} */ (structuredClone(totals))
+      )
+      totalsCopy.language = 'cy'
+      await saveDrilldown(totalsCopy, mockSession)
+
+      expect(mockCollection.insertMany).toHaveBeenCalledTimes(3)
+      expect(mockCollection.insertMany).toHaveBeenNthCalledWith(
+        1,
+        [
+          {
+            createdAt: expect.anything(),
+            formId: 'form-id-1',
+            language: 'cy',
+            metricName: 'NewFormsCreated',
+            metricValue: 1,
+            periodName: 'last7Days',
+            type: 'drilldown-metric'
+          },
+          {
+            createdAt: expect.anything(),
+            formId: 'form-id-2',
+            language: 'cy',
+            metricName: 'NewFormsCreated',
+            metricValue: 1,
+            periodName: 'last7Days',
+            type: 'drilldown-metric'
+          }
+        ],
+        expect.anything()
+      )
+    })
+
     it('should throw if error', async () => {
       const totalsCopy = structuredClone(totals)
       mockCollection.insertMany.mockImplementationOnce(() => {
@@ -816,8 +878,28 @@ describe('metrics-repository', () => {
       ).rejects.toThrow('bad db call')
     })
   })
+
+  describe('getLanguageFilter', () => {
+    it('should return filter to restrict to specific language', () => {
+      expect(getLanguageFilter('cy')).toEqual({ language: 'cy' })
+    })
+    it('should return empty filter', () => {
+      expect(getLanguageFilter(undefined)).toEqual({})
+    })
+  })
+
+  describe('getLanguageNoPropertyFilter', () => {
+    it('should return filter to restrict to specific language', () => {
+      expect(getLanguageNoPropertyFilter('cy')).toEqual({ language: 'cy' })
+    })
+    it('should return filter to look for records witout a language property', () => {
+      expect(getLanguageNoPropertyFilter(undefined)).toEqual({
+        language: { $exists: false }
+      })
+    })
+  })
 })
 
 /**
- * @import { FormOverviewMetric, FormTimelineMetric } from '@defra/forms-model'
+ * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
  */
