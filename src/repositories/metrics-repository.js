@@ -129,7 +129,7 @@ export function getFormTimelineMetricsCursor(formId, language, session) {
             {
               formId,
               type: FormMetricType.TimelineMetric,
-              ...getLanguageFilter(language)
+              ...getLanguageNoPropertyFilter(language)
             },
             { session }
           )
@@ -219,7 +219,7 @@ export function getAllTimelineMetrics(language, session) {
         .find(
           {
             type: FormMetricType.TimelineMetric,
-            ...getLanguageFilter(language)
+            ...getLanguageNoPropertyFilter(language)
           },
           { session }
         )
@@ -273,7 +273,10 @@ export function getMetricTotals(language, session) {
   try {
     return /** @type {Promise<WithId<FormTotalsMetric>>} */ (
       coll.findOne(
-        { type: FormMetricType.TotalsMetric, ...getLanguageFilter(language) },
+        {
+          type: FormMetricType.TotalsMetric,
+          ...getLanguageNoPropertyFilter(language)
+        },
         { session }
       )
     )
@@ -306,7 +309,7 @@ export async function getDrilldownRecords(
             type: FormMetricType.DrilldownMetric,
             periodName,
             metricName,
-            ...getLanguageFilter(language)
+            ...getLanguageNoPropertyFilter(language)
           },
           { session }
         )
@@ -425,67 +428,6 @@ export async function saveDrilldownRecords(
     logger.error(
       err,
       `Failed to save drilldown metric record - period: ${periodName} metricName: ${metricName} ${getErrorMessage(err)}`
-    )
-    throw err
-  }
-}
-
-/**
- * Determines if any other publish events exist for this form
- * @param {string} formId
- * @param {ClientSession} session
- * @returns {Promise<boolean>}
- */
-export async function isFirstPublish(formId, session) {
-  const coll = getMetricCollection()
-
-  try {
-    const firstPublished = await coll.findOne(
-      {
-        type: FormMetricType.TimelineMetric,
-        metricName: FormMetricName.FormsFirstPublished,
-        formId
-      },
-      { session }
-    )
-    return firstPublished === null
-  } catch (err) {
-    logger.error(
-      err,
-      `Failed to read timeline isFirstPublish for form id ${formId} - ${getErrorMessage(err)}`
-    )
-    throw err
-  }
-}
-
-/**
- * Gets the earliest 'draft created' record of a form
- * @param {string} formId
- * @param {ClientSession} session
- * @returns {Promise< WithId<FormTimelineMetric> | undefined >}
- */
-export async function getFirstDraft(formId, session) {
-  const coll = getMetricCollection()
-
-  try {
-    const drafts = /** @type {WithId<FormTimelineMetric>[]} */ (
-      await coll
-        .find(
-          {
-            type: FormMetricType.TimelineMetric,
-            metricName: FormMetricName.NewFormsCreated,
-            formId
-          },
-          { session }
-        )
-        .sort({ createdAt: 1 })
-        .toArray()
-    )
-    return drafts.length > 0 ? drafts[0] : undefined
-  } catch (err) {
-    logger.error(
-      err,
-      `Failed to read timeline getFirstDraft for form id ${formId} - ${getErrorMessage(err)}`
     )
     throw err
   }
@@ -679,7 +621,7 @@ export async function clearMetricsData(session) {
 }
 
 /**
- * @import { ClientSession, Collection, FindCursor, WithId } from 'mongodb'
+ * @import { ClientSession, FindCursor, WithId } from 'mongodb'
  * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FormDrilldownMetric } from '@defra/forms-model'
  * @import { FilterCriteria, FormMetricControl } from '~/src/service/metrics.js'
  */

@@ -20,18 +20,20 @@ import { logger } from '~/src/helpers/logging/logger.js'
 import { getJson } from '~/src/lib/fetch.js'
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
-import { getLanguageFilter } from '~/src/repositories/metrics-repository-helper.js'
+import {
+  getFirstDraft,
+  getLanguageFilter,
+  isFirstPublish
+} from '~/src/repositories/metrics-repository-helper.js'
 import {
   clearMetricsData,
   deleteFormOverviewMetrics,
   getAllOverviewMetrics,
   getAllTimelineMetrics,
   getDrilldownRecords,
-  getFirstDraft,
   getFormTimelineMetricsCursor,
   getMetricTotals,
   getNumberOfFormsInDraft,
-  isFirstPublish,
   saveFormOverviewMetrics,
   saveFormTimelineMetrics,
   updateMetricTotals
@@ -336,7 +338,7 @@ export async function collectTimelineMetricsFromAudit(
     // Check if first publish
     const firstPublish =
       !languageFormIds || languageFormIds.liveIds?.has(publish.entityId)
-        ? await isFirstPublish(publish.entityId, session)
+        ? await isFirstPublish(publish.entityId, language, session)
         : undefined
     if (firstPublish) {
       // Time to first publish
@@ -353,7 +355,7 @@ export async function collectTimelineMetricsFromAudit(
 
       const firstDraft =
         !languageFormIds || languageFormIds.draftIds?.has(publish.entityId)
-          ? await getFirstDraft(publish.entityId, session)
+          ? await getFirstDraft(publish.entityId, language, session)
           : undefined
       if (firstDraft) {
         const metricTimeToPublish = /** @type {FormTimelineMetric} */ ({
