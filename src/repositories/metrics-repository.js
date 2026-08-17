@@ -129,7 +129,7 @@ export function getFormTimelineMetricsCursor(formId, language, session) {
             {
               formId,
               type: FormMetricType.TimelineMetric,
-              ...getLanguageFilter(language)
+              ...getLanguageNoPropertyFilter(language)
             },
             { session }
           )
@@ -219,7 +219,7 @@ export function getAllTimelineMetrics(language, session) {
         .find(
           {
             type: FormMetricType.TimelineMetric,
-            ...getLanguageFilter(language)
+            ...getLanguageNoPropertyFilter(language)
           },
           { session }
         )
@@ -273,7 +273,10 @@ export function getMetricTotals(language, session) {
   try {
     return /** @type {Promise<WithId<FormTotalsMetric>>} */ (
       coll.findOne(
-        { type: FormMetricType.TotalsMetric, ...getLanguageFilter(language) },
+        {
+          type: FormMetricType.TotalsMetric,
+          ...getLanguageNoPropertyFilter(language)
+        },
         { session }
       )
     )
@@ -306,7 +309,7 @@ export async function getDrilldownRecords(
             type: FormMetricType.DrilldownMetric,
             periodName,
             metricName,
-            ...getLanguageFilter(language)
+            ...getLanguageNoPropertyFilter(language)
           },
           { session }
         )
@@ -433,10 +436,11 @@ export async function saveDrilldownRecords(
 /**
  * Determines if any other publish events exist for this form
  * @param {string} formId
+ * @param { string | undefined } language
  * @param {ClientSession} session
  * @returns {Promise<boolean>}
  */
-export async function isFirstPublish(formId, session) {
+export async function isFirstPublish(formId, language, session) {
   const coll = getMetricCollection()
 
   try {
@@ -444,7 +448,8 @@ export async function isFirstPublish(formId, session) {
       {
         type: FormMetricType.TimelineMetric,
         metricName: FormMetricName.FormsFirstPublished,
-        formId
+        formId,
+        ...getLanguageFilter(language)
       },
       { session }
     )
@@ -461,10 +466,11 @@ export async function isFirstPublish(formId, session) {
 /**
  * Gets the earliest 'draft created' record of a form
  * @param {string} formId
+ * @param { string | undefined } language
  * @param {ClientSession} session
  * @returns {Promise< WithId<FormTimelineMetric> | undefined >}
  */
-export async function getFirstDraft(formId, session) {
+export async function getFirstDraft(formId, language, session) {
   const coll = getMetricCollection()
 
   try {
@@ -474,7 +480,8 @@ export async function getFirstDraft(formId, session) {
           {
             type: FormMetricType.TimelineMetric,
             metricName: FormMetricName.NewFormsCreated,
-            formId
+            formId,
+            ...getLanguageFilter(language)
           },
           { session }
         )

@@ -514,7 +514,7 @@ describe('metrics-repository', () => {
   describe('isFirstPublish', () => {
     it('should return true if one or fewer records', async () => {
       mockCollection.findOne.mockReturnValueOnce(null)
-      const res = await isFirstPublish('form-id', mockSession)
+      const res = await isFirstPublish('form-id', undefined, mockSession)
       expect(res).toBe(true)
       expect(mockCollection.findOne).toHaveBeenCalledWith(
         {
@@ -528,7 +528,7 @@ describe('metrics-repository', () => {
 
     it('should return false if one or more records', async () => {
       mockCollection.findOne.mockReturnValueOnce({})
-      const res = await isFirstPublish('form-id', mockSession)
+      const res = await isFirstPublish('form-id', undefined, mockSession)
       expect(res).toBe(false)
       expect(mockCollection.findOne).toHaveBeenCalledWith(
         {
@@ -545,7 +545,7 @@ describe('metrics-repository', () => {
         throw new Error('bad db call')
       })
       await expect(() =>
-        isFirstPublish('form-id', mockSession)
+        isFirstPublish('form-id', undefined, mockSession)
       ).rejects.toThrow('bad db call')
     })
   })
@@ -557,7 +557,7 @@ describe('metrics-repository', () => {
           return { toArray: () => [{ draft1: 123 }, { draft2: 456 }] }
         })
       })
-      const res = await getFirstDraft('form-id', mockSession)
+      const res = await getFirstDraft('form-id', undefined, mockSession)
       expect(res).toEqual({ draft1: 123 })
       expect(mockCollection.find).toHaveBeenCalledWith(
         {
@@ -575,7 +575,7 @@ describe('metrics-repository', () => {
           return { toArray: () => [] }
         })
       })
-      const res = await getFirstDraft('form-id', mockSession)
+      const res = await getFirstDraft('form-id', undefined, mockSession)
       expect(res).toBeUndefined()
       expect(mockCollection.find).toHaveBeenCalledWith(
         {
@@ -591,9 +591,9 @@ describe('metrics-repository', () => {
       mockCollection.find.mockImplementationOnce(() => {
         throw new Error('bad db call')
       })
-      await expect(() => getFirstDraft('form-id', mockSession)).rejects.toThrow(
-        'bad db call'
-      )
+      await expect(() =>
+        getFirstDraft('form-id', undefined, mockSession)
+      ).rejects.toThrow('bad db call')
     })
   })
 
@@ -613,7 +613,10 @@ describe('metrics-repository', () => {
         {
           type: FormMetricType.DrilldownMetric,
           metricName: FormMetricName.NewFormsCreated,
-          periodName: 'last7Days'
+          periodName: 'last7Days',
+          language: {
+            $exists: false
+          }
         },
         { session: {} }
       )
