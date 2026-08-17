@@ -20,18 +20,20 @@ import { logger } from '~/src/helpers/logging/logger.js'
 import { getJson } from '~/src/lib/fetch.js'
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
-import { getLanguageFilter } from '~/src/repositories/metrics-repository-helper.js'
+import {
+  getFirstDraft,
+  getLanguageFilter,
+  isFirstPublish
+} from '~/src/repositories/metrics-repository-helper.js'
 import {
   clearMetricsData,
   deleteFormOverviewMetrics,
   getAllOverviewMetrics,
   getAllTimelineMetrics,
   getDrilldownRecords,
-  getFirstDraft,
   getFormTimelineMetricsCursor,
   getMetricTotals,
   getNumberOfFormsInDraft,
-  isFirstPublish,
   saveFormOverviewMetrics,
   saveFormTimelineMetrics,
   updateMetricTotals

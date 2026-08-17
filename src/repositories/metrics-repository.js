@@ -434,71 +434,6 @@ export async function saveDrilldownRecords(
 }
 
 /**
- * Determines if any other publish events exist for this form
- * @param {string} formId
- * @param { string | undefined } language
- * @param {ClientSession} session
- * @returns {Promise<boolean>}
- */
-export async function isFirstPublish(formId, language, session) {
-  const coll = getMetricCollection()
-
-  try {
-    const firstPublished = await coll.findOne(
-      {
-        type: FormMetricType.TimelineMetric,
-        metricName: FormMetricName.FormsFirstPublished,
-        formId,
-        ...getLanguageFilter(language)
-      },
-      { session }
-    )
-    return firstPublished === null
-  } catch (err) {
-    logger.error(
-      err,
-      `Failed to read timeline isFirstPublish for form id ${formId} - ${getErrorMessage(err)}`
-    )
-    throw err
-  }
-}
-
-/**
- * Gets the earliest 'draft created' record of a form
- * @param {string} formId
- * @param { string | undefined } language
- * @param {ClientSession} session
- * @returns {Promise< WithId<FormTimelineMetric> | undefined >}
- */
-export async function getFirstDraft(formId, language, session) {
-  const coll = getMetricCollection()
-
-  try {
-    const drafts = /** @type {WithId<FormTimelineMetric>[]} */ (
-      await coll
-        .find(
-          {
-            type: FormMetricType.TimelineMetric,
-            metricName: FormMetricName.NewFormsCreated,
-            formId,
-            ...getLanguageFilter(language)
-          },
-          { session }
-        )
-        .sort({ createdAt: 1 })
-        .toArray()
-    )
-    return drafts.length > 0 ? drafts[0] : undefined
-  } catch (err) {
-    logger.error(
-      err,
-      `Failed to read timeline getFirstDraft for form id ${formId} - ${getErrorMessage(err)}`
-    )
-    throw err
-  }
-}
-
-/**
  * Gets the 'forms in draft' metric for the specified date and returns the value
  * @param {Date} reportingDate
  * @param { string | undefined } language
@@ -686,7 +621,7 @@ export async function clearMetricsData(session) {
 }
 
 /**
- * @import { ClientSession, Collection, FindCursor, WithId } from 'mongodb'
+ * @import { ClientSession, FindCursor, WithId } from 'mongodb'
  * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FormDrilldownMetric } from '@defra/forms-model'
  * @import { FilterCriteria, FormMetricControl } from '~/src/service/metrics.js'
  */

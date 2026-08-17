@@ -6,16 +6,18 @@ import { getJson } from '~/src/lib/fetch.js'
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
 import {
+  getFirstDraft,
+  isFirstPublish
+} from '~/src/repositories/metrics-repository-helper.js'
+import {
   clearMetricsData,
   getAllOverviewMetrics,
   getAllTimelineMetrics,
   getDrilldownRecords,
-  getFirstDraft,
   getFormTimelineMetricsCursor,
   getMetricTotals,
   getNumberOfFormsInDraft,
   grabLock,
-  isFirstPublish,
   releaseLock,
   saveFormOverviewMetrics,
   saveFormTimelineMetrics
@@ -42,6 +44,7 @@ import {
 
 jest.mock('~/src/lib/fetch.js')
 jest.mock('~/src/repositories/metrics-repository.js')
+jest.mock('~/src/repositories/metrics-repository-helper.js')
 jest.mock('~/src/repositories/audit-record-repository.js')
 
 jest.mock('~/src/mongo.js', () => ({

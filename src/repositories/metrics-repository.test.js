@@ -3,8 +3,10 @@ import { FormMetricName, FormMetricType, FormStatus } from '@defra/forms-model'
 import { buildMockCollection } from '~/src/api/forms/__stubs__/mongo.js'
 import { db } from '~/src/mongo.js'
 import {
+  getFirstDraft,
   getLanguageFilter,
-  getLanguageNoPropertyFilter
+  getLanguageNoPropertyFilter,
+  isFirstPublish
 } from '~/src/repositories/metrics-repository-helper.js'
 import {
   clearMetricsData,
@@ -12,13 +14,11 @@ import {
   getAllOverviewMetrics,
   getAllTimelineMetrics,
   getDrilldownRecords,
-  getFirstDraft,
   getFormOverviewMetrics,
   getFormTimelineMetrics,
   getMetricTotals,
   getNumberOfFormsInDraft,
   grabLock,
-  isFirstPublish,
   releaseLock,
   saveDrilldown,
   saveDrilldownRecords,
