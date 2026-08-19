@@ -221,7 +221,7 @@ export function getAllTimelineMetrics(filter, session) {
         .find(
           {
             type: FormMetricType.TimelineMetric,
-            ...(filter ?? {})
+            ...filter
           },
           { session }
         )
