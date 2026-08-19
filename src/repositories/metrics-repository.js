@@ -206,12 +206,14 @@ export function getAllOverviewMetrics(filter, session) {
 
 /**
  * Get all timeline metrics
- * @param { string | undefined } language
+ * @param { Filter<WithId<FormTimelineMetric>> | undefined } filter
  * @param {ClientSession} session
  * @returns {FindCursor<WithId<FormTimelineMetric>>}
  */
-export function getAllTimelineMetrics(language, session) {
-  const coll = getMetricCollection()
+export function getAllTimelineMetrics(filter, session) {
+  const coll = /** @type {Collection<FormTimelineMetric>} */ (
+    getMetricCollection()
+  )
 
   try {
     const cursor = /** @type {FindCursor<WithId<FormTimelineMetric>>} */ (
@@ -219,7 +221,7 @@ export function getAllTimelineMetrics(language, session) {
         .find(
           {
             type: FormMetricType.TimelineMetric,
-            ...getLanguageNoPropertyFilter(language)
+            ...(filter ?? {})
           },
           { session }
         )
@@ -621,7 +623,7 @@ export async function clearMetricsData(session) {
 }
 
 /**
- * @import { ClientSession, FindCursor, WithId } from 'mongodb'
+ * @import { ClientSession, Collection, Filter, FindCursor, WithId } from 'mongodb'
  * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FormDrilldownMetric } from '@defra/forms-model'
  * @import { FilterCriteria, FormMetricControl } from '~/src/service/metrics.js'
  */
