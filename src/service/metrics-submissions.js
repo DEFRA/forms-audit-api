@@ -31,9 +31,13 @@ export async function generateSubmissionsReport(earliestDate) {
   } while (currentDate <= yesterdayAsMonthYear)
 
   try {
-    // Live metrics only
+    // Live metrics only, and ignore any metrics from other languages otherwise we'll double-count
     const timelineCursor = getAllTimelineMetrics(
-      { metricName: FormMetricName.Submissions, formStatus: FormStatus.Live },
+      {
+        metricName: FormMetricName.Submissions,
+        formStatus: FormStatus.Live,
+        language: { $exists: false }
+      },
       session
     )
 
