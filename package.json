@@ -86,6 +86,7 @@
     "jest": "^30.4.2",
     "lint-staged": "^16.1.2",
     "luxon": "^3.6.1",
+    "mongodb-memory-server": "^11.2.0",
     "neostandard": "^0.12.2",
     "nock": "14.0.15",
     "oidc-client-ts": "^3.2.1",
