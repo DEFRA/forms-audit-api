@@ -38,7 +38,10 @@ import {
   saveFormTimelineMetrics,
   updateMetricTotals
 } from '~/src/repositories/metrics-repository.js'
-import { getJsonFromManager, getJsonFromSubmissions } from '~/src/service/metrics-call-wrapper.js'
+import {
+  getJsonFromManager,
+  getJsonFromSubmissions
+} from '~/src/service/metrics-call-wrapper.js'
 import {
   createFormMap,
   dateFallsInsideTimeslot,
@@ -133,7 +136,6 @@ export async function collectMetrics(
   const languageFormIds = await collectManagerOverviewMetrics(session)
 
   while (formatDateOnly(reportDate) <= formatDateOnly(reportEndDate)) {
-    console.log(`[metrics] getting timeline metrics for ${reportDate.toISOString()}`)
     logger.info(
       `[metrics] getting timeline metrics for ${reportDate.toISOString()}`
     )
@@ -271,7 +273,9 @@ export async function collectTimelineMetrics(
 ) {
   const languageParam = language ? `&language=${language}` : ''
   const { body } = await getJsonFromSubmissions(
-      new URL(`${baseUrl}/report/timeline?date=${reportingDate.toISOString()}${languageParam}`)
+    new URL(
+      `${baseUrl}/report/timeline?date=${reportingDate.toISOString()}${languageParam}`
+    )
   )
   const metricsArray = /** @type {{ timeline: FormTimelineMetric[] }} */ (body)
 

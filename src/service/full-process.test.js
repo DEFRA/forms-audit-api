@@ -1,3 +1,4 @@
+// import { logger } from '~/src/helpers/logging/logger.js'
 import {
   getJsonFromManager,
   getJsonFromSubmissions
@@ -15,6 +16,10 @@ jest.mock('~/src/helpers/logging/logger.js')
 jest.mock('~/src/service/metrics-call-wrapper.js')
 
 setupIntegrationDb()
+
+// Route mocked logger calls to the console so they show with --silent=false
+// jest.mocked(logger.info).mockImplementation((...args) => console.log(...args))
+// jest.mocked(logger.error).mockImplementation((...args) => console.error(...args))
 
 describe('Full process', () => {
   it('should populate full metrics records, then read the report', async () => {
@@ -39,14 +44,14 @@ describe('Full process', () => {
     const metrics = await generateReport({})
     expect(metrics.totals.allTime).toEqual({
       FormsFirstPublished: {
-        count: 1
+        count: 2
       },
       FormsInDraft: {
-        count: 3
+        count: 2
       },
-      // FormsRePublished: {
-      //   count: 3
-      // },
+      FormsRePublished: {
+        count: 1
+      },
       NewFormsCreated: {
         count: 4
       },
@@ -54,7 +59,7 @@ describe('Full process', () => {
         count: 13
       },
       TimeToPublish: {
-        count: 8
+        count: 13.5
       }
     })
     expect(metrics.overview).toHaveLength(6)
@@ -97,12 +102,13 @@ describe('Full process', () => {
     expect(metrics.overview[1].formId).toBe('form-id-1')
     expect(metrics.overview[1].formName).toBe('Form 1')
     expect(metrics.overview[1].formStatus).toBe('live')
+    // Doesn't seem to be calculating submissions
     expect(metrics.overview[1].submissionsCount).toBe(8)
 
     expect(metrics.overview[2].formId).toBe('form-id-2')
     expect(metrics.overview[2].formName).toBe('Form 2')
     expect(metrics.overview[2].formStatus).toBe('draft')
-    expect(metrics.overview[2].submissionsCount).toBe(0)
+    expect(metrics.overview[2].submissionsCount).toBe(3)
 
     expect(metrics.overview[3].formId).toBe('form-id-3')
     expect(metrics.overview[3].formName).toBe('Form 3')
@@ -112,7 +118,7 @@ describe('Full process', () => {
     expect(metrics.overview[4].formId).toBe('form-id-welsh')
     expect(metrics.overview[4].formName).toBe('Form Welsh')
     expect(metrics.overview[4].formStatus).toBe('draft')
-    expect(metrics.overview[4].submissionsCount).toBe(0)
+    expect(metrics.overview[4].submissionsCount).toBe(1)
 
     expect(metrics.overview[5].formId).toBe('form-id-welsh')
     expect(metrics.overview[5].formName).toBe('Form Welsh')
@@ -124,11 +130,17 @@ describe('Full process', () => {
       'form-id-welsh': 19
     })
     expect(metrics.totals.earliestDate).toEqual(
-      new Date('2026-07-22T12:00:00.000Z')
+      new Date('2026-07-18T12:00:00.000Z')
     )
-    expect(metrics.totals.liveSubmissions).toEqual([
-      { '691db72966b1bdc98fa3e72a': 2 }
-    ])
+    expect(metrics.totals.liveSubmissions).toEqual({
+      'form-id-1': 8,
+      'form-id-welsh': 5
+    })
+    expect(metrics.totals.draftSubmissions).toEqual({
+      'form-id-1': 2,
+      'form-id-2': 3,
+      'form-id-welsh': 1
+    })
   }, 20_000)
 })
 

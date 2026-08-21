@@ -1,4 +1,4 @@
-import { differenceInDays } from "date-fns"
+import { differenceInDays } from 'date-fns'
 
 /**
  * Build an array of mock data to emulate the submissions values for metris calculations
@@ -6,71 +6,128 @@ import { differenceInDays } from "date-fns"
 export function buildMockSubmissionData() {
   const data = []
   data.push(
-    { timeline: [] },
-    { timeline: [
-      {
-        type: 'timeline-metric',
-        formId: 'form-id-1',
-        formStatus: 'live',
-        metricName: 'Submissions',
-        metricValue: 1,
-        createdAt: new Date('2026-07-18T12:00:00.000Z')
-      }
-    ]},
-    { timeline: [
-      {
-        type: 'timeline-metric',
-        formId: 'form-id-1',
-        formStatus: 'draft',
-        metricName: 'Submissions',
-        metricValue: 2,
-        createdAt: new Date('2026-07-20T12:00:00.000Z')
-      },
-      {
-        type: 'timeline-metric',
-        formId: 'form-id-welsh',
-        formStatus: 'live',
-        metricName: 'Submissions',
-        metricValue: 1,
-        createdAt: new Date('2026-07-20T14:00:00.000Z'),
-        language: 'cy'
-      }
-    ]},
-    { timeline: [
-      {
-        type: 'timeline-metric',
-        formId: 'form-id-1',
-        formStatus: 'live',
-        metricName: 'Submissions',
-        metricValue: 7,
-        createdAt: new Date('2026-07-23T12:00:00.000Z')
-      }
-    ]},
-    { timeline: [
-      {
-        type: 'timeline-metric',
-        formId: 'form-id-welsh',
-        formStatus: 'live',
-        metricName: 'Submissions',
-        metricValue: 4,
-        createdAt: new Date('2026-07-25T14:00:00.000Z'),
-        language: 'cy'
-      }
-    ]},
-    { timeline: [
-      {
-        type: 'timeline-metric',
-        formId: 'form-id-welsh',
-        formStatus: 'draft',
-        metricName: 'Submissions',
-        metricValue: 1,
-        createdAt: new Date('2026-07-27T12:00:00.000Z'),
-        language: 'cy'
-      }
-    ]
-  })
-  for (let i = 0; i < differenceInDays(new Date(), new Date('2026-06-10T12:00:00.000Z')); i++) {
-    data.push({ timeline: [] })
+    {
+      timeline: [
+        {
+          type: 'timeline-metric',
+          formId: 'form-id-1',
+          formStatus: 'live',
+          metricName: 'Submissions',
+          metricValue: 1,
+          createdAt: new Date('2026-07-18T12:00:00.000Z')
+        },
+        {
+          type: 'timeline-metric',
+          formId: 'form-id-2',
+          formStatus: 'draft',
+          metricName: 'Submissions',
+          metricValue: 3,
+          createdAt: new Date('2026-07-19T15:00:00.000Z')
+        }
+      ]
+    },
+    { timeline: [] }, // Welsh
+    {
+      timeline: [
+        {
+          type: 'timeline-metric',
+          formId: 'form-id-1',
+          formStatus: 'draft',
+          metricName: 'Submissions',
+          metricValue: 2,
+          createdAt: new Date('2026-07-20T12:00:00.000Z')
+        },
+        {
+          type: 'timeline-metric',
+          formId: 'form-id-welsh',
+          formStatus: 'live',
+          metricName: 'Submissions',
+          metricValue: 1,
+          createdAt: new Date('2026-07-20T14:00:00.000Z')
+        }
+      ]
+    },
+    {
+      timeline: [
+        {
+          type: 'timeline-metric',
+          formId: 'form-id-welsh',
+          formStatus: 'live',
+          metricName: 'Submissions',
+          metricValue: 1,
+          createdAt: new Date('2026-07-20T14:00:00.000Z'),
+          language: 'cy'
+        }
+      ]
+    },
+    {
+      timeline: [
+        {
+          type: 'timeline-metric',
+          formId: 'form-id-1',
+          formStatus: 'live',
+          metricName: 'Submissions',
+          metricValue: 7,
+          createdAt: new Date('2026-07-23T12:00:00.000Z')
+        },
+        {
+          type: 'timeline-metric',
+          formId: 'form-id-welsh',
+          formStatus: 'live',
+          metricName: 'Submissions',
+          metricValue: 4,
+          createdAt: new Date('2026-07-25T14:00:00.000Z')
+        }
+      ]
+    },
+    {
+      timeline: [
+        {
+          type: 'timeline-metric',
+          formId: 'form-id-welsh',
+          formStatus: 'live',
+          metricName: 'Submissions',
+          metricValue: 4,
+          createdAt: new Date('2026-07-25T14:00:00.000Z'),
+          language: 'cy'
+        }
+      ]
+    },
+    {
+      timeline: [
+        {
+          type: 'timeline-metric',
+          formId: 'form-id-welsh',
+          formStatus: 'draft',
+          metricName: 'Submissions',
+          metricValue: 1,
+          createdAt: new Date('2026-07-27T12:00:00.000Z')
+        }
+      ]
+    }, // English
+    {
+      timeline: [
+        {
+          type: 'timeline-metric',
+          formId: 'form-id-welsh',
+          formStatus: 'draft',
+          metricName: 'Submissions',
+          metricValue: 1,
+          createdAt: new Date('2026-07-27T12:00:00.000Z'),
+          language: 'cy'
+        }
+      ]
+    }
+  )
+  for (
+    let i = 0;
+    i < differenceInDays(new Date(), new Date('2026-06-10T12:00:00.000Z'));
+    i++
+  ) {
+    data.push(
+      { timeline: [] }, // For English
+      { timeline: [] } // For Welsh
+    )
   }
   return data
 }
@@ -90,7 +147,7 @@ function buildSummaryMetrics(name, status) {
     questionTypes: 7,
     conditions: 1,
     sections: 2,
-    features: [ 'Email confirmation', 'Declaration field' ]
+    features: ['Email confirmation', 'Declaration field']
   }
 }
 
