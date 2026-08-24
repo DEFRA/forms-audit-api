@@ -97,7 +97,12 @@ export default [
       return h.response(metrics).code(HTTP_OK)
     },
     options: {
-      auth: false
+      auth: false,
+      validate: {
+        query: Joi.object({
+          earliestDate: Joi.date().optional()
+        })
+      }
     }
   }),
 
