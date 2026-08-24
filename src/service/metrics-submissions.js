@@ -6,6 +6,9 @@ import { client } from '~/src/mongo.js'
 import { getAllTimelineMetrics } from '~/src/repositories/metrics-repository.js'
 
 const YEAR_MONTH_FORMAT = 'yyyy-MM'
+const UK_TIMEZONE = 'Europe/London'
+const MM = 'MM'
+const YYYY = 'yyyy'
 
 /**
  * @typedef {Map<string, number>} FormsMap
@@ -34,15 +37,11 @@ export async function generateSubmissionsReport(earliestDate) {
   // Operate in UK timezone to avoid inaccuracies in month/year placeholders
   const yesterday = addDays(new Date(), -1)
 
-  let currentMonth = parseInt(
-    formatInTimeZone(earliestDate, 'Europe/London', 'MM')
-  )
-  let currentYear = parseInt(
-    formatInTimeZone(earliestDate, 'Europe/London', 'yyyy')
-  )
+  let currentMonth = parseInt(formatInTimeZone(earliestDate, UK_TIMEZONE, MM))
+  let currentYear = parseInt(formatInTimeZone(earliestDate, UK_TIMEZONE, YYYY))
 
-  const endMonth = parseInt(formatInTimeZone(yesterday, 'Europe/London', 'MM'))
-  const endYear = parseInt(formatInTimeZone(yesterday, 'Europe/London', 'yyyy'))
+  const endMonth = parseInt(formatInTimeZone(yesterday, UK_TIMEZONE, MM))
+  const endYear = parseInt(formatInTimeZone(yesterday, UK_TIMEZONE, YYYY))
 
   const endMonthYearStr = `${endYear}-${lpadMonth(endMonth)}`
 
@@ -57,7 +56,7 @@ export async function generateSubmissionsReport(earliestDate) {
       currentYear++
       currentMonth = 1
     }
-  } while (currentMonthYearStr < endMonthYearStr)
+  } while (currentMonthYearStr.localeCompare(endMonthYearStr))
 
   try {
     // Live metrics only, and ignore any metrics from other languages otherwise we'll double-count
@@ -96,5 +95,5 @@ export async function generateSubmissionsReport(earliestDate) {
  * @param {Date} date
  */
 function formatAsYearMonthUK(date) {
-  return formatInTimeZone(date, 'Europe/London', YEAR_MONTH_FORMAT)
+  return formatInTimeZone(date, UK_TIMEZONE, YEAR_MONTH_FORMAT)
 }
