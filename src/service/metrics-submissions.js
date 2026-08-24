@@ -38,11 +38,17 @@ export async function generateSubmissionsReport(earliestDate) {
   // Operate in UK timezone to avoid inaccuracies in month/year placeholders
   const yesterday = addDays(new Date(), -1)
 
-  let currentMonth = parseInt(formatInTimeZone(earliestDate, UK_TIMEZONE, MM))
-  let currentYear = parseInt(formatInTimeZone(earliestDate, UK_TIMEZONE, YYYY))
+  let currentMonth = Number.parseInt(
+    formatInTimeZone(earliestDate, UK_TIMEZONE, MM)
+  )
+  let currentYear = Number.parseInt(
+    formatInTimeZone(earliestDate, UK_TIMEZONE, YYYY)
+  )
 
-  const endMonth = parseInt(formatInTimeZone(yesterday, UK_TIMEZONE, MM))
-  const endYear = parseInt(formatInTimeZone(yesterday, UK_TIMEZONE, YYYY))
+  const endMonth = Number.parseInt(formatInTimeZone(yesterday, UK_TIMEZONE, MM))
+  const endYear = Number.parseInt(
+    formatInTimeZone(yesterday, UK_TIMEZONE, YYYY)
+  )
 
   const endMonthYearStr = `${endYear}-${lpadMonth(endMonth)}`
 
