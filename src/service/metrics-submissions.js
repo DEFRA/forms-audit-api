@@ -9,6 +9,7 @@ const YEAR_MONTH_FORMAT = 'yyyy-MM'
 const UK_TIMEZONE = 'Europe/London'
 const MM = 'MM'
 const YYYY = 'yyyy'
+const MONTHS_IN_A_YEAR = 12
 
 /**
  * @typedef {Map<string, number>} FormsMap
@@ -52,7 +53,7 @@ export async function generateSubmissionsReport(earliestDate) {
     currentMonthYearStr = `${currentYear}-${lpadMonth(currentMonth)}`
     submissionsMap.set(currentMonthYearStr, /** @type {FormsMap} */ (new Map()))
     currentMonth++
-    if (currentMonth > 12) {
+    if (currentMonth > MONTHS_IN_A_YEAR) {
       currentYear++
       currentMonth = 1
     }
