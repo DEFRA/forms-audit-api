@@ -83,12 +83,42 @@ describe('metrics-submissions', () => {
         }
       }
     }
-    mockCollection.find.mockReturnValueOnce({
-      sort: jest.fn(() => mockAsyncIterator)
+    mockCollection.find
+      .mockReturnValueOnce({
+        sort: jest.fn(() => mockAsyncIterator)
+      })
+      .mockReturnValueOnce({
+        sort: jest.fn(() => mockAsyncIterator)
+      })
+
+    // Ensure months wrap around time-change months correctly
+    const res = await generateSubmissionsReport(new Date(2025, 1, 1)) // 01/02/2025
+    expect(res).toEqual({
+      '2025-02': {},
+      '2025-03': {},
+      '2025-04': {},
+      '2025-05': {},
+      '2025-06': {},
+      '2025-07': {},
+      '2025-08': {},
+      '2025-09': {},
+      '2025-10': {},
+      '2025-11': {},
+      '2025-12': {
+        'form-id-1': 5,
+        'form-id-2': 10
+      },
+      '2026-01': {
+        'form-id-1': 1
+      },
+      '2026-02': {},
+      '2026-03': {},
+      '2026-04': {}
     })
 
-    const res = await generateSubmissionsReport(new Date(2025, 9, 1))
-    expect(res).toEqual({
+    // Ensure start month in time-change month handles correctly
+    const res2 = await generateSubmissionsReport(new Date(2025, 9, 1)) // 01/10/2025
+    expect(res2).toEqual({
       '2025-10': {},
       '2025-11': {},
       '2025-12': {

@@ -1,5 +1,6 @@
 import { FormMetricName, FormStatus } from '@defra/forms-model'
-import { addDays, addMonths, format } from 'date-fns'
+import { addDays } from 'date-fns'
+import { formatInTimeZone } from 'date-fns-tz'
 
 import { client } from '~/src/mongo.js'
 import { getAllTimelineMetrics } from '~/src/repositories/metrics-repository.js'
@@ -12,6 +13,14 @@ const YEAR_MONTH_FORMAT = 'yyyy-MM'
  */
 
 /**
+ * Add leading zero to month, if needed
+ * @param {number} monthNum
+ */
+function lpadMonth(monthNum) {
+  return monthNum < 10 ? `0${monthNum}` : `${monthNum}`
+}
+
+/**
  * Generates a report of submissions each month per form
  * @param {Date} earliestDate - earliest date to build submissions counts
  */
@@ -22,13 +31,33 @@ export async function generateSubmissionsReport(earliestDate) {
   const submissionsMap = /** @type {SubmissionsMap} */ (new Map())
 
   // Pre-populate the month placeholders in the map
-  const yesterdayAsMonthYear = formatAsYearMonth(addDays(new Date(), -1))
-  let currentDate = formatAsYearMonth(earliestDate)
+  // Operate in UK timezone to avoid inaccuracies in month/year placeholders
+  const yesterday = addDays(new Date(), -1)
+
+  let currentMonth = parseInt(
+    formatInTimeZone(earliestDate, 'Europe/London', 'MM')
+  )
+  let currentYear = parseInt(
+    formatInTimeZone(earliestDate, 'Europe/London', 'yyyy')
+  )
+
+  const endMonth = parseInt(formatInTimeZone(yesterday, 'Europe/London', 'MM'))
+  const endYear = parseInt(formatInTimeZone(yesterday, 'Europe/London', 'yyyy'))
+
+  const endMonthYearStr = `${endYear}-${lpadMonth(endMonth)}`
+
+  let currentMonthYearStr
+
+  // Loop through each month of each year, from earliest date to end date
   do {
-    submissionsMap.set(currentDate, /** @type {FormsMap} */ (new Map()))
-    const nextMonth = addMonths(new Date(`${currentDate}-01`), 1)
-    currentDate = formatAsYearMonth(nextMonth)
-  } while (currentDate <= yesterdayAsMonthYear)
+    currentMonthYearStr = `${currentYear}-${lpadMonth(currentMonth)}`
+    submissionsMap.set(currentMonthYearStr, /** @type {FormsMap} */ (new Map()))
+    currentMonth++
+    if (currentMonth > 12) {
+      currentYear++
+      currentMonth = 1
+    }
+  } while (currentMonthYearStr < endMonthYearStr)
 
   try {
     // Live metrics only, and ignore any metrics from other languages otherwise we'll double-count
@@ -36,14 +65,15 @@ export async function generateSubmissionsReport(earliestDate) {
       {
         metricName: FormMetricName.Submissions,
         formStatus: FormStatus.Live,
+        createdAt: { $gte: earliestDate },
         language: { $exists: false }
       },
       session
     )
 
-    // Assign each submission metric to the appropriate month/form bucket
+    // Assign each submission metric to the appropriate month/form bucket (calculated in UK time)
     for await (const timeline of timelineCursor) {
-      const monthYear = formatAsYearMonth(timeline.createdAt)
+      const monthYear = formatAsYearMonthUK(timeline.createdAt)
       const monthMap = submissionsMap.get(monthYear)
       const count = monthMap?.get(timeline.formId) ?? 0
       monthMap?.set(timeline.formId, timeline.metricValue + count)
@@ -65,6 +95,6 @@ export async function generateSubmissionsReport(earliestDate) {
  * Format as year-month i.e. 2026-05
  * @param {Date} date
  */
-function formatAsYearMonth(date) {
-  return format(date, YEAR_MONTH_FORMAT)
+function formatAsYearMonthUK(date) {
+  return formatInTimeZone(date, 'Europe/London', YEAR_MONTH_FORMAT)
 }
