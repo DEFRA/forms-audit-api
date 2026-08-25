@@ -17,10 +17,21 @@ jest.mock('~/src/service/metrics-call-wrapper.js')
 
 setupIntegrationDb()
 
-// Route mocked logger calls to the console so they show with --silent=false
-// jest.mocked(logger.info).mockImplementation((...args) => console.log(...args))
-// jest.mocked(logger.error).mockImplementation((...args) => console.error(...args))
-
+/**
+ * @param {object} partialSummary
+ */
+function getExpectedSummary(partialSummary) {
+  return {
+    conditions: 1,
+    features: ['Email confirmation', 'Declaration field'],
+    organisation: 'Defra',
+    pages: 5,
+    questionTypes: 7,
+    republished: 0,
+    sections: 2,
+    ...partialSummary
+  }
+}
 describe('Full process', () => {
   it('should populate full metrics records, then read the report', async () => {
     const mockSubmissionsData = buildMockSubmissionData()
@@ -28,6 +39,23 @@ describe('Full process', () => {
       // @ts-expect-error - partial mock of test data
       jest.mocked(getJsonFromSubmissions).mockResolvedValueOnce({ body: data })
     )
+
+    const expectedFeatures = {
+      questionTypes: {
+        DeclarationField: 1
+      },
+      features: {
+        'Email confirmation': 1,
+        'Declaration field': 1
+      },
+      formStructure: {
+        pages: 5,
+        questions: 12,
+        sections: 2,
+        conditions: 1,
+        questionTypes: 7
+      }
+    }
 
     const mockManagerData = buildMockManagerData()
     // @ts-expect-error - partial mock of test data
@@ -102,28 +130,76 @@ describe('Full process', () => {
     expect(metrics.overview[1].formId).toBe('form-id-1')
     expect(metrics.overview[1].formName).toBe('Form 1')
     expect(metrics.overview[1].formStatus).toBe('live')
-    // Doesn't seem to be calculating submissions
     expect(metrics.overview[1].submissionsCount).toBe(8)
+    expect(metrics.overview[1].featureMetrics).toEqual(expectedFeatures)
+    expect(metrics.overview[1].summaryMetrics).toEqual(
+      getExpectedSummary({
+        name: 'Form 1',
+        status: 'live',
+        slug: 'form-1',
+        daysToPublish: 8,
+        republished: 1
+      })
+    )
 
     expect(metrics.overview[2].formId).toBe('form-id-2')
     expect(metrics.overview[2].formName).toBe('Form 2')
     expect(metrics.overview[2].formStatus).toBe('draft')
     expect(metrics.overview[2].submissionsCount).toBe(3)
+    expect(metrics.overview[2].featureMetrics).toEqual(expectedFeatures)
+    expect(metrics.overview[2].summaryMetrics).toEqual(
+      getExpectedSummary({
+        name: 'Form 2',
+        status: 'draft',
+        slug: 'form-2',
+        daysToPublish: undefined,
+        republished: undefined
+      })
+    )
 
     expect(metrics.overview[3].formId).toBe('form-id-3')
     expect(metrics.overview[3].formName).toBe('Form 3')
     expect(metrics.overview[3].formStatus).toBe('draft')
     expect(metrics.overview[3].submissionsCount).toBe(0)
+    expect(metrics.overview[3].featureMetrics).toEqual(expectedFeatures)
+    expect(metrics.overview[3].summaryMetrics).toEqual(
+      getExpectedSummary({
+        name: 'Form 3',
+        status: 'draft',
+        slug: 'form-3',
+        daysToPublish: undefined,
+        republished: undefined
+      })
+    )
 
     expect(metrics.overview[4].formId).toBe('form-id-welsh')
     expect(metrics.overview[4].formName).toBe('Form Welsh')
     expect(metrics.overview[4].formStatus).toBe('draft')
     expect(metrics.overview[4].submissionsCount).toBe(1)
+    expect(metrics.overview[4].featureMetrics).toEqual(expectedFeatures)
+    expect(metrics.overview[4].summaryMetrics).toEqual(
+      getExpectedSummary({
+        name: 'Form Welsh',
+        status: 'draft',
+        slug: 'form-welsh',
+        daysToPublish: undefined,
+        republished: undefined
+      })
+    )
 
     expect(metrics.overview[5].formId).toBe('form-id-welsh')
     expect(metrics.overview[5].formName).toBe('Form Welsh')
     expect(metrics.overview[5].formStatus).toBe('live')
     expect(metrics.overview[5].submissionsCount).toBe(5)
+    expect(metrics.overview[5].featureMetrics).toEqual(expectedFeatures)
+    expect(metrics.overview[5].summaryMetrics).toEqual(
+      getExpectedSummary({
+        name: 'Form Welsh',
+        status: 'live',
+        slug: 'form-welsh',
+        daysToPublish: 19
+      })
+    )
 
     expect(metrics.totals.daysToPublish).toEqual({
       'form-id-1': 8,
@@ -143,7 +219,3 @@ describe('Full process', () => {
     })
   }, 20_000)
 })
-
-/**
- * @import { Server } from '@hapi/hapi'
- */
