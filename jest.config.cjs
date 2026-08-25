@@ -7,7 +7,6 @@ const { CI } = process.env
 module.exports = {
   verbose: true,
   resetMocks: true,
-  resetModules: true,
   restoreMocks: true,
   clearMocks: true,
   silent: true,
