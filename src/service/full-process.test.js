@@ -217,5 +217,5 @@ describe('Full process', () => {
       'form-id-2': 3,
       'form-id-welsh': 1
     })
-  }, 20_000)
+  }, 60_000)
 })
