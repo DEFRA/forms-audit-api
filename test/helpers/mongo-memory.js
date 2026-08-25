@@ -1,7 +1,7 @@
 import { MongoMemoryReplSet } from 'mongodb-memory-server'
 
 import { config } from '~/src/config/index.js'
-import { client, prepareDb } from '~/src/mongo.js'
+import { prepareDb } from '~/src/mongo.js'
 import { seedAuditRecords } from '~/test/helpers/seed-audit-records.js'
 
 /**
@@ -42,19 +42,19 @@ export async function startMongoMemoryServer() {
  * the suite
  */
 export function setupIntegrationDb() {
-  /** @type {MongoMemoryReplSet} */
-  let mongod
+  // /** @type {MongoMemoryReplSet} */
+  // let mongod
 
   // eslint-disable-next-line no-undef
   beforeAll(async () => {
-    mongod = await startMongoMemoryServer()
+    await startMongoMemoryServer()
     await prepareDb(/** @type {never} */ ({ info: () => undefined }))
     await seedAuditRecords()
   }, MONGO_BOOT_TIMEOUT_MS)
 
   // eslint-disable-next-line no-undef
   afterAll(async () => {
-    await client.close()
-    await mongod.stop()
+    // await client.close()
+    // await mongod.stop()
   })
 }
