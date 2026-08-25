@@ -66,7 +66,7 @@ describe('Full process', () => {
     await seedMetricsRecords()
 
     // Run the metrcs collection
-    await expect(runMetricsCollectionJob()).resolves.not.toThrow()
+    await runMetricsCollectionJob()
 
     // Read back the metrics report and compare the results
     const metrics = await generateReport({})
@@ -217,5 +217,5 @@ describe('Full process', () => {
       'form-id-2': 3,
       'form-id-welsh': 1
     })
-  }, 60_000)
+  })
 })
