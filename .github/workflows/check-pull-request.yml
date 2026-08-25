@@ -159,6 +159,15 @@ jobs:
           key: ${{ matrix.task.name }}-${{ runner.os }}-${{ github.sha }}
           path: ${{ matrix.task.cache }}
 
+      # The integration suites run mongodb-memory-server, which downloads a
+      # mongod binary on first use. The version in the key follows
+      # MONGO_VERSION in test/helpers/mongo-memory.js
+      - name: Cache MongoDB binary
+        uses: actions/cache@v4
+        with:
+          key: mongodb-binaries-${{ runner.os }}-6.0.14
+          path: ~/.cache/mongodb-binaries
+
       - name: Run task
         run: ${{ matrix.task.run }}
 

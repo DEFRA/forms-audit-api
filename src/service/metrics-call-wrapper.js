@@ -5,10 +5,7 @@ import { getJson } from '~/src/lib/fetch.js'
  * @param {URL} url - target URL
  */
 export async function getJsonFromManager(url) {
-  const res = await getJson(
-    url,
-    {}
-  )
+  const res = await getJson(url, {})
   return res
 }
 
@@ -17,9 +14,6 @@ export async function getJsonFromManager(url) {
  * @param {URL} url - target URL
  */
 export async function getJsonFromSubmissions(url) {
-  const res = await getJson(
-    url,
-    {}
-  )
+  const res = await getJson(url, {})
   return res
 }
