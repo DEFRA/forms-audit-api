@@ -63,7 +63,7 @@ export async function generateSubmissionsReport(earliestDate) {
       currentYear++
       currentMonth = 1
     }
-  } while (currentMonthYearStr.localeCompare(endMonthYearStr))
+  } while (currentMonthYearStr.localeCompare(endMonthYearStr) < 0)
 
   try {
     // Live metrics only, and ignore any metrics from other languages otherwise we'll double-count

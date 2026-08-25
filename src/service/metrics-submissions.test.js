@@ -133,6 +133,39 @@ describe('metrics-submissions', () => {
       '2026-04': {}
     })
   })
+
+  it('should prevent endlees loop if future date supplied by accident', async () => {
+    const timelineMetrics = /** @type {FormTimelineMetric[]} */ ([
+      {
+        type: FormMetricType.TimelineMetric,
+        formId: 'form-id-1',
+        formStatus: FormStatus.Live,
+        metricName: FormMetricName.Submissions,
+        metricValue: 5,
+        createdAt: new Date('2025-12-10T10:00:00.000Z')
+      }
+    ])
+    const mockAsyncIterator = {
+      [Symbol.asyncIterator]: function* () {
+        for (const metric of timelineMetrics) {
+          yield metric
+        }
+      }
+    }
+    mockCollection.find
+      .mockReturnValueOnce({
+        sort: jest.fn(() => mockAsyncIterator)
+      })
+      .mockReturnValueOnce({
+        sort: jest.fn(() => mockAsyncIterator)
+      })
+
+    // Ensure months wrap around time-change months correctly
+    const res = await generateSubmissionsReport(new Date(2028, 1, 1))
+    expect(res).toEqual({
+      '2028-02': {}
+    })
+  })
 })
 
 /**
