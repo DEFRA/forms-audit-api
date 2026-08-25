@@ -1,7 +1,7 @@
 import { MongoMemoryReplSet } from 'mongodb-memory-server'
 
 import { config } from '~/src/config/index.js'
-import { prepareDb } from '~/src/mongo.js'
+import { client, prepareDb } from '~/src/mongo.js'
 import { seedAuditRecords } from '~/test/helpers/seed-audit-records.js'
 
 /**
@@ -52,9 +52,9 @@ export function setupIntegrationDb() {
     await seedAuditRecords()
   }, MONGO_BOOT_TIMEOUT_MS)
 
-  // Match boot's timeout so a slow stop() isn't cut short by Jest's default 5s hook timeout
   // eslint-disable-next-line no-undef
   afterAll(async () => {
+    await client.close()
     await mongod?.stop()
-  }, MONGO_BOOT_TIMEOUT_MS)
+  })
 }

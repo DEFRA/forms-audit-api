@@ -40,9 +40,6 @@ describe('Full process', () => {
       jest.mocked(getJsonFromSubmissions).mockResolvedValueOnce({ body: data })
     )
 
-    // Wait for 15 secs to ensure mongo download has finished
-    await new Promise((resolve) => setTimeout(resolve, 15000))
-
     const expectedFeatures = {
       questionTypes: {
         DeclarationField: 1
