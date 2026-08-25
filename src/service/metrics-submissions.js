@@ -6,6 +6,10 @@ import { client } from '~/src/mongo.js'
 import { getAllTimelineMetrics } from '~/src/repositories/metrics-repository.js'
 
 const YEAR_MONTH_FORMAT = 'yyyy-MM'
+const UK_TIMEZONE = 'Europe/London'
+const MM = 'MM'
+const YYYY = 'yyyy'
+const MONTHS_IN_A_YEAR = 12
 
 /**
  * @typedef {Map<string, number>} FormsMap
@@ -22,7 +26,7 @@ function lpadMonth(monthNum) {
 
 /**
  * Generates a report of submissions each month per form
- * @param {Date} earliestDate - earliest date to build submissions counts
+ * @param {Date} earliestDate - earliest date to build submissions count month/year buckets
  */
 export async function generateSubmissionsReport(earliestDate) {
   const session = client.startSession()
@@ -34,15 +38,17 @@ export async function generateSubmissionsReport(earliestDate) {
   // Operate in UK timezone to avoid inaccuracies in month/year placeholders
   const yesterday = addDays(new Date(), -1)
 
-  let currentMonth = parseInt(
-    formatInTimeZone(earliestDate, 'Europe/London', 'MM')
+  let currentMonth = Number.parseInt(
+    formatInTimeZone(earliestDate, UK_TIMEZONE, MM)
   )
-  let currentYear = parseInt(
-    formatInTimeZone(earliestDate, 'Europe/London', 'yyyy')
+  let currentYear = Number.parseInt(
+    formatInTimeZone(earliestDate, UK_TIMEZONE, YYYY)
   )
 
-  const endMonth = parseInt(formatInTimeZone(yesterday, 'Europe/London', 'MM'))
-  const endYear = parseInt(formatInTimeZone(yesterday, 'Europe/London', 'yyyy'))
+  const endMonth = Number.parseInt(formatInTimeZone(yesterday, UK_TIMEZONE, MM))
+  const endYear = Number.parseInt(
+    formatInTimeZone(yesterday, UK_TIMEZONE, YYYY)
+  )
 
   const endMonthYearStr = `${endYear}-${lpadMonth(endMonth)}`
 
@@ -53,14 +59,16 @@ export async function generateSubmissionsReport(earliestDate) {
     currentMonthYearStr = `${currentYear}-${lpadMonth(currentMonth)}`
     submissionsMap.set(currentMonthYearStr, /** @type {FormsMap} */ (new Map()))
     currentMonth++
-    if (currentMonth > 12) {
+    if (currentMonth > MONTHS_IN_A_YEAR) {
       currentYear++
       currentMonth = 1
     }
-  } while (currentMonthYearStr < endMonthYearStr)
+  } while (currentMonthYearStr.localeCompare(endMonthYearStr) < 0)
 
   try {
     // Live metrics only, and ignore any metrics from other languages otherwise we'll double-count
+    // We don't need to filter on 'earliestDate' as that was purely for constructing the month/year buckets.
+    // All records of type 'Submissions' will be read here.
     const timelineCursor = getAllTimelineMetrics(
       {
         metricName: FormMetricName.Submissions,
@@ -96,5 +104,5 @@ export async function generateSubmissionsReport(earliestDate) {
  * @param {Date} date
  */
 function formatAsYearMonthUK(date) {
-  return formatInTimeZone(date, 'Europe/London', YEAR_MONTH_FORMAT)
+  return formatInTimeZone(date, UK_TIMEZONE, YEAR_MONTH_FORMAT)
 }
