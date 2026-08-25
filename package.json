@@ -107,6 +107,7 @@
     "@defra/cdp-auditing": true,
     "@defra/hapi-tracing": true,
     "esbuild": true,
+    "mongodb-memory-server": true,
     "unrs-resolver": true
   }
 }
