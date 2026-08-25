@@ -23,6 +23,7 @@ import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repositor
 import {
   getFirstDraft,
   getLanguageFilter,
+  getLanguageNoPropertyFilter,
   isFirstPublish
 } from '~/src/repositories/metrics-repository-helper.js'
 import {
@@ -71,7 +72,7 @@ import {
 const managerUrl = config.get('managerUrl')
 const submissionUrl = config.get('submissionUrl')
 
-const EARLIEST_REPORT_DATE_AS_STRING = '2025-07-01'
+export const EARLIEST_REPORT_DATE_AS_STRING = '2025-07-01'
 const METRICS_FORM_BATCH_SIZE = 20
 
 /**
@@ -435,7 +436,7 @@ export async function recalcMetrics(reportingDate, language, session, formId) {
 
   const metricCursor = formId
     ? getFormTimelineMetricsCursor(formId, language, session)
-    : getAllTimelineMetrics(language, session)
+    : getAllTimelineMetrics(getLanguageNoPropertyFilter(language), session)
 
   for await (const metric of metricCursor) {
     // FormsInDraft needs special attention since the cursor will return values from 'all' and other languages (e.g. Welsh),

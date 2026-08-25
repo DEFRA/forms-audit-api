@@ -3,7 +3,9 @@ import Joi from 'joi'
 
 import { WELSH } from '~/src/constants.js'
 import { runMetricsCollectionJob } from '~/src/service/metrics-job.js'
+import { generateSubmissionsReport } from '~/src/service/metrics-submissions.js'
 import {
+  EARLIEST_REPORT_DATE_AS_STRING,
   clearMetricsDatabase,
   generateDrilldownReport,
   generateReport,
@@ -76,6 +78,30 @@ export default [
       validate: {
         params: paramSchema,
         query: querySchema
+      }
+    }
+  }),
+
+  /**
+   * @satisfies {ServerRoute< { Query: { earliestDate?: Date } }>}
+   */
+  ({
+    method: 'GET',
+    path: '/report-submissions',
+    async handler(request, h) {
+      const { earliestDate } = request.query
+      const metrics = await generateSubmissionsReport(
+        earliestDate ?? new Date(EARLIEST_REPORT_DATE_AS_STRING)
+      )
+
+      return h.response(metrics).code(HTTP_OK)
+    },
+    options: {
+      auth: false,
+      validate: {
+        query: Joi.object({
+          earliestDate: Joi.date().optional()
+        })
       }
     }
   }),
