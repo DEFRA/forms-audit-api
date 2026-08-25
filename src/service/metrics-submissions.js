@@ -73,7 +73,6 @@ export async function generateSubmissionsReport(earliestDate) {
       {
         metricName: FormMetricName.Submissions,
         formStatus: FormStatus.Live,
-        createdAt: { $gte: earliestDate },
         language: { $exists: false }
       },
       session
