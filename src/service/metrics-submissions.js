@@ -26,7 +26,7 @@ function lpadMonth(monthNum) {
 
 /**
  * Generates a report of submissions each month per form
- * @param {Date} earliestDate - earliest date to build submissions counts
+ * @param {Date} earliestDate - earliest date to build submissions count month/year buckets
  */
 export async function generateSubmissionsReport(earliestDate) {
   const session = client.startSession()
@@ -67,11 +67,12 @@ export async function generateSubmissionsReport(earliestDate) {
 
   try {
     // Live metrics only, and ignore any metrics from other languages otherwise we'll double-count
+    // We don't need to filter on 'earliestDate' as that was purely for constructing the month/year buckets.
+    // All records of type 'Submissions' will be read here.
     const timelineCursor = getAllTimelineMetrics(
       {
         metricName: FormMetricName.Submissions,
         formStatus: FormStatus.Live,
-        createdAt: { $gte: earliestDate },
         language: { $exists: false }
       },
       session
