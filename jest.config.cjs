@@ -8,6 +8,7 @@ module.exports = {
   verbose: true,
   restoreMocks: true,
   clearMocks: true,
+  resetMocks: true,
   silent: true,
   testMatch: ['<rootDir>/src/**/*.test.{cjs,js,mjs}'],
   reporters: CI

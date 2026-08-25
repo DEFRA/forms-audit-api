@@ -634,8 +634,12 @@ describe('runMetricsCollectionJob', () => {
         }
       }
 
-      // @ts-expect-error - resolves to an async iterator like FindCursor<FormSubmissionDocument>
-      jest.mocked(getAllTimelineMetrics).mockReturnValueOnce(mockAsyncIterator)
+      jest
+        .mocked(getAllTimelineMetrics)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<FormSubmissionDocument>
+        .mockReturnValueOnce(mockAsyncIterator)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<FormSubmissionDocument>
+        .mockReturnValueOnce(mockAsyncIterator)
 
       const totals = await recalcMetrics(
         new Date('2026-01-01'),
