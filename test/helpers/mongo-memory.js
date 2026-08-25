@@ -42,19 +42,19 @@ export async function startMongoMemoryServer() {
  * the suite
  */
 export function setupIntegrationDb() {
-  // /** @type {MongoMemoryReplSet} */
-  // let mongod
+  /** @type {MongoMemoryReplSet | undefined} */
+  let mongod
 
   // eslint-disable-next-line no-undef
   beforeAll(async () => {
-    await startMongoMemoryServer()
+    mongod = await startMongoMemoryServer()
     await prepareDb(/** @type {never} */ ({ info: () => undefined }))
     await seedAuditRecords()
   }, MONGO_BOOT_TIMEOUT_MS)
 
+  // Match boot's timeout so a slow stop() isn't cut short by Jest's default 5s hook timeout
   // eslint-disable-next-line no-undef
   afterAll(async () => {
-    // await client.close()
-    // await mongod.stop()
-  })
+    await mongod?.stop()
+  }, MONGO_BOOT_TIMEOUT_MS)
 }

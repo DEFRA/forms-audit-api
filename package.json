@@ -103,6 +103,11 @@
     "node": "^24.19.0",
     "npm": "^11.17.0 || >=12.0.2"
   },
+  "config": {
+    "mongodbMemoryServer": {
+      "version": "6.0.14"
+    }
+  },
   "allowScripts": {
     "@defra/cdp-auditing": true,
     "@defra/hapi-tracing": true,
