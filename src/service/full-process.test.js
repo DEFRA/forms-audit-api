@@ -1,9 +1,9 @@
-// import { logger } from '~/src/helpers/logging/logger.js'
 import {
   getJsonFromManager,
   getJsonFromSubmissions
 } from '~/src/service/metrics-call-wrapper.js'
 import { runMetricsCollectionJob } from '~/src/service/metrics-job.js'
+import { generateSubmissionsReport } from '~/src/service/metrics-submissions.js'
 import { clearMetricsDatabase, generateReport } from '~/src/service/metrics.js'
 import {
   buildMockManagerData,
@@ -70,6 +70,18 @@ describe('Full process', () => {
 
     // Read back the metrics report and compare the results
     const metrics = await generateReport({})
+
+    expect(metrics.totals.earliestDate).toEqual(
+      new Date('2026-07-18T12:00:00.000Z')
+    )
+
+    // Read back the form submissions per month and compare the results
+    // Start creating the month buckets from June even though this is earlier than the actual earliest date
+    // in thiese tests
+    const formSubmissionsPerMonth = await generateSubmissionsReport(
+      new Date('2026-06-10T12:00:00.000Z')
+    )
+
     expect(metrics.totals.allTime).toEqual({
       FormsFirstPublished: {
         count: 2
@@ -205,9 +217,6 @@ describe('Full process', () => {
       'form-id-1': 8,
       'form-id-welsh': 19
     })
-    expect(metrics.totals.earliestDate).toEqual(
-      new Date('2026-07-18T12:00:00.000Z')
-    )
     expect(metrics.totals.liveSubmissions).toEqual({
       'form-id-1': 8,
       'form-id-welsh': 5
@@ -217,5 +226,12 @@ describe('Full process', () => {
       'form-id-2': 3,
       'form-id-welsh': 1
     })
+
+    expect(formSubmissionsPerMonth['2026-06']).toEqual({})
+    expect(formSubmissionsPerMonth['2026-07']).toEqual({
+      'form-id-1': 8,
+      'form-id-welsh': 5
+    })
+    expect(formSubmissionsPerMonth['2026-08']).toEqual({})
   }, 30_000)
 })
