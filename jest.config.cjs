@@ -6,10 +6,9 @@ const { CI } = process.env
  */
 module.exports = {
   verbose: true,
-  resetMocks: true,
-  resetModules: true,
   restoreMocks: true,
   clearMocks: true,
+  resetMocks: true,
   silent: true,
   testMatch: ['<rootDir>/src/**/*.test.{cjs,js,mjs}'],
   reporters: CI

@@ -2,29 +2,32 @@
 
 Core delivery platform Node.js Backend Template.
 
-- [Requirements](#requirements)
-  - [Node.js](#nodejs)
-- [Local development](#local-development)
-  - [Setup](#setup)
-  - [Development](#development)
-  - [Testing](#testing)
-  - [Production](#production)
-  - [Npm scripts](#npm-scripts)
-  - [Update dependencies](#update-dependencies)
-  - [Formatting](#formatting)
-    - [Windows prettier issue](#windows-prettier-issue)
-- [API endpoints](#api-endpoints)
-- [Development helpers](#development-helpers)
-  - [MongoDB Locks](#mongodb-locks)
-  - [Proxy](#proxy)
-- [Docker](#docker)
-  - [Development image](#development-image)
-  - [Production image](#production-image)
-  - [Docker Compose](#docker-compose)
-  - [Dependabot](#dependabot)
-  - [SonarCloud](#sonarcloud)
-- [Licence](#licence)
-  - [About the licence](#about-the-licence)
+- [forms-audit-api](#forms-audit-api)
+  - [Requirements](#requirements)
+    - [Node.js](#nodejs)
+  - [Local development](#local-development)
+    - [Setup](#setup)
+    - [Development](#development)
+    - [Testing](#testing)
+    - [Production](#production)
+    - [Notes on SQS queue configuration](#notes-on-sqs-queue-configuration)
+      - [Queue configuration in forms-audit-api](#queue-configuration-in-forms-audit-api)
+    - [Npm scripts](#npm-scripts)
+    - [Update dependencies](#update-dependencies)
+    - [Formatting](#formatting)
+      - [Windows prettier issue](#windows-prettier-issue)
+  - [API endpoints](#api-endpoints)
+  - [Development helpers](#development-helpers)
+    - [MongoDB Locks](#mongodb-locks)
+    - [Proxy](#proxy)
+  - [Docker](#docker)
+    - [Development image](#development-image)
+    - [Production image](#production-image)
+    - [Docker Compose](#docker-compose)
+    - [Dependabot](#dependabot)
+    - [SonarCloud](#sonarcloud)
+  - [Licence](#licence)
+    - [About the licence](#about-the-licence)
 
 ## Requirements
 
@@ -92,6 +95,8 @@ To test the application run:
 ```bash
 npm run test
 ```
+
+The unit tests include a full end-to-end metrics calculation test using an in-memory mongo database.
 
 ### Production
 

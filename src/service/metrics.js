@@ -17,7 +17,6 @@ import {
 import { config } from '~/src/config/index.js'
 import { WELSH } from '~/src/constants.js'
 import { logger } from '~/src/helpers/logging/logger.js'
-import { getJson } from '~/src/lib/fetch.js'
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
 import {
@@ -39,6 +38,10 @@ import {
   saveFormTimelineMetrics,
   updateMetricTotals
 } from '~/src/repositories/metrics-repository.js'
+import {
+  getJsonFromManager,
+  getJsonFromSubmissions
+} from '~/src/service/metrics-call-wrapper.js'
 import {
   createFormMap,
   dateFallsInsideTimeslot,
@@ -248,7 +251,7 @@ export async function getOverviewMetricsForForms(page, perPage) {
     `${managerUrl}/report/overview?page=${page}&perPage=${perPage}`
   )
 
-  const { body } = await getJson(requestUrl, {})
+  const { body } = await getJsonFromManager(requestUrl)
 
   return /** @type {{ data: { draft: FormOverviewMetric | undefined, live: FormOverviewMetric | undefined}[], totalItems: number, filters: FilterOptions }} */ (
     body
@@ -269,11 +272,10 @@ export async function collectTimelineMetrics(
   session
 ) {
   const languageParam = language ? `&language=${language}` : ''
-  const { body } = await getJson(
+  const { body } = await getJsonFromSubmissions(
     new URL(
       `${baseUrl}/report/timeline?date=${reportingDate.toISOString()}${languageParam}`
-    ),
-    {}
+    )
   )
   const metricsArray = /** @type {{ timeline: FormTimelineMetric[] }} */ (body)
 
