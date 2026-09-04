@@ -20,10 +20,10 @@ jobs:
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Cache dependencies
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         id: npm-install-cache
         with:
           enableCrossOsArchive: true
@@ -31,14 +31,14 @@ jobs:
           path: node_modules
 
       - name: Cache build
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           enableCrossOsArchive: true
           key: npm-build-${{ runner.os }}-${{ github.sha }}
           path: .server
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
 
@@ -85,10 +85,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Restore dependencies
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           enableCrossOsArchive: true
           fail-on-cache-miss: true
@@ -97,14 +97,14 @@ jobs:
 
       - name: Cache task
         if: ${{ matrix.task.cache }}
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           enableCrossOsArchive: true
           key: ${{ matrix.task.name }}-${{ runner.os }}
           path: ${{ matrix.task.cache }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
 
@@ -130,10 +130,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Restore dependencies
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           enableCrossOsArchive: true
           fail-on-cache-miss: true
@@ -141,7 +141,7 @@ jobs:
           path: node_modules
 
       - name: Restore build
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           enableCrossOsArchive: true
           fail-on-cache-miss: true
@@ -149,13 +149,13 @@ jobs:
           path: .server
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
 
       - name: Cache task
         if: ${{ matrix.task.cache }}
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           enableCrossOsArchive: true
           key: ${{ matrix.task.name }}-${{ runner.os }}-${{ github.sha }}
@@ -165,7 +165,7 @@ jobs:
       # mongod binary on first use. The version in the key follows
       # MONGO_VERSION in test/helpers/mongo-memory.js
       - name: Cache MongoDB binary
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           key: mongodb-binaries-${{ runner.os }}-6.0.14
           path: ~/.cache/mongodb-binaries
@@ -189,12 +189,12 @@ jobs:
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Restore unit test coverage
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           enableCrossOsArchive: true
           fail-on-cache-miss: true
