@@ -42,7 +42,8 @@ module.exports = {
       'nanoid', // Supports ESM only
       'slug', // Supports ESM only
       '@defra/hapi-tracing', // Supports ESM only,
-      '@defra/cdp-auditing' // Supports ESM only
+      '@defra/cdp-auditing', // Supports ESM only
+      '@joi/date' // Supports ESM only
     ].join('|')}/)`
   ]
 }
