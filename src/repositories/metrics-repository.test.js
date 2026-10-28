@@ -152,11 +152,16 @@ describe('metrics-repository', () => {
       ...baseOverviewDoc
     })
     it('should save doc', async () => {
-      mockCollection.updateOne.mockResolvedValueOnce({})
+      mockCollection.replaceOne.mockResolvedValueOnce({})
 
       await saveFormOverviewMetrics(formId, FormStatus.Draft, doc, mockSession)
 
-      expect(mockCollection.insertOne).toHaveBeenCalledWith(
+      expect(mockCollection.replaceOne).toHaveBeenCalledWith(
+        {
+          type: 'overview-metric',
+          formId: '3d29fb0b-c1bd-4ec8-a0d3-4c024347f1ef',
+          formStatus: 'draft'
+        },
         {
           featureMetrics: {},
           formId: '3d29fb0b-c1bd-4ec8-a0d3-4c024347f1ef',
@@ -167,13 +172,14 @@ describe('metrics-repository', () => {
           updatedAt: new Date('2026-02-01T00:00:00.000Z')
         },
         {
-          session: {}
+          session: {},
+          upsert: true
         }
       )
     })
 
     it('should throw if error', async () => {
-      mockCollection.insertOne.mockImplementationOnce(() => {
+      mockCollection.replaceOne.mockImplementationOnce(() => {
         throw new Error('db error')
       })
 

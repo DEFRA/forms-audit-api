@@ -72,12 +72,18 @@ export async function saveFormOverviewMetrics(
   const coll = getMetricCollection()
 
   try {
-    await coll.insertOne(
+    // Upsert so a form returned more than once by the paged overview report is stored only once
+    await coll.replaceOne(
+      {
+        type: FormMetricType.OverviewMetric,
+        formId,
+        formStatus
+      },
       {
         ...metricData,
         formStatus
       },
-      { session }
+      { session, upsert: true }
     )
   } catch (err) {
     logger.error(
