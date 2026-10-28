@@ -79,10 +79,10 @@ export async function saveFormOverviewMetrics(
         formId,
         formStatus
       },
-      {
+      /** @type {WithoutId<FormOverviewMetric>} */ ({
         ...metricData,
         formStatus
-      },
+      }),
       { session, upsert: true }
     )
   } catch (err) {
@@ -629,7 +629,7 @@ export async function clearMetricsData(session) {
 }
 
 /**
- * @import { ClientSession, Collection, Filter, FindCursor, WithId } from 'mongodb'
+ * @import { ClientSession, Collection, Filter, FindCursor, WithId, WithoutId } from 'mongodb'
  * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FormDrilldownMetric } from '@defra/forms-model'
  * @import { FilterCriteria, FormMetricControl } from '~/src/service/metrics.js'
  */
