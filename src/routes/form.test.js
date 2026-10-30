@@ -9,7 +9,14 @@ import {
 
 jest.mock('~/src/mongo.js')
 jest.mock('~/src/service/events.js')
-jest.mock('~/src/helpers/logging/logger.js')
+jest.mock('~/src/helpers/logging/logger.js', () => ({
+  logger: {
+    debug: jest.fn(),
+    error: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn()
+  }
+}))
 jest.mock('~/src/tasks/receive-messages.js')
 jest.mock('~/src/plugins/audit-cache.js')
 

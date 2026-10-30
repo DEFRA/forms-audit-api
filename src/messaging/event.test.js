@@ -5,6 +5,7 @@ import {
   SendMessageCommand,
   StartMessageMoveTaskCommand
 } from '@aws-sdk/client-sqs'
+import { createLogContext, runWithLogContext } from '@defra/forms-common'
 import { mockClient } from 'aws-sdk-client-mock'
 
 import 'aws-sdk-client-mock-jest'
@@ -46,6 +47,9 @@ describe('event', () => {
       }
       snsMock.on(ReceiveMessageCommand).resolves(receivedMessage)
       await expect(receiveEventMessages()).resolves.toEqual(receivedMessage)
+      expect(snsMock).toHaveReceivedCommandWith(ReceiveMessageCommand, {
+        MessageAttributeNames: ['All']
+      })
     })
   })
 
@@ -169,20 +173,58 @@ describe('event', () => {
   })
 
   describe('resubmitDlqMessage', () => {
-    it('should resubmit message to main queue', async () => {
+    const messageAttributes = {
+      correlationId: { DataType: 'String', StringValue: 'correlation-id' },
+      sessionId: { DataType: 'String', StringValue: 'session-id' }
+    }
+
+    it('should resubmit message to main queue with the attributes of the original message', async () => {
       const sendMessage = {
         MessageId: '12345'
       }
 
+      snsMock.on(ReceiveMessageCommand).resolves({
+        Messages: [{ ...messageStub, MessageAttributes: messageAttributes }]
+      })
       snsMock.on(SendMessageCommand).resolves(sendMessage)
       await resubmitDlqMessage(messageStub.MessageId, messageStub.Body)
+      expect(snsMock).toHaveReceivedCommandWith(ReceiveMessageCommand, {
+        VisibilityTimeout: 0,
+        MessageAttributeNames: ['All']
+      })
       expect(snsMock).toHaveReceivedCommandWith(SendMessageCommand, {
         QueueUrl: expect.any(String),
-        MessageBody: messageStub.Body
+        MessageBody: messageStub.Body,
+        MessageAttributes: messageAttributes
+      })
+    })
+
+    it('should use the current log context when the original message is not found', async () => {
+      jest.useFakeTimers()
+
+      snsMock.on(ReceiveMessageCommand).resolves({ Messages: [] })
+      snsMock.on(SendMessageCommand).resolves({ MessageId: '12345' })
+
+      const resubmit = runWithLogContext(
+        createLogContext({ correlationId: 'correlation-id' }),
+        () => resubmitDlqMessage(messageStub.MessageId, messageStub.Body)
+      )
+
+      await jest.runAllTimersAsync()
+      await resubmit
+
+      jest.useRealTimers()
+
+      expect(snsMock).toHaveReceivedCommandWith(SendMessageCommand, {
+        MessageBody: messageStub.Body,
+        MessageAttributes: {
+          correlationId: { DataType: 'String', StringValue: 'correlation-id' }
+        }
       })
     })
 
     it('should throw if resubmit fails', async () => {
+      snsMock.on(ReceiveMessageCommand).resolves({ Messages: [messageStub] })
       snsMock.on(SendMessageCommand).rejects('bad SQS command')
       await expect(() =>
         resubmitDlqMessage(messageStub.MessageId, messageStub.Body)
