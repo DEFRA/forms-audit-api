@@ -72,12 +72,18 @@ export async function saveFormOverviewMetrics(
   const coll = getMetricCollection()
 
   try {
-    await coll.insertOne(
+    // Upsert so a form returned more than once by the paged overview report is stored only once
+    await coll.replaceOne(
       {
-        ...metricData,
+        type: FormMetricType.OverviewMetric,
+        formId,
         formStatus
       },
-      { session }
+      /** @type {WithoutId<FormOverviewMetric>} */ ({
+        ...metricData,
+        formStatus
+      }),
+      { session, upsert: true }
     )
   } catch (err) {
     logger.error(
@@ -623,7 +629,7 @@ export async function clearMetricsData(session) {
 }
 
 /**
- * @import { ClientSession, Collection, Filter, FindCursor, WithId } from 'mongodb'
+ * @import { ClientSession, Collection, Filter, FindCursor, WithId, WithoutId } from 'mongodb'
  * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FormDrilldownMetric } from '@defra/forms-model'
  * @import { FilterCriteria, FormMetricControl } from '~/src/service/metrics.js'
  */
