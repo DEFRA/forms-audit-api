@@ -20,6 +20,18 @@ export function applyTraceHeaders(headers) {
   return applyTraceHeader(headers, tracingHeader)
 }
 
+const entitlementUrl = config.get('entitlementUrl')
+
+/**
+ * The origin of Forms Entitlements. The session ID and form reference number are
+ * only sent to this service.
+ * @type {string | undefined}
+ */
+const entitlementOrigin =
+  entitlementUrl && URL.canParse(entitlementUrl)
+    ? new URL(entitlementUrl).origin
+    : undefined
+
 /**
  * Adds the session ID and form reference number of the current log context to
  * the headers of an outbound HTTP request, when the request is to another
@@ -30,9 +42,7 @@ export function applyTraceHeaders(headers) {
  * @returns {Headers | undefined}
  */
 export function applyLogContextHeaders(url, headers) {
-  const entitlementUrl = config.get('entitlementUrl')
-
-  if (!entitlementUrl || url.origin !== new URL(entitlementUrl).origin) {
+  if (url.origin !== entitlementOrigin) {
     return headers
   }
 
