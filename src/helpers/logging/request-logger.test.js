@@ -24,9 +24,7 @@ describe('request-logger', () => {
         },
         20
       )
-    ).toBe(
-      '[response] [9c145f66-0ce8-435f-a6aa-f1f0041baebc]  GET /audit/forms/12121212 200 (20ms)'
-    )
+    ).toBe('[response] GET /audit/forms/12121212 200 (20ms)')
   })
 
   it('should log requests 2', () => {

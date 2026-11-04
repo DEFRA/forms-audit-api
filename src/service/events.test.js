@@ -1,5 +1,6 @@
 // @ts-expect-error - no types available for '@defra/cdp-auditing'
 import { audit } from '@defra/cdp-auditing'
+import { getCorrelationId, getSessionId } from '@defra/forms-common'
 import {
   AuditEventMessageCategory,
   AuditEventMessageSource,
@@ -430,6 +431,40 @@ describe('events', () => {
       })
 
       expect(audit).toHaveBeenCalledTimes(1)
+    })
+
+    it('should process each message in the log context of the message', async () => {
+      /** @type {{ correlationId?: string, sessionId?: string }[]} */
+      const contexts = []
+
+      jest.mocked(auditRecord.createAuditRecord).mockImplementation(() => {
+        contexts.push({
+          correlationId: getCorrelationId(),
+          sessionId: getSessionId()
+        })
+        return Promise.resolve(/** @type {any} */ (undefined))
+      })
+
+      await createAuditEvents([
+        {
+          ...message1,
+          MessageAttributes: {
+            correlationId: { DataType: 'String', StringValue: 'correlation-1' },
+            sessionId: { DataType: 'String', StringValue: 'session-1' }
+          }
+        },
+        {
+          ...message2,
+          MessageAttributes: {
+            correlationId: { DataType: 'String', StringValue: 'correlation-2' }
+          }
+        }
+      ])
+
+      expect(contexts).toEqual([
+        { correlationId: 'correlation-1', sessionId: 'session-1' },
+        { correlationId: 'correlation-2', sessionId: undefined }
+      ])
     })
 
     it('should invalidate cache after successful transaction', async () => {

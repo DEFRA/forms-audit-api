@@ -6,7 +6,14 @@ import { createAuditEvents } from '~/src/service/events.js'
 import { runTask, runTaskOnce } from '~/src/tasks/receive-messages.js'
 jest.mock('~/src/messaging/event.js')
 jest.mock('~/src/service/events.js')
-jest.mock('~/src/helpers/logging/logger.js')
+jest.mock('~/src/helpers/logging/logger.js', () => ({
+  logger: {
+    debug: jest.fn(),
+    error: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn()
+  }
+}))
 
 describe('receive-messages', () => {
   const message = /** @type {Message} */ ({

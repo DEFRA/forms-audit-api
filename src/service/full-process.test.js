@@ -12,7 +12,14 @@ import {
 import { setupIntegrationDb } from '~/test/helpers/mongo-memory.js'
 import { seedMetricsRecords } from '~/test/helpers/seed-audit-records.js'
 
-jest.mock('~/src/helpers/logging/logger.js')
+jest.mock('~/src/helpers/logging/logger.js', () => ({
+  logger: {
+    debug: jest.fn(),
+    error: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn()
+  }
+}))
 jest.mock('~/src/service/metrics-call-wrapper.js')
 
 setupIntegrationDb()

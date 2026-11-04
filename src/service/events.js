@@ -1,5 +1,6 @@
 // @ts-expect-error - no types available for '@defra/cdp-auditing'
 import { audit } from '@defra/cdp-auditing'
+import { runWithMessageLogContext } from '@defra/forms-common'
 import { messageSchema } from '@defra/forms-model'
 import Joi from 'joi'
 
@@ -125,7 +126,11 @@ export async function createAuditEvents(messages) {
     }
   }
 
-  const results = await Promise.allSettled(messages.map(createAuditEvent))
+  const results = await Promise.allSettled(
+    messages.map((message) =>
+      runWithMessageLogContext(message, () => createAuditEvent(message))
+    )
+  )
 
   const saved = results
     .filter((result) => result.status === 'fulfilled')

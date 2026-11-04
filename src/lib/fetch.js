@@ -1,6 +1,11 @@
 import Boom from '@hapi/boom'
 import Wreck from '@hapi/wreck'
 
+import {
+  applyLogContextHeaders,
+  applyTraceHeaders
+} from '~/src/helpers/request-tracing.js'
+
 const MIN_OK_STATUS = 200
 const MAX_OK_STATUS = 299
 
@@ -12,6 +17,17 @@ const MAX_OK_STATUS = 299
  * @returns {Promise<{response: object, body: any}>}
  */
 export async function request(method, url, options) {
+  const headers = applyLogContextHeaders(
+    url,
+    applyTraceHeaders(
+      /** @type {{ headers?: Record<string, string> }} */ (options).headers
+    )
+  )
+
+  if (headers) {
+    options = { ...options, headers }
+  }
+
   const response = await Wreck.request(method, url.href, options)
   const body = await Wreck.read(response, options)
   const statusCode = response.statusCode
