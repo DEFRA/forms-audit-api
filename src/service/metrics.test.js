@@ -6,19 +6,21 @@ import { getJson } from '~/src/lib/fetch.js'
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
 import {
+  clearMetricsData,
+  grabLock,
+  releaseLock
+} from '~/src/repositories/metrics-job-repository.js'
+import {
   getFirstDraft,
   isFirstPublish
 } from '~/src/repositories/metrics-repository-helper.js'
 import {
-  clearMetricsData,
   getAllOverviewMetrics,
   getAllTimelineMetrics,
   getDrilldownRecords,
   getFormTimelineMetricsCursor,
   getMetricTotals,
   getNumberOfFormsInDraft,
-  grabLock,
-  releaseLock,
   saveFormOverviewMetrics,
   saveFormTimelineMetrics
 } from '~/src/repositories/metrics-repository.js'
@@ -39,11 +41,14 @@ import {
   generateReport,
   generateReportForForm,
   getOverviewMetricsForForms,
-  recalcMetrics
+  recalcFormMetrics
 } from '~/src/service/metrics.js'
 
 jest.mock('~/src/lib/fetch.js')
 jest.mock('~/src/repositories/metrics-repository.js')
+jest.mock('~/src/repositories/metrics-job-repository.js')
+jest.mock('~/src/repositories/metrics-repository.js')
+jest.mock('~/src/repositories/metrics-func-area-repository.js')
 jest.mock('~/src/repositories/metrics-repository-helper.js')
 jest.mock('~/src/repositories/audit-record-repository.js')
 
@@ -641,7 +646,7 @@ describe('runMetricsCollectionJob', () => {
         // @ts-expect-error - resolves to an async iterator like FindCursor<FormSubmissionDocument>
         .mockReturnValueOnce(mockAsyncIterator)
 
-      const totals = await recalcMetrics(
+      const totals = await recalcFormMetrics(
         new Date('2026-01-01'),
         undefined,
         mockSession
@@ -1150,6 +1155,10 @@ describe('runMetricsCollectionJob', () => {
           }
         }
       }
+      jest
+        .mocked(getAuditRecordsOfType)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValue(mockAsyncIteratorBlankSet)
 
       jest
         .mocked(getAllTimelineMetrics)
@@ -1157,6 +1166,8 @@ describe('runMetricsCollectionJob', () => {
         .mockReturnValueOnce(mockAsyncIteratorBlankSet)
         // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
         .mockReturnValueOnce(mockAsyncIteratorBlankSet)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValue(mockAsyncIteratorBlankSet)
 
       const res = await collectMetrics(
         currentRunDate,
@@ -1181,7 +1192,7 @@ describe('runMetricsCollectionJob', () => {
       expect(calls[2][0].href).toBe(
         'http://localhost:3002/report/timeline?date=2026-05-12T15:56:04.364Z&language=cy'
       )
-      expect(getAuditRecordsOfType).toHaveBeenCalledTimes(4)
+      expect(getAuditRecordsOfType).toHaveBeenCalledTimes(11)
       expect(getAuditRecordsOfType).toHaveBeenNthCalledWith(
         1,
         'FORM_CREATED',
@@ -1196,6 +1207,13 @@ describe('runMetricsCollectionJob', () => {
         undefined,
         expect.anything(),
         { createdAt: 1 } // Overrides sort option
+      )
+      expect(getAuditRecordsOfType).toHaveBeenNthCalledWith(
+        5,
+        'IDENTITY_REGISTRATION',
+        new Date('2026-05-12T15:56:04.364Z'),
+        undefined,
+        expect.anything()
       )
       expect(getAuditRecordsOfType).toHaveBeenNthCalledWith(
         3,
@@ -1275,6 +1293,10 @@ describe('runMetricsCollectionJob', () => {
           }
         }
       }
+      jest
+        .mocked(getAuditRecordsOfType)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValue(mockAsyncIteratorBlankSet)
 
       jest
         .mocked(getAllTimelineMetrics)
@@ -1286,6 +1308,8 @@ describe('runMetricsCollectionJob', () => {
         .mockReturnValueOnce(mockAsyncIteratorBlankSet)
         // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
         .mockReturnValueOnce(mockAsyncIteratorBlankSet)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValue(mockAsyncIteratorBlankSet)
 
       const res = await collectMetrics(
         currentRunDate,

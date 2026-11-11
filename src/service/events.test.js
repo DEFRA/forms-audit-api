@@ -6,7 +6,6 @@ import {
   AuditEventMessageSource,
   AuditEventMessageType
 } from '@defra/forms-model'
-import { ValidationError } from 'joi'
 import { ObjectId } from 'mongodb'
 import { pino } from 'pino'
 
@@ -178,8 +177,64 @@ describe('events', () => {
       })
 
       expect(() => mapAuditEvent(auditEventMessage)).toThrow(
-        new ValidationError('"createdAt" is required', [], auditEventMessage)
+        '"createdAt" is required'
       )
+    })
+
+    it.each([
+      AuditEventMessageType.IDENTITY_SIGN_IN_SUCCESSFUL,
+      AuditEventMessageType.IDENTITY_SIGN_OUT,
+      AuditEventMessageType.IDENTITY_REGISTRATION,
+      AuditEventMessageType.IDENTITY_TOO_MANY_OTPS_REQUESTED,
+      AuditEventMessageType.IDENTITY_INCORRECT_CODE_ENTERED,
+      AuditEventMessageType.IDENTITY_INCORRECT_CODE_LOCKOUT,
+      AuditEventMessageType.IDENTITY_ACCOUNT_DELETION,
+      AuditEventMessageType.IDENTITY_EMAIL_ADDRESS_UPDATED,
+      AuditEventMessageType.IDENTITY_PHONE_NUMBER_UPDATED
+    ])('should map identity audit event %s', (type) => {
+      const createdAt = new Date('2026-05-01T10:00:00.000Z')
+      const identityMessage = {
+        category: AuditEventMessageCategory.AUTHENTICATION,
+        type,
+        source: AuditEventMessageSource.FORMS_IDENTITY,
+        entityId: 'identity-account-id',
+        schemaVersion: 1,
+        createdAt,
+        messageCreatedAt: createdAt,
+        createdBy: {
+          id: 'identity-user-id',
+          displayName: 'Identity User'
+        },
+        data: {
+          accountId: 'identity-account-id',
+          email: 'user@example.com'
+        }
+      }
+
+      const mapped = mapAuditEvent(
+        buildMessage({
+          MessageId: 'identity-message-id',
+          Body: JSON.stringify(identityMessage)
+        })
+      )
+
+      expect(mapped).toMatchObject({
+        messageId: 'identity-message-id',
+        category: AuditEventMessageCategory.AUTHENTICATION,
+        type,
+        source: AuditEventMessageSource.FORMS_IDENTITY,
+        entityId: 'identity-account-id',
+        createdAt,
+        createdBy: {
+          id: 'identity-user-id',
+          displayName: 'Identity User'
+        },
+        data: {
+          accountId: 'identity-account-id',
+          email: 'user@example.com'
+        }
+      })
+      expect(mapped.recordCreatedAt).toBeInstanceOf(Date)
     })
   })
 

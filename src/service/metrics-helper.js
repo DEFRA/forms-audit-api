@@ -1,5 +1,14 @@
 import { FormMetricName, FormStatus } from '@defra/forms-model'
-import { format } from 'date-fns'
+import {
+  addMilliseconds,
+  endOfDay,
+  format,
+  startOfDay,
+  subDays,
+  subYears
+} from 'date-fns'
+
+import { FOURTEEN_DAYS, SEVEN_DAYS, THIRTY_DAYS } from '~/src/constants.js'
 
 export const CalculationTypes = {
   Accumulation: 'Accumulation',
@@ -9,7 +18,7 @@ export const CalculationTypes = {
 }
 
 export const metricConfig =
-  /** { Record<FormMetricName, { calculationType: string }>} */ {
+  /** @type { Record<FormMetricName, { calculationType: string }> } */ ({
     [FormMetricName.NewFormsCreated]: {
       calculationType: CalculationTypes.AccumulationWithDrilldown
     },
@@ -28,7 +37,7 @@ export const metricConfig =
     [FormMetricName.TimeToPublish]: {
       calculationType: CalculationTypes.Average
     }
-  }
+  })
 
 export const metricDrilldownPeriods = ['last7Days', 'last30Days', 'allTime']
 
@@ -131,6 +140,30 @@ export function handleMetricValue(
 
 /**
  * @param {FormTimelineMetric} metric
+ * @param {Record<string, { count?: number }> | undefined} period
+ * @param {string} metricCalcType
+ * @param {Date} createdAt
+ * @param {Date} startOfSlot
+ * @param {Date} endOfSlot
+ * @param {boolean} [saveDrilldown]
+ */
+export function handleTimeslot(
+  metric,
+  period,
+  metricCalcType,
+  createdAt,
+  startOfSlot,
+  endOfSlot,
+  saveDrilldown
+) {
+  const endOfDaySlot = addMilliseconds(endOfDay(endOfSlot), 1)
+  if (dateFallsInsideTimeslot(createdAt, startOfSlot, endOfDaySlot)) {
+    handleMetricValue(metric, period, metricCalcType, saveDrilldown)
+  }
+}
+
+/**
+ * @param {FormTimelineMetric} metric
  * @param { Record<string, { count?: number, details?: FormTimelineMetric[] }> | undefined } period
  * @param {boolean} [drillDown]
  */
@@ -202,6 +235,22 @@ export function updateMetricAverage(metric, period) {
     period[metricName].avgCount = currentAvgCount + 1
   } else {
     period[metricName] = { avgTotal: metric.metricValue, avgCount: 1 }
+  }
+}
+
+/**
+ * Constructs an object containing various period timeslots based on the reporting date.
+ * @param {Date} reportingDate
+ */
+export function constructPeriodTimeslots(reportingDate) {
+  return {
+    reportMorning: startOfDay(reportingDate),
+    sevenDaysAgo: subDays(startOfDay(reportingDate), SEVEN_DAYS),
+    fourteenDaysAgo: subDays(startOfDay(reportingDate), FOURTEEN_DAYS),
+    thirtyDaysAgo: subDays(startOfDay(reportingDate), THIRTY_DAYS),
+    sixtyDaysAgo: subDays(startOfDay(reportingDate), 60),
+    oneYearAgo: subYears(startOfDay(reportingDate), 1),
+    twoYearsAgo: subYears(startOfDay(reportingDate), 2)
   }
 }
 

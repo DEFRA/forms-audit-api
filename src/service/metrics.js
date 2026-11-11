@@ -3,30 +3,22 @@ import {
   FormMetricName,
   FormStatus
 } from '@defra/forms-model'
-import {
-  add,
-  differenceInDays,
-  endOfDay,
-  min,
-  startOfDay,
-  sub,
-  subDays,
-  subYears
-} from 'date-fns'
+import { add, differenceInDays, min, sub, subDays } from 'date-fns'
 
 import { config } from '~/src/config/index.js'
 import { WELSH } from '~/src/constants.js'
 import { logger } from '~/src/helpers/logging/logger.js'
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
+import { clearMetricsData } from '~/src/repositories/metrics-job-repository.js'
 import {
+  adjustEarliestDate,
+  getAllFormMetricsFilter,
   getFirstDraft,
   getLanguageFilter,
-  getLanguageNoPropertyFilter,
   isFirstPublish
 } from '~/src/repositories/metrics-repository-helper.js'
 import {
-  clearMetricsData,
   deleteFormOverviewMetrics,
   getAllOverviewMetrics,
   getAllTimelineMetrics,
@@ -36,6 +28,7 @@ import {
   getNumberOfFormsInDraft,
   saveFormOverviewMetrics,
   saveFormTimelineMetrics,
+  updateFunctionalAreaMetricTotals,
   updateMetricTotals
 } from '~/src/repositories/metrics-repository.js'
 import {
@@ -43,15 +36,20 @@ import {
   getJsonFromSubmissions
 } from '~/src/service/metrics-call-wrapper.js'
 import {
+  constructPeriodTimeslots,
   createFormMap,
-  dateFallsInsideTimeslot,
   formatDateOnly,
   getMetricCalcType,
   handleMetricValue,
+  handleTimeslot,
   isDraftSubmission,
   isLiveSubmission,
   setTimeOnDate
 } from '~/src/service/metrics-helper.js'
+import {
+  collectSigninMetricsFromAudit,
+  recalcSigninMetrics
+} from '~/src/service/metrics-signin.js'
 
 /**
  * @typedef {object} FilterCriteria
@@ -159,17 +157,31 @@ export async function collectMetrics(
       session
     )
 
+    // Functional areas - currently only sign-in metrics are collected
+    await collectSigninMetricsFromAudit(reportDate, session)
+
     reportDate = add(reportDate, { days: 1 })
   }
 
+  // Form metrics
   const totals = [
     // All languages
-    await recalcMetrics(reportEndDate, undefined, session),
+    await recalcFormMetrics(reportEndDate, undefined, session),
     // Welsh-only
-    await recalcMetrics(reportEndDate, WELSH, session)
+    await recalcFormMetrics(reportEndDate, WELSH, session)
   ]
 
   await updateMetricTotals(reportEndDate, totals, session)
+
+  // Functional areas - currently only sign-in metrics are collected
+  const functionalAreaTotals = [
+    await recalcSigninMetrics(reportEndDate, session)
+  ]
+  await updateFunctionalAreaMetricTotals(
+    reportEndDate,
+    functionalAreaTotals,
+    session
+  )
 
   return {
     success: true,
@@ -407,14 +419,13 @@ export async function collectTimelineMetricsFromAudit(
  * @param {string} [formId] - supplied if calcs are for a specific form
  * @returns {Promise<FormTotalsMetric>}
  */
-export async function recalcMetrics(reportingDate, language, session, formId) {
-  const reportMorning = startOfDay(reportingDate)
-  const sevenDaysAgo = subDays(reportMorning, 7)
-  const fourteenDaysAgo = subDays(reportMorning, 14)
-  const thirtyDaysAgo = subDays(reportMorning, 30)
-  const sixtyDaysAgo = subDays(reportMorning, 60)
-  const oneYearAgo = subYears(reportMorning, 1)
-  const twoYearsAgo = subYears(reportMorning, 2)
+export async function recalcFormMetrics(
+  reportingDate,
+  language,
+  session,
+  formId
+) {
+  const timeslots = constructPeriodTimeslots(reportingDate)
 
   const maps = {
     formSubmissionsMapDraft: /** @type {Map<string, number>} */ (new Map()),
@@ -436,9 +447,7 @@ export async function recalcMetrics(reportingDate, language, session, formId) {
   /** @type { Date | undefined } */
   let earliestDataDate
 
-  const metricCursor = formId
-    ? getFormTimelineMetricsCursor(formId, language, session)
-    : getAllTimelineMetrics(getLanguageNoPropertyFilter(language), session)
+  const metricCursor = getFormMetricsCursor(formId, language, session)
 
   for await (const metric of metricCursor) {
     // FormsInDraft needs special attention since the cursor will return values from 'all' and other languages (e.g. Welsh),
@@ -451,6 +460,7 @@ export async function recalcMetrics(reportingDate, language, session, formId) {
     }
 
     const metricCalcType = getMetricCalcType(metric)
+
     if (metric.metricName === FormMetricName.Submissions) {
       // Live submissions
       handleLiveSubmissions(metric, maps.formSubmissionsMapLive)
@@ -460,9 +470,10 @@ export async function recalcMetrics(reportingDate, language, session, formId) {
 
       // Find earliest submission
       const createdAtSubmission = new Date(metric.createdAt)
-      if (!earliestDataDate || createdAtSubmission < earliestDataDate) {
-        earliestDataDate = createdAtSubmission
-      }
+      earliestDataDate = adjustEarliestDate(
+        earliestDataDate,
+        createdAtSubmission
+      )
     }
 
     if (metric.metricName === FormMetricName.TimeToPublish) {
@@ -480,27 +491,27 @@ export async function recalcMetrics(reportingDate, language, session, formId) {
     const createdAt = new Date(metric.createdAt)
     // Last 7 days
     // prettier-ignore
-    handleTimeslot(metric, totals.last7Days, metricCalcType, createdAt, sevenDaysAgo, reportMorning, true)
+    handleTimeslot(metric, totals.last7Days, metricCalcType, createdAt, timeslots.sevenDaysAgo, timeslots.reportMorning, true)
 
     // Previous 7 days
     // prettier-ignore
-    handleTimeslot(metric, totals.prev7Days, metricCalcType, createdAt, fourteenDaysAgo, sevenDaysAgo)
+    handleTimeslot(metric, totals.prev7Days, metricCalcType, createdAt, timeslots.fourteenDaysAgo, timeslots.sevenDaysAgo)
 
     // Last 30 days
     // prettier-ignore
-    handleTimeslot(metric, totals.last30Days, metricCalcType, createdAt, thirtyDaysAgo, reportMorning, true)
+    handleTimeslot(metric, totals.last30Days, metricCalcType, createdAt, timeslots.thirtyDaysAgo, timeslots.reportMorning, true)
 
     // Previous 30 days
     // prettier-ignore
-    handleTimeslot(metric, totals.prev30Days, metricCalcType, createdAt, sixtyDaysAgo, thirtyDaysAgo)
+    handleTimeslot(metric, totals.prev30Days, metricCalcType, createdAt, timeslots.sixtyDaysAgo, timeslots.thirtyDaysAgo)
 
     // Last year
     // prettier-ignore
-    handleTimeslot(metric, totals.lastYear, metricCalcType, createdAt, oneYearAgo, reportMorning)
+    handleTimeslot(metric, totals.lastYear, metricCalcType, createdAt, timeslots.oneYearAgo, timeslots.reportMorning)
 
     // Previous year
     // prettier-ignore
-    handleTimeslot(metric, totals.prevYear, metricCalcType, createdAt, twoYearsAgo, oneYearAgo)
+    handleTimeslot(metric, totals.prevYear, metricCalcType, createdAt, timeslots.twoYearsAgo, timeslots.oneYearAgo)
 
     // All time
     handleMetricValue(metric, totals.allTime, metricCalcType, true)
@@ -538,30 +549,6 @@ function handleDraftSubmissions(metric, map) {
   if (isDraftSubmission(metric)) {
     const formTotalSoFar = map.get(metric.formId) ?? 0
     map.set(metric.formId, formTotalSoFar + metric.metricValue)
-  }
-}
-
-/**
- * @param {FormTimelineMetric} metric
- * @param {Record<string, { count?: number }> | undefined} period
- * @param {string} metricCalcType
- * @param {Date} createdAt
- * @param {Date} startOfSlot
- * @param {Date} endOfSlot
- * @param {boolean} [saveDrilldown]
- */
-function handleTimeslot(
-  metric,
-  period,
-  metricCalcType,
-  createdAt,
-  startOfSlot,
-  endOfSlot,
-  saveDrilldown
-) {
-  const endOfDaySlot = endOfDay(endOfSlot)
-  if (dateFallsInsideTimeslot(createdAt, startOfSlot, endOfDaySlot)) {
-    handleMetricValue(metric, period, metricCalcType, saveDrilldown)
   }
 }
 
@@ -649,7 +636,7 @@ export async function generateReportForForm(formId, language) {
   try {
     const yesterday = sub(new Date(), { days: 1 })
 
-    const totals = await recalcMetrics(yesterday, language, session, formId)
+    const totals = await recalcFormMetrics(yesterday, language, session, formId)
 
     // Determine the full date range (from = earliestDate, to = updatedAt)
     // of when submissions have been collected (not just for this for form but
@@ -722,6 +709,18 @@ export function applyExtraColumns(metrics) {
         ? submissionCountsLive.get(metric.formId)
         : submissionCountsDraft.get(metric.formId)) ?? 0
   }))
+}
+
+/**
+ * Returns a cursor for the form metrics based on the form ID and language.
+ * @param { string | undefined } formId
+ * @param { string | undefined } language
+ * @param {ClientSession} session
+ */
+function getFormMetricsCursor(formId, language, session) {
+  return formId
+    ? getFormTimelineMetricsCursor(formId, language, session)
+    : getAllTimelineMetrics(getAllFormMetricsFilter(language), session)
 }
 
 /**

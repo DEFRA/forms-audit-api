@@ -21,11 +21,36 @@ export function getLanguageNoPropertyFilter(language) {
 }
 
 /**
+ * Creates a filter to query records with a specific language,
+ * with metric names included in FormMetricName
+ * @param { string | undefined } language
+ */
+export function getAllFormMetricsFilter(language) {
+  return {
+    ...getLanguageNoPropertyFilter(language),
+    metricName: { $in: Object.values(FormMetricName) }
+  }
+}
+
+/**
+ * Adjusts the earliest data date based on a new submission date
+ * @param { Date | undefined } earliestDataDate
+ * @param {Date} createdAtSubmission
+ * @returns {Date}
+ */
+export function adjustEarliestDate(earliestDataDate, createdAtSubmission) {
+  if (!earliestDataDate || createdAtSubmission < earliestDataDate) {
+    return createdAtSubmission
+  }
+  return earliestDataDate
+}
+
+/**
  * Gets the metric collection
- * @returns {Collection<FormOverviewMetric | FormTimelineMetric | FormTotalsMetric | FormDrilldownMetric | FormMetricControl>}
+ * @returns {Collection<FormOverviewMetric | FormTimelineMetric | SigninTimelineMetric | FormTotalsMetric | FunctionalAreaTotalsMetric | FormDrilldownMetric | FormMetricControl>}
  */
 export function getMetricCollection() {
-  return /** @type {Collection<FormOverviewMetric | FormTimelineMetric | FormTotalsMetric | FormDrilldownMetric | FormMetricControl>} */ (
+  return /** @type {Collection<FormOverviewMetric | FormTimelineMetric | SigninTimelineMetric | FormTotalsMetric | FunctionalAreaTotalsMetric | FormDrilldownMetric | FormMetricControl>} */ (
     db.collection(METRICS_COLLECTION_NAME)
   )
 }
@@ -97,6 +122,6 @@ export async function getFirstDraft(formId, language, session) {
 
 /**
  * @import { ClientSession, Collection, WithId } from 'mongodb'
- * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FormDrilldownMetric } from '@defra/forms-model'
+ * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FormDrilldownMetric, FunctionalAreaTotalsMetric,SigninTimelineMetric } from '@defra/forms-model'
  * @import { FormMetricControl } from '~/src/service/metrics.js'
  */
