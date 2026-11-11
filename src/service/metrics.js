@@ -447,9 +447,7 @@ export async function recalcFormMetrics(
   /** @type { Date | undefined } */
   let earliestDataDate
 
-  const metricCursor = formId
-    ? getFormTimelineMetricsCursor(formId, language, session)
-    : getAllTimelineMetrics(getAllFormMetricsFilter(language), session)
+  const metricCursor = getFormMetricsCursor(formId, language, session)
 
   for await (const metric of metricCursor) {
     // FormsInDraft needs special attention since the cursor will return values from 'all' and other languages (e.g. Welsh),
@@ -711,6 +709,18 @@ export function applyExtraColumns(metrics) {
         ? submissionCountsLive.get(metric.formId)
         : submissionCountsDraft.get(metric.formId)) ?? 0
   }))
+}
+
+/**
+ * Returns a cursor for the form metrics based on the form ID and language.
+ * @param { string | undefined } formId
+ * @param { string | undefined } language
+ * @param {ClientSession} session
+ */
+function getFormMetricsCursor(formId, language, session) {
+  return formId
+    ? getFormTimelineMetricsCursor(formId, language, session)
+    : getAllTimelineMetrics(getAllFormMetricsFilter(language), session)
 }
 
 /**
