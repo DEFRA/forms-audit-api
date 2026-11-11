@@ -3,9 +3,7 @@ import {
   FunctionalAreaType,
   SigninMetricName
 } from '@defra/forms-model'
-import { startOfDay, subDays, subYears } from 'date-fns'
 
-import { FOURTEEN_DAYS, SEVEN_DAYS, THIRTY_DAYS } from '~/src/constants.js'
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
 import { saveSigninTimelineMetrics } from '~/src/repositories/metrics-func-area-repository.js'
@@ -16,6 +14,7 @@ import {
 } from '~/src/repositories/metrics-repository.js'
 import {
   CalculationTypes,
+  constructPeriodTimeslots,
   handleMetricValue,
   handleTimeslot
 } from '~/src/service/metrics-helper.js'
@@ -109,13 +108,7 @@ async function collectSigninMetricsFromAuditByType(
  * @returns {Promise<FunctionalAreaTotalsMetric>}
  */
 export async function recalcSigninMetrics(reportingDate, session) {
-  const reportMorning = startOfDay(reportingDate)
-  const sevenDaysAgo = subDays(reportMorning, SEVEN_DAYS)
-  const fourteenDaysAgo = subDays(reportMorning, FOURTEEN_DAYS)
-  const thirtyDaysAgo = subDays(reportMorning, THIRTY_DAYS)
-  const sixtyDaysAgo = subDays(reportMorning, 60)
-  const oneYearAgo = subYears(reportMorning, 1)
-  const twoYearsAgo = subYears(reportMorning, 2)
+  const timeslots = constructPeriodTimeslots(reportingDate)
 
   const totals = /** @type {FunctionalAreaTotalsMetric} */ ({
     last7Days: {},
@@ -143,27 +136,27 @@ export async function recalcSigninMetrics(reportingDate, session) {
 
     // Last 7 days
     // prettier-ignore
-    handleTimeslot(metric, totals.last7Days, CalculationTypes.Accumulation, createdAt, sevenDaysAgo, reportMorning, true)
+    handleTimeslot(metric, totals.last7Days, CalculationTypes.Accumulation, createdAt, timeslots.sevenDaysAgo, timeslots.reportMorning, true)
 
     // Previous 7 days
     // prettier-ignore
-    handleTimeslot(metric, totals.prev7Days, CalculationTypes.Accumulation, createdAt, fourteenDaysAgo, sevenDaysAgo)
+    handleTimeslot(metric, totals.prev7Days, CalculationTypes.Accumulation, createdAt, timeslots.fourteenDaysAgo, timeslots.sevenDaysAgo)
 
     // Last 30 days
     // prettier-ignore
-    handleTimeslot(metric, totals.last30Days, CalculationTypes.Accumulation, createdAt, thirtyDaysAgo, reportMorning, true)
+    handleTimeslot(metric, totals.last30Days, CalculationTypes.Accumulation, createdAt, timeslots.thirtyDaysAgo, timeslots.reportMorning, true)
 
     // Previous 30 days
     // prettier-ignore
-    handleTimeslot(metric, totals.prev30Days, CalculationTypes.Accumulation, createdAt, sixtyDaysAgo, thirtyDaysAgo)
+    handleTimeslot(metric, totals.prev30Days, CalculationTypes.Accumulation, createdAt, timeslots.sixtyDaysAgo, timeslots.thirtyDaysAgo)
 
     // Last year
     // prettier-ignore
-    handleTimeslot(metric, totals.lastYear, CalculationTypes.Accumulation, createdAt, oneYearAgo, reportMorning)
+    handleTimeslot(metric, totals.lastYear, CalculationTypes.Accumulation, createdAt, timeslots.oneYearAgo, timeslots.reportMorning)
 
     // Previous year
     // prettier-ignore
-    handleTimeslot(metric, totals.prevYear, CalculationTypes.Accumulation, createdAt, twoYearsAgo, oneYearAgo)
+    handleTimeslot(metric, totals.prevYear, CalculationTypes.Accumulation, createdAt, timeslots.twoYearsAgo, timeslots.oneYearAgo)
 
     // All time
     handleMetricValue(

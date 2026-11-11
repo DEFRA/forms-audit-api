@@ -1,5 +1,14 @@
 import { FormMetricName, FormStatus } from '@defra/forms-model'
-import { addMilliseconds, endOfDay, format } from 'date-fns'
+import {
+  addMilliseconds,
+  endOfDay,
+  format,
+  startOfDay,
+  subDays,
+  subYears
+} from 'date-fns'
+
+import { FOURTEEN_DAYS, SEVEN_DAYS, THIRTY_DAYS } from '~/src/constants.js'
 
 export const CalculationTypes = {
   Accumulation: 'Accumulation',
@@ -226,6 +235,22 @@ export function updateMetricAverage(metric, period) {
     period[metricName].avgCount = currentAvgCount + 1
   } else {
     period[metricName] = { avgTotal: metric.metricValue, avgCount: 1 }
+  }
+}
+
+/**
+ * Constructs an object containing various period timeslots based on the reporting date.
+ * @param {Date} reportingDate
+ */
+export function constructPeriodTimeslots(reportingDate) {
+  return {
+    reportMorning: startOfDay(reportingDate),
+    sevenDaysAgo: subDays(startOfDay(reportingDate), SEVEN_DAYS),
+    fourteenDaysAgo: subDays(startOfDay(reportingDate), FOURTEEN_DAYS),
+    thirtyDaysAgo: subDays(startOfDay(reportingDate), THIRTY_DAYS),
+    sixtyDaysAgo: subDays(startOfDay(reportingDate), 60),
+    oneYearAgo: subYears(startOfDay(reportingDate), 1),
+    twoYearsAgo: subYears(startOfDay(reportingDate), 2)
   }
 }
 

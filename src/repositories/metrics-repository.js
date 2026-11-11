@@ -410,16 +410,18 @@ export async function updateFunctionalAreaMetricTotals(
       { session }
     )
 
-    for (const totals of totalsList) {
-      totals.updatedAt = reportDate
-      await coll.insertOne(
-        {
-          ...totals,
-          type: FormMetricType.FunctionalAreaTotalsMetric
-        },
-        { session }
-      )
-    }
+    await Promise.all(
+      totalsList.map((totals) => {
+        totals.updatedAt = reportDate
+        return coll.insertOne(
+          {
+            ...totals,
+            type: FormMetricType.FunctionalAreaTotalsMetric
+          },
+          { session }
+        )
+      })
+    )
   } catch (err) {
     logger.error(
       err,

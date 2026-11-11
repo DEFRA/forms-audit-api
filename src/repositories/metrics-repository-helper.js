@@ -28,7 +28,7 @@ export function getLanguageNoPropertyFilter(language) {
 export function getAllFormMetricsFilter(language) {
   return {
     ...getLanguageNoPropertyFilter(language),
-    ...{ metricName: { $in: Object.values(FormMetricName) } }
+    metricName: { $in: Object.values(FormMetricName) }
   }
 }
 

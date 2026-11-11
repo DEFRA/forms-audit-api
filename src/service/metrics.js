@@ -3,23 +3,10 @@ import {
   FormMetricName,
   FormStatus
 } from '@defra/forms-model'
-import {
-  add,
-  differenceInDays,
-  min,
-  startOfDay,
-  sub,
-  subDays,
-  subYears
-} from 'date-fns'
+import { add, differenceInDays, min, sub, subDays } from 'date-fns'
 
 import { config } from '~/src/config/index.js'
-import {
-  FOURTEEN_DAYS,
-  SEVEN_DAYS,
-  THIRTY_DAYS,
-  WELSH
-} from '~/src/constants.js'
+import { WELSH } from '~/src/constants.js'
 import { logger } from '~/src/helpers/logging/logger.js'
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
@@ -49,6 +36,7 @@ import {
   getJsonFromSubmissions
 } from '~/src/service/metrics-call-wrapper.js'
 import {
+  constructPeriodTimeslots,
   createFormMap,
   formatDateOnly,
   getMetricCalcType,
@@ -437,13 +425,7 @@ export async function recalcFormMetrics(
   session,
   formId
 ) {
-  const reportMorning = startOfDay(reportingDate)
-  const sevenDaysAgo = subDays(reportMorning, SEVEN_DAYS)
-  const fourteenDaysAgo = subDays(reportMorning, FOURTEEN_DAYS)
-  const thirtyDaysAgo = subDays(reportMorning, THIRTY_DAYS)
-  const sixtyDaysAgo = subDays(reportMorning, 60)
-  const oneYearAgo = subYears(reportMorning, 1)
-  const twoYearsAgo = subYears(reportMorning, 2)
+  const timeslots = constructPeriodTimeslots(reportingDate)
 
   const maps = {
     formSubmissionsMapDraft: /** @type {Map<string, number>} */ (new Map()),
@@ -511,27 +493,27 @@ export async function recalcFormMetrics(
     const createdAt = new Date(metric.createdAt)
     // Last 7 days
     // prettier-ignore
-    handleTimeslot(metric, totals.last7Days, metricCalcType, createdAt, sevenDaysAgo, reportMorning, true)
+    handleTimeslot(metric, totals.last7Days, metricCalcType, createdAt, timeslots.sevenDaysAgo, timeslots.reportMorning, true)
 
     // Previous 7 days
     // prettier-ignore
-    handleTimeslot(metric, totals.prev7Days, metricCalcType, createdAt, fourteenDaysAgo, sevenDaysAgo)
+    handleTimeslot(metric, totals.prev7Days, metricCalcType, createdAt, timeslots.fourteenDaysAgo, timeslots.sevenDaysAgo)
 
     // Last 30 days
     // prettier-ignore
-    handleTimeslot(metric, totals.last30Days, metricCalcType, createdAt, thirtyDaysAgo, reportMorning, true)
+    handleTimeslot(metric, totals.last30Days, metricCalcType, createdAt, timeslots.thirtyDaysAgo, timeslots.reportMorning, true)
 
     // Previous 30 days
     // prettier-ignore
-    handleTimeslot(metric, totals.prev30Days, metricCalcType, createdAt, sixtyDaysAgo, thirtyDaysAgo)
+    handleTimeslot(metric, totals.prev30Days, metricCalcType, createdAt, timeslots.sixtyDaysAgo, timeslots.thirtyDaysAgo)
 
     // Last year
     // prettier-ignore
-    handleTimeslot(metric, totals.lastYear, metricCalcType, createdAt, oneYearAgo, reportMorning)
+    handleTimeslot(metric, totals.lastYear, metricCalcType, createdAt, timeslots.oneYearAgo, timeslots.reportMorning)
 
     // Previous year
     // prettier-ignore
-    handleTimeslot(metric, totals.prevYear, metricCalcType, createdAt, twoYearsAgo, oneYearAgo)
+    handleTimeslot(metric, totals.prevYear, metricCalcType, createdAt, timeslots.twoYearsAgo, timeslots.oneYearAgo)
 
     // All time
     handleMetricValue(metric, totals.allTime, metricCalcType, true)
