@@ -1150,6 +1150,10 @@ describe('runMetricsCollectionJob', () => {
           }
         }
       }
+      jest
+        .mocked(getAuditRecordsOfType)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValue(mockAsyncIteratorBlankSet)
 
       jest
         .mocked(getAllTimelineMetrics)
@@ -1157,6 +1161,8 @@ describe('runMetricsCollectionJob', () => {
         .mockReturnValueOnce(mockAsyncIteratorBlankSet)
         // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
         .mockReturnValueOnce(mockAsyncIteratorBlankSet)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValue(mockAsyncIteratorBlankSet)
 
       const res = await collectMetrics(
         currentRunDate,
@@ -1181,7 +1187,7 @@ describe('runMetricsCollectionJob', () => {
       expect(calls[2][0].href).toBe(
         'http://localhost:3002/report/timeline?date=2026-05-12T15:56:04.364Z&language=cy'
       )
-      expect(getAuditRecordsOfType).toHaveBeenCalledTimes(4)
+      expect(getAuditRecordsOfType).toHaveBeenCalledTimes(11)
       expect(getAuditRecordsOfType).toHaveBeenNthCalledWith(
         1,
         'FORM_CREATED',
@@ -1196,6 +1202,13 @@ describe('runMetricsCollectionJob', () => {
         undefined,
         expect.anything(),
         { createdAt: 1 } // Overrides sort option
+      )
+      expect(getAuditRecordsOfType).toHaveBeenNthCalledWith(
+        5,
+        'IDENTITY_REGISTRATION',
+        new Date('2026-05-12T15:56:04.364Z'),
+        undefined,
+        expect.anything()
       )
       expect(getAuditRecordsOfType).toHaveBeenNthCalledWith(
         3,
@@ -1275,6 +1288,10 @@ describe('runMetricsCollectionJob', () => {
           }
         }
       }
+      jest
+        .mocked(getAuditRecordsOfType)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValue(mockAsyncIteratorBlankSet)
 
       jest
         .mocked(getAllTimelineMetrics)
@@ -1286,6 +1303,8 @@ describe('runMetricsCollectionJob', () => {
         .mockReturnValueOnce(mockAsyncIteratorBlankSet)
         // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
         .mockReturnValueOnce(mockAsyncIteratorBlankSet)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValue(mockAsyncIteratorBlankSet)
 
       const res = await collectMetrics(
         currentRunDate,

@@ -1,5 +1,5 @@
 import { FormMetricName, FormStatus } from '@defra/forms-model'
-import { endOfDay, format } from 'date-fns'
+import { addMilliseconds, endOfDay, format } from 'date-fns'
 
 export const CalculationTypes = {
   Accumulation: 'Accumulation',
@@ -147,7 +147,7 @@ export function handleTimeslot(
   endOfSlot,
   saveDrilldown
 ) {
-  const endOfDaySlot = endOfDay(endOfSlot)
+  const endOfDaySlot = addMilliseconds(endOfDay(endOfSlot), 1)
   if (dateFallsInsideTimeslot(createdAt, startOfSlot, endOfDaySlot)) {
     handleMetricValue(metric, period, metricCalcType, saveDrilldown)
   }

@@ -1,8 +1,11 @@
-import { FormMetricName, FormStatus } from '@defra/forms-model'
+import { FormMetricName, FormMetricType, FormStatus } from '@defra/forms-model'
+import { endOfDay } from 'date-fns'
 
 import {
   CalculationTypes,
+  getMetricCalcType,
   handleMetricValue,
+  handleTimeslot,
   setTimeOnDate
 } from '~/src/service/metrics-helper.js'
 
@@ -12,6 +15,80 @@ describe('metrics-helper', () => {
       const testDateStr = '2026-02-05'
       const expectedDate = new Date('2026-02-05T08:59:34.000Z')
       expect(setTimeOnDate(testDateStr, expectedDate)).toEqual(expectedDate)
+    })
+  })
+
+  describe('getMetricCalcType', () => {
+    it('should return the configured calculation type', () => {
+      expect(
+        getMetricCalcType({
+          type: FormMetricType.TimelineMetric,
+          metricName: FormMetricName.Submissions,
+          formId: 'form-id',
+          formStatus: FormStatus.Live,
+          metricValue: 1,
+          createdAt: new Date('2026-05-01T00:00:00.000Z')
+        })
+      ).toBe(CalculationTypes.AccumulationWithDrilldown)
+    })
+
+    it('should return undefined for an unconfigured metric', () => {
+      // @ts-expect-error - guards against unsupported runtime metric names
+      expect(getMetricCalcType({ metricName: 'unknown' })).toBeUndefined()
+    })
+  })
+
+  describe('handleTimeslot', () => {
+    const metric = /** @type {FormTimelineMetric} */ ({
+      metricName: FormMetricName.FormsInDraft,
+      formStatus: FormStatus.Draft,
+      metricValue: 3
+    })
+    const startOfSlot = new Date('2026-05-01T00:00:00.000Z')
+    const endOfSlot = new Date('2026-05-02T00:00:00.000Z')
+
+    it('should include metrics on the start and end dates', () => {
+      const period = /** @type {Record<string, { count?: number }>} */ ({})
+      handleTimeslot(
+        metric,
+        period,
+        CalculationTypes.Accumulation,
+        startOfSlot,
+        startOfSlot,
+        endOfSlot
+      )
+      handleTimeslot(
+        metric,
+        period,
+        CalculationTypes.Accumulation,
+        endOfDay(endOfSlot),
+        startOfSlot,
+        endOfSlot
+      )
+
+      expect(period).toEqual({ FormsInDraft: { count: 6 } })
+    })
+
+    it('should ignore metrics outside the slot', () => {
+      const period = /** @type {Record<string, { count?: number }>} */ ({})
+      handleTimeslot(
+        metric,
+        period,
+        CalculationTypes.Accumulation,
+        new Date('2026-04-30T23:59:59.999Z'),
+        startOfSlot,
+        endOfSlot
+      )
+      handleTimeslot(
+        metric,
+        period,
+        CalculationTypes.Accumulation,
+        new Date('2026-05-03T00:00:00.000Z'),
+        startOfSlot,
+        endOfSlot
+      )
+
+      expect(period).toEqual({})
     })
   })
 
