@@ -5,12 +5,13 @@ import {
 } from '@defra/forms-model'
 import { startOfDay, subDays, subYears } from 'date-fns'
 
+import { FOURTEEN_DAYS, SEVEN_DAYS, THIRTY_DAYS } from '~/src/constants.js'
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
+import { saveSigninTimelineMetrics } from '~/src/repositories/metrics-func-area-repository.js'
 import {
   getAllTimelineMetrics,
-  getFunctionalAreaMetricTotals,
-  saveSigninTimelineMetrics
+  getFunctionalAreaMetricTotals
 } from '~/src/repositories/metrics-repository.js'
 import {
   CalculationTypes,
@@ -108,9 +109,9 @@ async function collectSigninMetricsFromAuditByType(
  */
 export async function recalcSigninMetrics(reportingDate, session) {
   const reportMorning = startOfDay(reportingDate)
-  const sevenDaysAgo = subDays(reportMorning, 7)
-  const fourteenDaysAgo = subDays(reportMorning, 14)
-  const thirtyDaysAgo = subDays(reportMorning, 30)
+  const sevenDaysAgo = subDays(reportMorning, SEVEN_DAYS)
+  const fourteenDaysAgo = subDays(reportMorning, FOURTEEN_DAYS)
+  const thirtyDaysAgo = subDays(reportMorning, THIRTY_DAYS)
   const sixtyDaysAgo = subDays(reportMorning, 60)
   const oneYearAgo = subYears(reportMorning, 1)
   const twoYearsAgo = subYears(reportMorning, 2)

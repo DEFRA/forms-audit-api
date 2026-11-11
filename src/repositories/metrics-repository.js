@@ -272,31 +272,6 @@ export async function saveFormTimelineMetrics(formId, metricData, session) {
 }
 
 /**
- * Saves snapshot metric records for a form.
- * @param {SigninTimelineMetric} metricData
- * @param {ClientSession} session
- */
-export async function saveSigninTimelineMetrics(metricData, session) {
-  const coll = getMetricCollection()
-
-  try {
-    await coll.insertOne(
-      {
-        ...metricData,
-        type: FormMetricType.TimelineMetric
-      },
-      { session }
-    )
-  } catch (err) {
-    logger.error(
-      err,
-      `Failed to save signin timeline metrics - ${getErrorMessage(err)}`
-    )
-    throw err
-  }
-}
-
-/**
  * Gets metric totals record.
  * @param { string | undefined } language
  * @param {ClientSession} session

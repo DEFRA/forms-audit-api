@@ -14,7 +14,12 @@ import {
 } from 'date-fns'
 
 import { config } from '~/src/config/index.js'
-import { WELSH } from '~/src/constants.js'
+import {
+  FOURTEEN_DAYS,
+  SEVEN_DAYS,
+  THIRTY_DAYS,
+  WELSH
+} from '~/src/constants.js'
 import { logger } from '~/src/helpers/logging/logger.js'
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
@@ -432,9 +437,9 @@ export async function recalcFormMetrics(
   formId
 ) {
   const reportMorning = startOfDay(reportingDate)
-  const sevenDaysAgo = subDays(reportMorning, 7)
-  const fourteenDaysAgo = subDays(reportMorning, 14)
-  const thirtyDaysAgo = subDays(reportMorning, 30)
+  const sevenDaysAgo = subDays(reportMorning, SEVEN_DAYS)
+  const fourteenDaysAgo = subDays(reportMorning, FOURTEEN_DAYS)
+  const thirtyDaysAgo = subDays(reportMorning, THIRTY_DAYS)
   const sixtyDaysAgo = subDays(reportMorning, 60)
   const oneYearAgo = subYears(reportMorning, 1)
   const twoYearsAgo = subYears(reportMorning, 2)
@@ -459,9 +464,13 @@ export async function recalcFormMetrics(
   /** @type { Date | undefined } */
   let earliestDataDate
 
+  const allFormsFilter = {
+    ...getLanguageNoPropertyFilter(language),
+    ...{ metricName: { $in: Object.values(FormMetricName) } }
+  }
   const metricCursor = formId
     ? getFormTimelineMetricsCursor(formId, language, session)
-    : getAllTimelineMetrics(getLanguageNoPropertyFilter(language), session)
+    : getAllTimelineMetrics(allFormsFilter, session)
 
   for await (const metric of metricCursor) {
     // FormsInDraft needs special attention since the cursor will return values from 'all' and other languages (e.g. Welsh),
@@ -474,9 +483,7 @@ export async function recalcFormMetrics(
     }
 
     const metricCalcType = getMetricCalcType(metric)
-    if (!metricCalcType) {
-      continue
-    }
+
     if (metric.metricName === FormMetricName.Submissions) {
       // Live submissions
       handleLiveSubmissions(metric, maps.formSubmissionsMapLive)

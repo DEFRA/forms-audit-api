@@ -9,7 +9,7 @@ export const CalculationTypes = {
 }
 
 export const metricConfig =
-  /** @type { Partial<Record<FormMetricName, { calculationType: string }>> } */ ({
+  /** @type { Record<FormMetricName, { calculationType: string }> } */ ({
     [FormMetricName.NewFormsCreated]: {
       calculationType: CalculationTypes.AccumulationWithDrilldown
     },
@@ -89,7 +89,7 @@ export function isLiveSubmission(metric) {
  */
 export function getMetricCalcType(metric) {
   const metricName = /** @type {FormMetricName} */ (metric.metricName)
-  return metricConfig[metricName]?.calculationType
+  return metricConfig[metricName].calculationType
 }
 
 /**

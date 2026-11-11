@@ -31,11 +31,6 @@ describe('metrics-helper', () => {
         })
       ).toBe(CalculationTypes.AccumulationWithDrilldown)
     })
-
-    it('should return undefined for an unconfigured metric', () => {
-      // @ts-expect-error - guards against unsupported runtime metric names
-      expect(getMetricCalcType({ metricName: 'unknown' })).toBeUndefined()
-    })
   })
 
   describe('handleTimeslot', () => {

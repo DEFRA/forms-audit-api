@@ -44,6 +44,7 @@ import {
 
 jest.mock('~/src/lib/fetch.js')
 jest.mock('~/src/repositories/metrics-repository.js')
+jest.mock('~/src/repositories/metrics-func-area-repository.js')
 jest.mock('~/src/repositories/metrics-repository-helper.js')
 jest.mock('~/src/repositories/audit-record-repository.js')
 
