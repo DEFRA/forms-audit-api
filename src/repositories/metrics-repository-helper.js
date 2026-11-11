@@ -21,6 +21,31 @@ export function getLanguageNoPropertyFilter(language) {
 }
 
 /**
+ * Creates a filter to query records with a specific language,
+ * with metric names included in FormMetricName
+ * @param { string | undefined } language
+ */
+export function getAllFormMetricsFilter(language) {
+  return {
+    ...getLanguageNoPropertyFilter(language),
+    ...{ metricName: { $in: Object.values(FormMetricName) } }
+  }
+}
+
+/**
+ * Adjusts the earliest data date based on a new submission date
+ * @param { Date | undefined } earliestDataDate
+ * @param {Date} createdAtSubmission
+ * @returns {Date}
+ */
+export function adjustEarliestDate(earliestDataDate, createdAtSubmission) {
+  if (!earliestDataDate || createdAtSubmission < earliestDataDate) {
+    return createdAtSubmission
+  }
+  return earliestDataDate
+}
+
+/**
  * Gets the metric collection
  * @returns {Collection<FormOverviewMetric | FormTimelineMetric | SigninTimelineMetric | FormTotalsMetric | FunctionalAreaTotalsMetric | FormDrilldownMetric | FormMetricControl>}
  */

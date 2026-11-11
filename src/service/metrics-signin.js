@@ -9,6 +9,7 @@ import { FOURTEEN_DAYS, SEVEN_DAYS, THIRTY_DAYS } from '~/src/constants.js'
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
 import { saveSigninTimelineMetrics } from '~/src/repositories/metrics-func-area-repository.js'
+import { adjustEarliestDate } from '~/src/repositories/metrics-repository-helper.js'
 import {
   getAllTimelineMetrics,
   getFunctionalAreaMetricTotals
@@ -138,9 +139,7 @@ export async function recalcSigninMetrics(reportingDate, session) {
   for await (const metric of metricCursor) {
     // Find earliest metric
     const createdAt = new Date(metric.createdAt)
-    if (!earliestDataDate || createdAt < earliestDataDate) {
-      earliestDataDate = createdAt
-    }
+    earliestDataDate = adjustEarliestDate(earliestDataDate, createdAt)
 
     // Last 7 days
     // prettier-ignore

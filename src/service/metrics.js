@@ -23,14 +23,15 @@ import {
 import { logger } from '~/src/helpers/logging/logger.js'
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
+import { clearMetricsData } from '~/src/repositories/metrics-job-repository.js'
 import {
+  adjustEarliestDate,
+  getAllFormMetricsFilter,
   getFirstDraft,
   getLanguageFilter,
-  getLanguageNoPropertyFilter,
   isFirstPublish
 } from '~/src/repositories/metrics-repository-helper.js'
 import {
-  clearMetricsData,
   deleteFormOverviewMetrics,
   getAllOverviewMetrics,
   getAllTimelineMetrics,
@@ -464,13 +465,9 @@ export async function recalcFormMetrics(
   /** @type { Date | undefined } */
   let earliestDataDate
 
-  const allFormsFilter = {
-    ...getLanguageNoPropertyFilter(language),
-    ...{ metricName: { $in: Object.values(FormMetricName) } }
-  }
   const metricCursor = formId
     ? getFormTimelineMetricsCursor(formId, language, session)
-    : getAllTimelineMetrics(allFormsFilter, session)
+    : getAllTimelineMetrics(getAllFormMetricsFilter(language), session)
 
   for await (const metric of metricCursor) {
     // FormsInDraft needs special attention since the cursor will return values from 'all' and other languages (e.g. Welsh),
@@ -493,9 +490,10 @@ export async function recalcFormMetrics(
 
       // Find earliest submission
       const createdAtSubmission = new Date(metric.createdAt)
-      if (!earliestDataDate || createdAtSubmission < earliestDataDate) {
-        earliestDataDate = createdAtSubmission
-      }
+      earliestDataDate = adjustEarliestDate(
+        earliestDataDate,
+        createdAtSubmission
+      )
     }
 
     if (metric.metricName === FormMetricName.TimeToPublish) {
