@@ -39,7 +39,7 @@ import {
   generateReport,
   generateReportForForm,
   getOverviewMetricsForForms,
-  recalcMetrics
+  recalcFormMetrics
 } from '~/src/service/metrics.js'
 
 jest.mock('~/src/lib/fetch.js')
@@ -641,7 +641,7 @@ describe('runMetricsCollectionJob', () => {
         // @ts-expect-error - resolves to an async iterator like FindCursor<FormSubmissionDocument>
         .mockReturnValueOnce(mockAsyncIterator)
 
-      const totals = await recalcMetrics(
+      const totals = await recalcFormMetrics(
         new Date('2026-01-01'),
         undefined,
         mockSession

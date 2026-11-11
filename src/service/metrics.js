@@ -6,7 +6,6 @@ import {
 import {
   add,
   differenceInDays,
-  endOfDay,
   min,
   startOfDay,
   sub,
@@ -36,6 +35,7 @@ import {
   getNumberOfFormsInDraft,
   saveFormOverviewMetrics,
   saveFormTimelineMetrics,
+  updateFunctionalAreaMetricTotals,
   updateMetricTotals
 } from '~/src/repositories/metrics-repository.js'
 import {
@@ -44,14 +44,15 @@ import {
 } from '~/src/service/metrics-call-wrapper.js'
 import {
   createFormMap,
-  dateFallsInsideTimeslot,
   formatDateOnly,
   getMetricCalcType,
   handleMetricValue,
+  handleTimeslot,
   isDraftSubmission,
   isLiveSubmission,
   setTimeOnDate
 } from '~/src/service/metrics-helper.js'
+import { collectSigninMetricsFromAudit, recalcSigninMetrics } from '~/src/service/metrics-signin.js'
 
 /**
  * @typedef {object} FilterCriteria
@@ -159,17 +160,30 @@ export async function collectMetrics(
       session
     )
 
+    // Functional areas - currently only sign-in metrics are collected
+    await collectSigninMetricsFromAudit(
+      reportDate,
+      session
+    )
+
     reportDate = add(reportDate, { days: 1 })
   }
 
+  // Form metrics
   const totals = [
     // All languages
-    await recalcMetrics(reportEndDate, undefined, session),
+    await recalcFormMetrics(reportEndDate, undefined, session),
     // Welsh-only
-    await recalcMetrics(reportEndDate, WELSH, session)
+    await recalcFormMetrics(reportEndDate, WELSH, session)
   ]
 
   await updateMetricTotals(reportEndDate, totals, session)
+
+  // Functional areas - currently only sign-in metrics are collected
+  const functionalAreaTotals = [
+    await recalcSigninMetrics(reportEndDate, session)
+  ]
+  await updateFunctionalAreaMetricTotals(reportEndDate, functionalAreaTotals, session)
 
   return {
     success: true,
@@ -407,7 +421,7 @@ export async function collectTimelineMetricsFromAudit(
  * @param {string} [formId] - supplied if calcs are for a specific form
  * @returns {Promise<FormTotalsMetric>}
  */
-export async function recalcMetrics(reportingDate, language, session, formId) {
+export async function recalcFormMetrics(reportingDate, language, session, formId) {
   const reportMorning = startOfDay(reportingDate)
   const sevenDaysAgo = subDays(reportMorning, 7)
   const fourteenDaysAgo = subDays(reportMorning, 14)
@@ -451,6 +465,9 @@ export async function recalcMetrics(reportingDate, language, session, formId) {
     }
 
     const metricCalcType = getMetricCalcType(metric)
+    if (!metricCalcType) {
+      continue
+    }
     if (metric.metricName === FormMetricName.Submissions) {
       // Live submissions
       handleLiveSubmissions(metric, maps.formSubmissionsMapLive)
@@ -542,30 +559,6 @@ function handleDraftSubmissions(metric, map) {
 }
 
 /**
- * @param {FormTimelineMetric} metric
- * @param {Record<string, { count?: number }> | undefined} period
- * @param {string} metricCalcType
- * @param {Date} createdAt
- * @param {Date} startOfSlot
- * @param {Date} endOfSlot
- * @param {boolean} [saveDrilldown]
- */
-function handleTimeslot(
-  metric,
-  period,
-  metricCalcType,
-  createdAt,
-  startOfSlot,
-  endOfSlot,
-  saveDrilldown
-) {
-  const endOfDaySlot = endOfDay(endOfSlot)
-  if (dateFallsInsideTimeslot(createdAt, startOfSlot, endOfDaySlot)) {
-    handleMetricValue(metric, period, metricCalcType, saveDrilldown)
-  }
-}
-
-/**
  * @param {string} metricPropertyName
  * @param {any} totals
  * @param {string} periodName
@@ -649,7 +642,7 @@ export async function generateReportForForm(formId, language) {
   try {
     const yesterday = sub(new Date(), { days: 1 })
 
-    const totals = await recalcMetrics(yesterday, language, session, formId)
+    const totals = await recalcFormMetrics(yesterday, language, session, formId)
 
     // Determine the full date range (from = earliestDate, to = updatedAt)
     // of when submissions have been collected (not just for this for form but

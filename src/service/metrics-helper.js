@@ -1,5 +1,5 @@
 import { FormMetricName, FormStatus } from '@defra/forms-model'
-import { format } from 'date-fns'
+import { endOfDay, format } from 'date-fns'
 
 export const CalculationTypes = {
   Accumulation: 'Accumulation',
@@ -9,7 +9,7 @@ export const CalculationTypes = {
 }
 
 export const metricConfig =
-  /** { Record<FormMetricName, { calculationType: string }>} */ {
+  /** @type { Partial<Record<FormMetricName, { calculationType: string }>> } */ ({
     [FormMetricName.NewFormsCreated]: {
       calculationType: CalculationTypes.AccumulationWithDrilldown
     },
@@ -28,7 +28,7 @@ export const metricConfig =
     [FormMetricName.TimeToPublish]: {
       calculationType: CalculationTypes.Average
     }
-  }
+  })
 
 export const metricDrilldownPeriods = ['last7Days', 'last30Days', 'allTime']
 
@@ -89,7 +89,7 @@ export function isLiveSubmission(metric) {
  */
 export function getMetricCalcType(metric) {
   const metricName = /** @type {FormMetricName} */ (metric.metricName)
-  return metricConfig[metricName].calculationType
+  return metricConfig[metricName]?.calculationType
 }
 
 /**
@@ -126,6 +126,30 @@ export function handleMetricValue(
   }
   if (calculationType === CalculationTypes.Average) {
     updateMetricAverage(metric, period)
+  }
+}
+
+/**
+ * @param {FormTimelineMetric} metric
+ * @param {Record<string, { count?: number }> | undefined} period
+ * @param {string} metricCalcType
+ * @param {Date} createdAt
+ * @param {Date} startOfSlot
+ * @param {Date} endOfSlot
+ * @param {boolean} [saveDrilldown]
+ */
+export function handleTimeslot(
+  metric,
+  period,
+  metricCalcType,
+  createdAt,
+  startOfSlot,
+  endOfSlot,
+  saveDrilldown
+) {
+  const endOfDaySlot = endOfDay(endOfSlot)
+  if (dateFallsInsideTimeslot(createdAt, startOfSlot, endOfDaySlot)) {
+    handleMetricValue(metric, period, metricCalcType, saveDrilldown)
   }
 }
 

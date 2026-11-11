@@ -212,12 +212,12 @@ export function getAllOverviewMetrics(filter, session) {
 
 /**
  * Get all timeline metrics
- * @param { Filter<WithId<FormTimelineMetric>> | undefined } filter
+ * @param { Filter<WithId<FormTimelineMetric | SigninTimelineMetric>> | undefined } filter
  * @param {ClientSession} session
  * @returns {FindCursor<WithId<FormTimelineMetric>>}
  */
 export function getAllTimelineMetrics(filter, session) {
-  const coll = /** @type {Collection<FormTimelineMetric>} */ (
+  const coll = /** @type {Collection<FormTimelineMetric | SigninTimelineMetric>} */ (
     getMetricCollection()
   )
 
@@ -265,6 +265,31 @@ export async function saveFormTimelineMetrics(formId, metricData, session) {
     logger.error(
       err,
       `Failed to save timeline metrics for form id ${formId} - ${getErrorMessage(err)}`
+    )
+    throw err
+  }
+}
+
+/**
+ * Saves snapshot metric records for a form.
+ * @param {SigninTimelineMetric} metricData
+ * @param {ClientSession} session
+ */
+export async function saveSigninTimelineMetrics(metricData, session) {
+  const coll = getMetricCollection()
+
+  try {
+    await coll.insertOne(
+      {
+        ...metricData,
+        type: FormMetricType.TimelineMetric
+      },
+      { session }
+    )
+  } catch (err) {
+    logger.error(
+      err,
+      `Failed to save signin timeline metrics - ${getErrorMessage(err)}`
     )
     throw err
   }
@@ -333,6 +358,30 @@ export async function getDrilldownRecords(
 }
 
 /**
+ * Gets functional area metric totals record.
+ * @param {FunctionalAreaType} area
+ * @param {ClientSession} session
+ */
+export function getFunctionalAreaMetricTotals(area, session) {
+  const coll = getMetricCollection()
+
+  try {
+    return /** @type {Promise<WithId<FunctionalAreaTotalsMetric>>} */ (
+      coll.findOne(
+        {
+          type: FormMetricType.FunctionalAreaTotalsMetric,
+          area
+        },
+        { session }
+      )
+    )
+  } catch (err) {
+    logger.error(err, `Failed to get functional area totals metric for ${area} - ${getErrorMessage(err)}`)
+    throw err
+  }
+}
+
+/**
  * Saves snapshot metric records for a form.
  * @param {Date} reportDate
  * @param {FormTotalsMetric[]} totalsList
@@ -361,6 +410,34 @@ export async function updateMetricTotals(reportDate, totalsList, session) {
     }
   } catch (err) {
     logger.error(err, `Failed to save totals metric - ${getErrorMessage(err)}`)
+    throw err
+  }
+}
+
+/**
+ * Saves snapshot metric records for functional areas.
+ * @param {Date} reportDate
+ * @param {FunctionalAreaTotalsMetric[]} totalsList
+ * @param {ClientSession} session
+ */
+export async function updateFunctionalAreaMetricTotals(reportDate, totalsList, session) {
+  const coll = getMetricCollection()
+
+  try {
+    await coll.deleteMany({ type: FormMetricType.FunctionalAreaTotalsMetric }, { session })
+
+    for (const totals of totalsList) {
+      totals.updatedAt = reportDate
+      await coll.insertOne(
+        {
+          ...totals,
+          type: FormMetricType.FunctionalAreaTotalsMetric
+        },
+        { session }
+      )
+    }
+  } catch (err) {
+    logger.error(err, `Failed to save functional area totals metric - ${getErrorMessage(err)}`)
     throw err
   }
 }
@@ -630,6 +707,6 @@ export async function clearMetricsData(session) {
 
 /**
  * @import { ClientSession, Collection, Filter, FindCursor, WithId, WithoutId } from 'mongodb'
- * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FormDrilldownMetric } from '@defra/forms-model'
+ * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FormDrilldownMetric, FunctionalAreaTotalsMetric, FunctionalAreaType, SigninTimelineMetric } from '@defra/forms-model'
  * @import { FilterCriteria, FormMetricControl } from '~/src/service/metrics.js'
  */
