@@ -52,7 +52,10 @@ import {
   isLiveSubmission,
   setTimeOnDate
 } from '~/src/service/metrics-helper.js'
-import { collectSigninMetricsFromAudit, recalcSigninMetrics } from '~/src/service/metrics-signin.js'
+import {
+  collectSigninMetricsFromAudit,
+  recalcSigninMetrics
+} from '~/src/service/metrics-signin.js'
 
 /**
  * @typedef {object} FilterCriteria
@@ -161,10 +164,7 @@ export async function collectMetrics(
     )
 
     // Functional areas - currently only sign-in metrics are collected
-    await collectSigninMetricsFromAudit(
-      reportDate,
-      session
-    )
+    await collectSigninMetricsFromAudit(reportDate, session)
 
     reportDate = add(reportDate, { days: 1 })
   }
@@ -183,7 +183,11 @@ export async function collectMetrics(
   const functionalAreaTotals = [
     await recalcSigninMetrics(reportEndDate, session)
   ]
-  await updateFunctionalAreaMetricTotals(reportEndDate, functionalAreaTotals, session)
+  await updateFunctionalAreaMetricTotals(
+    reportEndDate,
+    functionalAreaTotals,
+    session
+  )
 
   return {
     success: true,
@@ -421,7 +425,12 @@ export async function collectTimelineMetricsFromAudit(
  * @param {string} [formId] - supplied if calcs are for a specific form
  * @returns {Promise<FormTotalsMetric>}
  */
-export async function recalcFormMetrics(reportingDate, language, session, formId) {
+export async function recalcFormMetrics(
+  reportingDate,
+  language,
+  session,
+  formId
+) {
   const reportMorning = startOfDay(reportingDate)
   const sevenDaysAgo = subDays(reportMorning, 7)
   const fourteenDaysAgo = subDays(reportMorning, 14)

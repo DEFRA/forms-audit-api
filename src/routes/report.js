@@ -147,7 +147,9 @@ export default [
       auth: false,
       validate: {
         params: Joi.object({
-          area: Joi.string().valid(...Object.values(FunctionalAreaType)).required ()
+          area: Joi.string()
+            .valid(...Object.values(FunctionalAreaType))
+            .required()
         })
       }
     }

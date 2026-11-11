@@ -217,9 +217,10 @@ export function getAllOverviewMetrics(filter, session) {
  * @returns {FindCursor<WithId<FormTimelineMetric>>}
  */
 export function getAllTimelineMetrics(filter, session) {
-  const coll = /** @type {Collection<FormTimelineMetric | SigninTimelineMetric>} */ (
-    getMetricCollection()
-  )
+  const coll =
+    /** @type {Collection<FormTimelineMetric | SigninTimelineMetric>} */ (
+      getMetricCollection()
+    )
 
   try {
     const cursor = /** @type {FindCursor<WithId<FormTimelineMetric>>} */ (
@@ -376,7 +377,10 @@ export function getFunctionalAreaMetricTotals(area, session) {
       )
     )
   } catch (err) {
-    logger.error(err, `Failed to get functional area totals metric for ${area} - ${getErrorMessage(err)}`)
+    logger.error(
+      err,
+      `Failed to get functional area totals metric for ${area} - ${getErrorMessage(err)}`
+    )
     throw err
   }
 }
@@ -420,11 +424,18 @@ export async function updateMetricTotals(reportDate, totalsList, session) {
  * @param {FunctionalAreaTotalsMetric[]} totalsList
  * @param {ClientSession} session
  */
-export async function updateFunctionalAreaMetricTotals(reportDate, totalsList, session) {
+export async function updateFunctionalAreaMetricTotals(
+  reportDate,
+  totalsList,
+  session
+) {
   const coll = getMetricCollection()
 
   try {
-    await coll.deleteMany({ type: FormMetricType.FunctionalAreaTotalsMetric }, { session })
+    await coll.deleteMany(
+      { type: FormMetricType.FunctionalAreaTotalsMetric },
+      { session }
+    )
 
     for (const totals of totalsList) {
       totals.updatedAt = reportDate
@@ -437,7 +448,10 @@ export async function updateFunctionalAreaMetricTotals(reportDate, totalsList, s
       )
     }
   } catch (err) {
-    logger.error(err, `Failed to save functional area totals metric - ${getErrorMessage(err)}`)
+    logger.error(
+      err,
+      `Failed to save functional area totals metric - ${getErrorMessage(err)}`
+    )
     throw err
   }
 }

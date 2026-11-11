@@ -1,17 +1,22 @@
-import { AuditEventMessageType, FunctionalAreaType, SigninMetricName } from '@defra/forms-model'
 import {
-  startOfDay,
-  subDays,
-  subYears } from 'date-fns'
+  AuditEventMessageType,
+  FunctionalAreaType,
+  SigninMetricName
+} from '@defra/forms-model'
+import { startOfDay, subDays, subYears } from 'date-fns'
 
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
 import {
   getAllTimelineMetrics,
   getFunctionalAreaMetricTotals,
-  saveSigninTimelineMetrics,
+  saveSigninTimelineMetrics
 } from '~/src/repositories/metrics-repository.js'
-import { CalculationTypes, handleMetricValue, handleTimeslot } from '~/src/service/metrics-helper.js'
+import {
+  CalculationTypes,
+  handleMetricValue,
+  handleTimeslot
+} from '~/src/service/metrics-helper.js'
 import { calcAverages } from '~/src/service/metrics.js'
 
 const allSigninMetricNames = Object.values(SigninMetricName)
@@ -73,7 +78,12 @@ export async function collectSigninMetricsFromAudit(reportingDate, session) {
  * @param {Date} reportingDate
  * @param {ClientSession} session
  */
-async function collectSigninMetricsFromAuditByType(queryType, metricName, reportingDate, session) {
+async function collectSigninMetricsFromAuditByType(
+  queryType,
+  metricName,
+  reportingDate,
+  session
+) {
   const cursor = getAuditRecordsOfType(
     queryType,
     reportingDate,
@@ -119,7 +129,10 @@ export async function recalcSigninMetrics(reportingDate, session) {
   /** @type { Date | undefined } */
   let earliestDataDate
 
-  const metricCursor = getAllTimelineMetrics({ metricName: { $in: allSigninMetricNames } }, session)
+  const metricCursor = getAllTimelineMetrics(
+    { metricName: { $in: allSigninMetricNames } },
+    session
+  )
 
   for await (const metric of metricCursor) {
     // Find earliest metric
@@ -153,7 +166,12 @@ export async function recalcSigninMetrics(reportingDate, session) {
     handleTimeslot(metric, totals.prevYear, CalculationTypes.Accumulation, createdAt, twoYearsAgo, oneYearAgo)
 
     // All time
-    handleMetricValue(metric, totals.allTime, CalculationTypes.Accumulation, true)
+    handleMetricValue(
+      metric,
+      totals.allTime,
+      CalculationTypes.Accumulation,
+      true
+    )
   }
   // Approximate implementation date as fallback if no submissions found
   totals.earliestDate = earliestDataDate ?? new Date('2025-12-01')
