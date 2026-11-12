@@ -1,7 +1,8 @@
 import {
   AuditEventMessageType,
   FormMetricName,
-  FormStatus
+  FormStatus,
+  FunctionalAreaType
 } from '@defra/forms-model'
 import { add, differenceInDays, min, sub, subDays } from 'date-fns'
 
@@ -35,20 +36,21 @@ import {
   getJsonFromManager,
   getJsonFromSubmissions
 } from '~/src/service/metrics-call-wrapper.js'
+import { allowedCopyAnswersMetricNames } from '~/src/service/metrics-copy-answers.js'
 import {
   constructPeriodTimeslots,
   createFormMap,
   formatDateOnly,
   getMetricCalcType,
-  handleMetricValue,
-  handleTimeslot,
-  isDraftSubmission,
-  isLiveSubmission,
+  handleAllTimeslots,
+  handleDraftSubmissions,
+  handleLiveSubmissions,
+  recalcFunctionalAreaMetrics,
   setTimeOnDate
 } from '~/src/service/metrics-helper.js'
 import {
-  collectSigninMetricsFromAudit,
-  recalcSigninMetrics
+  allowedSigninMetricNames,
+  collectSigninMetricsFromAudit
 } from '~/src/service/metrics-signin.js'
 
 /**
@@ -157,8 +159,9 @@ export async function collectMetrics(
       session
     )
 
-    // Functional areas - currently only sign-in metrics are collected
+    // Functional areas
     await collectSigninMetricsFromAudit(reportDate, session)
+    // Copy answers metrics are collected during submission processing
 
     reportDate = add(reportDate, { days: 1 })
   }
@@ -173,9 +176,20 @@ export async function collectMetrics(
 
   await updateMetricTotals(reportEndDate, totals, session)
 
-  // Functional areas - currently only sign-in metrics are collected
+  // Functional areas
   const functionalAreaTotals = [
-    await recalcSigninMetrics(reportEndDate, session)
+    await recalcFunctionalAreaMetrics(
+      reportEndDate,
+      FunctionalAreaType.Signin,
+      allowedSigninMetricNames,
+      session
+    ),
+    await recalcFunctionalAreaMetrics(
+      reportEndDate,
+      FunctionalAreaType.CopyAnswers,
+      allowedCopyAnswersMetricNames,
+      session
+    )
   ]
   await updateFunctionalAreaMetricTotals(
     reportEndDate,
@@ -489,32 +503,8 @@ export async function recalcFormMetrics(
 
     // Update windowed metrics
     const createdAt = new Date(metric.createdAt)
-    // Last 7 days
-    // prettier-ignore
-    handleTimeslot(metric, totals.last7Days, metricCalcType, createdAt, timeslots.sevenDaysAgo, timeslots.reportMorning, true)
 
-    // Previous 7 days
-    // prettier-ignore
-    handleTimeslot(metric, totals.prev7Days, metricCalcType, createdAt, timeslots.fourteenDaysAgo, timeslots.sevenDaysAgo)
-
-    // Last 30 days
-    // prettier-ignore
-    handleTimeslot(metric, totals.last30Days, metricCalcType, createdAt, timeslots.thirtyDaysAgo, timeslots.reportMorning, true)
-
-    // Previous 30 days
-    // prettier-ignore
-    handleTimeslot(metric, totals.prev30Days, metricCalcType, createdAt, timeslots.sixtyDaysAgo, timeslots.thirtyDaysAgo)
-
-    // Last year
-    // prettier-ignore
-    handleTimeslot(metric, totals.lastYear, metricCalcType, createdAt, timeslots.oneYearAgo, timeslots.reportMorning)
-
-    // Previous year
-    // prettier-ignore
-    handleTimeslot(metric, totals.prevYear, metricCalcType, createdAt, timeslots.twoYearsAgo, timeslots.oneYearAgo)
-
-    // All time
-    handleMetricValue(metric, totals.allTime, metricCalcType, true)
+    handleAllTimeslots(metric, totals, metricCalcType, createdAt, timeslots)
   }
   totals.liveSubmissions = Object.fromEntries(maps.formSubmissionsMapLive)
   totals.draftSubmissions = Object.fromEntries(maps.formSubmissionsMapDraft)
@@ -528,28 +518,6 @@ export async function recalcFormMetrics(
   const finalTotals = calcAverages(totals)
 
   return finalTotals
-}
-
-/**
- * @param {FormTimelineMetric} metric
- * @param {Map<string, number>} map
- */
-function handleLiveSubmissions(metric, map) {
-  if (isLiveSubmission(metric)) {
-    const formTotalSoFar = map.get(metric.formId) ?? 0
-    map.set(metric.formId, formTotalSoFar + metric.metricValue)
-  }
-}
-
-/**
- * @param {FormTimelineMetric} metric
- * @param {Map<string, number>} map
- */
-function handleDraftSubmissions(metric, map) {
-  if (isDraftSubmission(metric)) {
-    const formTotalSoFar = map.get(metric.formId) ?? 0
-    map.set(metric.formId, formTotalSoFar + metric.metricValue)
-  }
 }
 
 /**
@@ -725,6 +693,6 @@ function getFormMetricsCursor(formId, language, session) {
 
 /**
  * @import { ClientSession } from 'mongodb'
- * @import { FilterOptions, FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
+ * @import { FilterOptions, FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FunctionalAreaTotalsMetric } from '@defra/forms-model'
  * @import { CollectionJobResult } from '~/src/service/metrics-helper.js'
  */

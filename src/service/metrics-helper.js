@@ -1,4 +1,8 @@
-import { FormMetricName, FormStatus } from '@defra/forms-model'
+import {
+  FormMetricName,
+  FormStatus,
+  FunctionalAreaType
+} from '@defra/forms-model'
 import {
   addMilliseconds,
   endOfDay,
@@ -9,6 +13,16 @@ import {
 } from 'date-fns'
 
 import { FOURTEEN_DAYS, SEVEN_DAYS, THIRTY_DAYS } from '~/src/constants.js'
+import { client } from '~/src/mongo.js'
+import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
+import { saveFunctionalAreaTimelineMetrics } from '~/src/repositories/metrics-func-area-repository.js'
+import { adjustEarliestDate } from '~/src/repositories/metrics-repository-helper.js'
+import {
+  getAllOverviewMetrics,
+  getAllTimelineMetrics,
+  getFunctionalAreaMetricTotals
+} from '~/src/repositories/metrics-repository.js'
+import { calcAverages } from '~/src/service/metrics.js'
 
 export const CalculationTypes = {
   Accumulation: 'Accumulation',
@@ -77,19 +91,23 @@ export function dateFallsInsideTimeslot(date, startOfRange, endOfRange) {
  * @param {FormTimelineMetric} metric
  */
 export function isDraftSubmission(metric) {
-  return (
-    metric.metricName === FormMetricName.Submissions &&
-    metric.formStatus === FormStatus.Draft
-  )
+  return isSubmission(metric) && metric.formStatus === FormStatus.Draft
 }
 
 /**
  * @param {FormTimelineMetric} metric
  */
 export function isLiveSubmission(metric) {
+  return isSubmission(metric) && metric.formStatus === FormStatus.Live
+}
+
+/**
+ * @param {FormTimelineMetric} metric
+ */
+function isSubmission(metric) {
   return (
-    metric.metricName === FormMetricName.Submissions &&
-    metric.formStatus === FormStatus.Live
+    metric.metricName === FormMetricName.Submissions ||
+    metric.metricName.endsWith('Submission')
   )
 }
 
@@ -124,17 +142,19 @@ export function handleMetricValue(
   calculationType,
   saveDrilldown
 ) {
-  if (calculationType === CalculationTypes.AccumulationWithDrilldown) {
-    updateMetricTotal(metric, period, saveDrilldown)
-  }
-  if (calculationType === CalculationTypes.Accumulation) {
-    updateMetricTotal(metric, period)
-  }
-  if (calculationType === CalculationTypes.Snapshot) {
-    setMetricTotal(metric, period)
-  }
-  if (calculationType === CalculationTypes.Average) {
-    updateMetricAverage(metric, period)
+  switch (calculationType) {
+    case CalculationTypes.AccumulationWithDrilldown:
+      updateMetricTotal(metric, period, saveDrilldown)
+      break
+    case CalculationTypes.Accumulation:
+      updateMetricTotal(metric, period)
+      break
+    case CalculationTypes.Snapshot:
+      setMetricTotal(metric, period)
+      break
+    case CalculationTypes.Average:
+      updateMetricAverage(metric, period)
+      break
   }
 }
 
@@ -176,18 +196,18 @@ export function updateMetricTotal(metric, period, drillDown) {
   ) {
     return
   }
-  if (metricName in period && 'count' in period[metricName]) {
-    const currentTotal = period[metricName].count ?? 0
-    const newTotal = currentTotal + metric.metricValue
-    const detail = drillDown
-      ? {
-          details: [...(period[metricName].details ?? []), mapToMinimal(metric)]
-        }
-      : {}
-    period[metricName] = { count: newTotal, ...detail }
-  } else {
-    const detail = drillDown ? { details: [mapToMinimal(metric)] } : {}
-    period[metricName] = { count: metric.metricValue, ...detail }
+
+  const existingMetric =
+    metricName in period && 'count' in period[metricName]
+      ? period[metricName]
+      : undefined
+  const details = drillDown
+    ? [...(existingMetric?.details ?? []), mapToMinimal(metric)]
+    : undefined
+
+  period[metricName] = {
+    count: (existingMetric?.count ?? 0) + metric.metricValue,
+    ...(drillDown ? { details } : {})
   }
 }
 
@@ -229,12 +249,38 @@ export function updateMetricAverage(metric, period) {
     'avgTotal' in period[metricName] &&
     'avgCount' in period[metricName]
   ) {
-    const currentAvgTotal = period[metricName].avgTotal ?? 0
-    const currentAvgCount = period[metricName].avgCount ?? 0
-    period[metricName].avgTotal = currentAvgTotal + metric.metricValue
-    period[metricName].avgCount = currentAvgCount + 1
+    const metricAverage = period[metricName]
+    metricAverage.avgTotal = (metricAverage.avgTotal ?? 0) + metric.metricValue
+    metricAverage.avgCount = (metricAverage.avgCount ?? 0) + 1
   } else {
     period[metricName] = { avgTotal: metric.metricValue, avgCount: 1 }
+  }
+}
+
+/**
+ * @param {FormTimelineMetric} metric
+ * @param {Map<string, number>} map
+ */
+export function handleLiveSubmissions(metric, map) {
+  handleSubmission(metric, map, FormStatus.Live)
+}
+
+/**
+ * @param {FormTimelineMetric} metric
+ * @param {Map<string, number>} map
+ */
+export function handleDraftSubmissions(metric, map) {
+  handleSubmission(metric, map, FormStatus.Draft)
+}
+
+/**
+ * @param {FormTimelineMetric} metric
+ * @param {Map<string, number>} map
+ * @param {FormStatus} formStatus
+ */
+function handleSubmission(metric, map, formStatus) {
+  if (metric.formStatus === formStatus && isSubmission(metric)) {
+    map.set(metric.formId, (map.get(metric.formId) ?? 0) + metric.metricValue)
   }
 }
 
@@ -243,17 +289,220 @@ export function updateMetricAverage(metric, period) {
  * @param {Date} reportingDate
  */
 export function constructPeriodTimeslots(reportingDate) {
+  const reportMorning = startOfDay(reportingDate)
+
   return {
-    reportMorning: startOfDay(reportingDate),
-    sevenDaysAgo: subDays(startOfDay(reportingDate), SEVEN_DAYS),
-    fourteenDaysAgo: subDays(startOfDay(reportingDate), FOURTEEN_DAYS),
-    thirtyDaysAgo: subDays(startOfDay(reportingDate), THIRTY_DAYS),
-    sixtyDaysAgo: subDays(startOfDay(reportingDate), 60),
-    oneYearAgo: subYears(startOfDay(reportingDate), 1),
-    twoYearsAgo: subYears(startOfDay(reportingDate), 2)
+    reportMorning,
+    sevenDaysAgo: subDays(reportMorning, SEVEN_DAYS),
+    fourteenDaysAgo: subDays(reportMorning, FOURTEEN_DAYS),
+    thirtyDaysAgo: subDays(reportMorning, THIRTY_DAYS),
+    sixtyDaysAgo: subDays(reportMorning, 60),
+    oneYearAgo: subYears(reportMorning, 1),
+    twoYearsAgo: subYears(reportMorning, 2)
   }
 }
 
 /**
- * @import { FormTimelineMetric } from '@defra/forms-model'
+ * Collect signin metrics from audit events by type
+ * @param {AuditEventMessageType} queryType
+ * @param {string} metricName
+ * @param {Date} reportingDate
+ * @param {ClientSession} session
+ */
+export async function collectFunctionalAreaMetricsFromAuditByType(
+  queryType,
+  metricName,
+  reportingDate,
+  session
+) {
+  const cursor = getAuditRecordsOfType(
+    queryType,
+    reportingDate,
+    undefined,
+    session
+  )
+  for await (const created of cursor) {
+    const metric = /** @type {FunctionalAreaTimelineMetric} */ ({
+      metricName,
+      metricValue: 1,
+      createdAt: created.createdAt
+    })
+    await saveFunctionalAreaTimelineMetrics(metric, session)
+  }
+}
+
+/**
+ * Generates a report of functional area events
+ * @param {Date} reportingDate
+ * @param {FunctionalAreaType} area
+ * @param {FunctionalAreaMetricName[]} allowedMetricNames
+ * @param {ClientSession} session
+ * @returns {Promise<FunctionalAreaTotalsMetric>}
+ */
+export async function recalcFunctionalAreaMetrics(
+  reportingDate,
+  area,
+  allowedMetricNames,
+  session
+) {
+  const timeslots = constructPeriodTimeslots(reportingDate)
+
+  const formSubmissionsMapDraft = /** @type {Map<string, number>} */ (new Map())
+  const formSubmissionsMapLive = /** @type {Map<string, number>} */ (new Map())
+
+  const totals = /** @type {FunctionalAreaTotalsMetric} */ ({
+    last7Days: {},
+    prev7Days: {},
+    last30Days: {},
+    prev30Days: {},
+    lastYear: {},
+    prevYear: {},
+    allTime: {},
+    area
+  })
+
+  /** @type { Date | undefined } */
+  let earliestDataDate
+
+  const metricCursor = getAllTimelineMetrics(
+    { metricName: { $in: allowedMetricNames } },
+    session
+  )
+
+  for await (const metric of metricCursor) {
+    if (metric.metricName.endsWith('Submission')) {
+      // Live submissions
+      handleLiveSubmissions(metric, formSubmissionsMapLive)
+
+      // Draft submissions
+      handleDraftSubmissions(metric, formSubmissionsMapDraft)
+    }
+
+    // Find earliest metric
+    const createdAt = new Date(metric.createdAt)
+    earliestDataDate = adjustEarliestDate(earliestDataDate, createdAt)
+
+    handleAllTimeslots(
+      metric,
+      totals,
+      CalculationTypes.Accumulation,
+      createdAt,
+      timeslots
+    )
+  }
+
+  totals.liveSubmissions = Object.fromEntries(formSubmissionsMapLive)
+  totals.draftSubmissions = Object.fromEntries(formSubmissionsMapDraft)
+  // Approximate implementation date as fallback if no submissions found
+  totals.earliestDate = earliestDataDate ?? new Date('2025-12-01')
+  const finalTotals = calcAverages(totals)
+
+  return finalTotals
+}
+
+/** @type {Record<FunctionalAreaType, string>} */
+const FunctionalAreaFeatureMap = {
+  [FunctionalAreaType.Signin]: 'no-metric-required',
+  [FunctionalAreaType.CopyAnswers]: 'Copy answers'
+}
+
+/**
+ * Generates a report based on the stored metrics for sign-in activities
+ * @param {FunctionalAreaType} area - The functional area sub-type for which to generate the report
+ */
+export async function generateFunctionalAreaReport(area) {
+  const session = client.startSession()
+
+  const featureText = FunctionalAreaFeatureMap[area]
+
+  try {
+    // Get summary tiles
+    const totals = await getFunctionalAreaMetricTotals(area, session)
+
+    const overview = await getAllOverviewMetrics({}, session).toArray()
+
+    const formsInFunctionalArea = overview.filter((form) =>
+      Object.keys(form.featureMetrics.features).includes(featureText)
+    )
+
+    // Apply extra columns: submissionsCount
+    const overviewFull = applySubmissionCountsForFunctionalArea({
+      overview: formsInFunctionalArea,
+      totals
+    })
+
+    return {
+      totals,
+      overview: overviewFull
+    }
+  } finally {
+    await session.endSession()
+  }
+}
+
+/**
+ * @param {{ overview: FormOverviewMetric[], totals: FunctionalAreaTotalsMetric}} metrics
+ */
+export function applySubmissionCountsForFunctionalArea(metrics) {
+  // Create a map of certain counts per form for quicker lookups
+  const submissionCountsLive = createFormMap(metrics.totals.liveSubmissions)
+  const submissionCountsDraft = createFormMap(metrics.totals.draftSubmissions)
+
+  return metrics.overview.map((metric) => ({
+    featureMetrics: metric.featureMetrics,
+    summaryMetrics: metric.summaryMetrics,
+    formId: metric.formId,
+    formName: metric.summaryMetrics.name,
+    formStatus: metric.formStatus,
+    submissionsCount:
+      (metric.formStatus === FormStatus.Live
+        ? submissionCountsLive.get(metric.formId)
+        : submissionCountsDraft.get(metric.formId)) ?? 0
+  }))
+}
+
+/**
+ * Handles all timeslots for a given metric and totals, applying the appropriate calculations for each timeslot.
+ * @param {WithId<FormTimelineMetric>} metric
+ * @param {FormTotalsMetric | FunctionalAreaTotalsMetric} totals
+ * @param {string} metricCalcType
+ * @param {Date} createdAt
+ * @param {Record<string, Date>} timeslots
+ */
+export function handleAllTimeslots(
+  metric,
+  totals,
+  metricCalcType,
+  createdAt,
+  timeslots
+) {
+  /** @type {Array<[Record<string, { count?: number }> | undefined, Date, Date, boolean?]>} */
+  const periods = [
+    [totals.last7Days, timeslots.sevenDaysAgo, timeslots.reportMorning, true],
+    [totals.prev7Days, timeslots.fourteenDaysAgo, timeslots.sevenDaysAgo],
+    [totals.last30Days, timeslots.thirtyDaysAgo, timeslots.reportMorning, true],
+    [totals.prev30Days, timeslots.sixtyDaysAgo, timeslots.thirtyDaysAgo],
+    [totals.lastYear, timeslots.oneYearAgo, timeslots.reportMorning],
+    [totals.prevYear, timeslots.twoYearsAgo, timeslots.oneYearAgo]
+  ]
+
+  for (const [period, start, end, saveDrilldown] of periods) {
+    handleTimeslot(
+      metric,
+      period,
+      metricCalcType,
+      createdAt,
+      start,
+      end,
+      saveDrilldown
+    )
+  }
+
+  // All time
+  handleMetricValue(metric, totals.allTime, metricCalcType, true)
+}
+
+/**
+ * @import { ClientSession, WithId } from 'mongodb'
+ * @import { AuditEventMessageType, FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FunctionalAreaMetricName, FunctionalAreaTimelineMetric, FunctionalAreaTotalsMetric } from '@defra/forms-model'
  */

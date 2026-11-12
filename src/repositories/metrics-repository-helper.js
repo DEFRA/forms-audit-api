@@ -47,10 +47,10 @@ export function adjustEarliestDate(earliestDataDate, createdAtSubmission) {
 
 /**
  * Gets the metric collection
- * @returns {Collection<FormOverviewMetric | FormTimelineMetric | SigninTimelineMetric | FormTotalsMetric | FunctionalAreaTotalsMetric | FormDrilldownMetric | FormMetricControl>}
+ * @returns {Collection<FormOverviewMetric | FormTimelineMetric | FunctionalAreaTimelineMetric | FormTotalsMetric | FunctionalAreaTotalsMetric | FormDrilldownMetric | FormMetricControl>}
  */
 export function getMetricCollection() {
-  return /** @type {Collection<FormOverviewMetric | FormTimelineMetric | SigninTimelineMetric | FormTotalsMetric | FunctionalAreaTotalsMetric | FormDrilldownMetric | FormMetricControl>} */ (
+  return /** @type {Collection<FormOverviewMetric | FormTimelineMetric | FunctionalAreaTimelineMetric | FormTotalsMetric | FunctionalAreaTotalsMetric | FormDrilldownMetric | FormMetricControl>} */ (
     db.collection(METRICS_COLLECTION_NAME)
   )
 }
@@ -122,6 +122,6 @@ export async function getFirstDraft(formId, language, session) {
 
 /**
  * @import { ClientSession, Collection, WithId } from 'mongodb'
- * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FormDrilldownMetric, FunctionalAreaTotalsMetric,SigninTimelineMetric } from '@defra/forms-model'
+ * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FormDrilldownMetric, FunctionalAreaTotalsMetric, FunctionalAreaTimelineMetric } from '@defra/forms-model'
  * @import { FormMetricControl } from '~/src/service/metrics.js'
  */

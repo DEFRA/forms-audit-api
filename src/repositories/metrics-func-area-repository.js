@@ -5,10 +5,10 @@ import { getMetricCollection } from '~/src/repositories/metrics-repository-helpe
 
 /**
  * Saves snapshot metric records for a form.
- * @param {SigninTimelineMetric} metricData
+ * @param {FunctionalAreaTimelineMetric} metricData
  * @param {ClientSession} session
  */
-export async function saveSigninTimelineMetrics(metricData, session) {
+export async function saveFunctionalAreaTimelineMetrics(metricData, session) {
   const coll = getMetricCollection()
 
   try {
@@ -22,7 +22,7 @@ export async function saveSigninTimelineMetrics(metricData, session) {
   } catch (err) {
     logger.error(
       err,
-      `Failed to save signin timeline metrics - ${getErrorMessage(err)}`
+      `Failed to save functional area timeline metrics for name ${metricData.metricName} - ${getErrorMessage(err)}`
     )
     throw err
   }
@@ -30,5 +30,5 @@ export async function saveSigninTimelineMetrics(metricData, session) {
 
 /**
  * @import { ClientSession } from 'mongodb'
- * @import { SigninTimelineMetric } from '@defra/forms-model'
+ * @import { FunctionalAreaTimelineMetric } from '@defra/forms-model'
  */

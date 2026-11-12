@@ -2,8 +2,8 @@ import { FormMetricName, FunctionalAreaType, Scopes } from '@defra/forms-model'
 import Joi from 'joi'
 
 import { WELSH } from '~/src/constants.js'
+import { generateFunctionalAreaReport } from '~/src/service/metrics-helper.js'
 import { runMetricsCollectionJob } from '~/src/service/metrics-job.js'
-import { generateFunctionalAreaReport } from '~/src/service/metrics-signin.js'
 import { generateSubmissionsReport } from '~/src/service/metrics-submissions.js'
 import {
   EARLIEST_REPORT_DATE_AS_STRING,
