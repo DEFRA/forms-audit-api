@@ -7,7 +7,6 @@ import {
   FunctionalAreaType,
   SigninMetricName
 } from '@defra/forms-model'
-import { endOfDay } from 'date-fns'
 
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
@@ -21,8 +20,10 @@ import {
   CalculationTypes,
   applySubmissionCountsForFunctionalArea,
   collectFunctionalAreaMetricsFromAuditByType,
+  constructPeriodTimeslots,
   generateFunctionalAreaReport,
   getMetricCalcType,
+  handleAllTimeslots,
   handleDraftSubmissions,
   handleLiveSubmissions,
   handleMetricValue,
@@ -103,7 +104,7 @@ describe('metrics-helper', () => {
     const startOfSlot = new Date('2026-05-01T00:00:00.000Z')
     const endOfSlot = new Date('2026-05-02T00:00:00.000Z')
 
-    it('should include metrics on the start and end dates', () => {
+    it('includes the start and the instant before the exclusive end', () => {
       const period = /** @type {Record<string, { count?: number }>} */ ({})
       handleTimeslot(
         metric,
@@ -117,7 +118,7 @@ describe('metrics-helper', () => {
         metric,
         period,
         CalculationTypes.Accumulation,
-        endOfDay(endOfSlot),
+        new Date(endOfSlot.getTime() - 1),
         startOfSlot,
         endOfSlot
       )
@@ -125,7 +126,7 @@ describe('metrics-helper', () => {
       expect(period).toEqual({ FormsInDraft: { count: 6 } })
     })
 
-    it('should ignore metrics outside the slot', () => {
+    it('excludes the instant before the start and the exclusive end', () => {
       const period = /** @type {Record<string, { count?: number }>} */ ({})
       handleTimeslot(
         metric,
@@ -139,12 +140,86 @@ describe('metrics-helper', () => {
         metric,
         period,
         CalculationTypes.Accumulation,
-        new Date('2026-05-03T00:00:00.000Z'),
+        endOfSlot,
         startOfSlot,
         endOfSlot
       )
 
       expect(period).toEqual({})
+    })
+  })
+
+  describe('handleAllTimeslots', () => {
+    const reportingDate = new Date(2026, 4, 10, 12)
+    const reportEnd = new Date(2026, 4, 11)
+    const metric = /** @type {WithId<FormTimelineMetric>} */ ({
+      metricName: FormMetricName.NewFormsCreated,
+      formStatus: FormStatus.Draft,
+      formId: 'form-id',
+      metricValue: 1,
+      createdAt: reportingDate
+    })
+
+    /** @type {Array<['last7Days' | 'last30Days' | 'lastYear', 'prev7Days' | 'prev30Days' | 'prevYear', Date, Date]>} */
+    const periods = [
+      ['last7Days', 'prev7Days', new Date(2026, 4, 4), new Date(2026, 3, 27)],
+      [
+        'last30Days',
+        'prev30Days',
+        new Date(2026, 3, 11),
+        new Date(2026, 2, 12)
+      ],
+      ['lastYear', 'prevYear', new Date(2025, 4, 11), new Date(2024, 4, 11)]
+    ]
+
+    it.each(periods)(
+      'assigns %s and %s boundaries without overlap',
+      (last, previous, boundary, previousStart) => {
+        const timeslots = constructPeriodTimeslots(reportingDate)
+
+        /** @type {Array<[Date, boolean, boolean]>} */
+        const cases = [
+          [new Date(previousStart.getTime() - 1), false, false],
+          [previousStart, false, true],
+          [new Date(boundary.getTime() - 1), false, true],
+          [boundary, true, false],
+          [new Date(reportEnd.getTime() - 1), true, false],
+          [reportEnd, false, false]
+        ]
+        for (const [createdAt, expectedLast, expectedPrevious] of cases) {
+          const totals = /** @type {FormTotalsMetric} */ ({
+            last7Days: {},
+            prev7Days: {},
+            last30Days: {},
+            prev30Days: {},
+            lastYear: {},
+            prevYear: {},
+            allTime: {}
+          })
+
+          handleAllTimeslots(
+            metric,
+            totals,
+            CalculationTypes.Accumulation,
+            createdAt,
+            timeslots
+          )
+
+          expect(Boolean(totals[last]?.NewFormsCreated)).toBe(expectedLast)
+          expect(Boolean(totals[previous]?.NewFormsCreated)).toBe(
+            expectedPrevious
+          )
+          expect(totals.allTime?.NewFormsCreated.count).toBe(1)
+        }
+      }
+    )
+
+    it('includes leap day in the reporting year and keeps years adjacent', () => {
+      const timeslots = constructPeriodTimeslots(new Date(2024, 1, 29, 12))
+
+      expect(timeslots.reportEnd).toEqual(new Date(2024, 2, 1))
+      expect(timeslots.oneYearAgo).toEqual(new Date(2023, 2, 1))
+      expect(timeslots.twoYearsAgo).toEqual(new Date(2022, 2, 1))
     })
   })
 
@@ -572,5 +647,6 @@ describe('metrics-helper', () => {
 })
 
 /**
- * @import { FormOverviewMetric, FormTimelineMetric, FunctionalAreaTimelineMetric, FunctionalAreaTotalsMetric } from '@defra/forms-model'
+ * @import { WithId } from 'mongodb'
+ * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FunctionalAreaTimelineMetric, FunctionalAreaTotalsMetric } from '@defra/forms-model'
  */

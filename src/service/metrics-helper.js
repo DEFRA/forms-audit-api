@@ -3,14 +3,7 @@ import {
   FormStatus,
   FunctionalAreaType
 } from '@defra/forms-model'
-import {
-  addMilliseconds,
-  endOfDay,
-  format,
-  startOfDay,
-  subDays,
-  subYears
-} from 'date-fns'
+import { addDays, format, startOfDay, subDays, subYears } from 'date-fns'
 
 import { FOURTEEN_DAYS, SEVEN_DAYS, THIRTY_DAYS } from '~/src/constants.js'
 import { client } from '~/src/mongo.js'
@@ -163,8 +156,8 @@ export function handleMetricValue(
  * @param {Record<string, { count?: number }> | undefined} period
  * @param {string} metricCalcType
  * @param {Date} createdAt
- * @param {Date} startOfSlot
- * @param {Date} endOfSlot
+ * @param {Date} startOfSlot - inclusive
+ * @param {Date} endOfSlot - exclusive
  * @param {boolean} [saveDrilldown]
  */
 export function handleTimeslot(
@@ -176,8 +169,7 @@ export function handleTimeslot(
   endOfSlot,
   saveDrilldown
 ) {
-  const endOfDaySlot = addMilliseconds(endOfDay(endOfSlot), 1)
-  if (dateFallsInsideTimeslot(createdAt, startOfSlot, endOfDaySlot)) {
+  if (dateFallsInsideTimeslot(createdAt, startOfSlot, endOfSlot)) {
     handleMetricValue(metric, period, metricCalcType, saveDrilldown)
   }
 }
@@ -289,16 +281,16 @@ function handleSubmission(metric, map, formStatus) {
  * @param {Date} reportingDate
  */
 export function constructPeriodTimeslots(reportingDate) {
-  const reportMorning = startOfDay(reportingDate)
+  const reportEnd = addDays(startOfDay(reportingDate), 1)
 
   return {
-    reportMorning,
-    sevenDaysAgo: subDays(reportMorning, SEVEN_DAYS),
-    fourteenDaysAgo: subDays(reportMorning, FOURTEEN_DAYS),
-    thirtyDaysAgo: subDays(reportMorning, THIRTY_DAYS),
-    sixtyDaysAgo: subDays(reportMorning, 60),
-    oneYearAgo: subYears(reportMorning, 1),
-    twoYearsAgo: subYears(reportMorning, 2)
+    reportEnd,
+    sevenDaysAgo: subDays(reportEnd, SEVEN_DAYS),
+    fourteenDaysAgo: subDays(reportEnd, FOURTEEN_DAYS),
+    thirtyDaysAgo: subDays(reportEnd, THIRTY_DAYS),
+    sixtyDaysAgo: subDays(reportEnd, 60),
+    oneYearAgo: subYears(reportEnd, 1),
+    twoYearsAgo: subYears(reportEnd, 2)
   }
 }
 
@@ -478,11 +470,11 @@ export function handleAllTimeslots(
 ) {
   /** @type {Array<[Record<string, { count?: number }> | undefined, Date, Date, boolean?]>} */
   const periods = [
-    [totals.last7Days, timeslots.sevenDaysAgo, timeslots.reportMorning, true],
+    [totals.last7Days, timeslots.sevenDaysAgo, timeslots.reportEnd, true],
     [totals.prev7Days, timeslots.fourteenDaysAgo, timeslots.sevenDaysAgo],
-    [totals.last30Days, timeslots.thirtyDaysAgo, timeslots.reportMorning, true],
+    [totals.last30Days, timeslots.thirtyDaysAgo, timeslots.reportEnd, true],
     [totals.prev30Days, timeslots.sixtyDaysAgo, timeslots.thirtyDaysAgo],
-    [totals.lastYear, timeslots.oneYearAgo, timeslots.reportMorning],
+    [totals.lastYear, timeslots.oneYearAgo, timeslots.reportEnd],
     [totals.prevYear, timeslots.twoYearsAgo, timeslots.oneYearAgo]
   ]
 
