@@ -1,4 +1,5 @@
 import {
+  CopyAnswersMetricName,
   FormMetricName,
   FormStatus,
   FunctionalAreaType
@@ -95,12 +96,12 @@ export function isLiveSubmission(metric) {
 }
 
 /**
- * @param {FormTimelineMetric} metric
+ * @param {FormTimelineMetric | FunctionalAreaTimelineMetric} metric
  */
 function isSubmission(metric) {
   return (
     metric.metricName === FormMetricName.Submissions ||
-    metric.metricName.endsWith('Submission')
+    metric.metricName === CopyAnswersMetricName.CopyAnswersSubmission
   )
 }
 
@@ -364,25 +365,37 @@ export async function recalcFunctionalAreaMetrics(
   )
 
   for await (const metric of metricCursor) {
-    if (metric.metricName.endsWith('Submission')) {
+    const createdAt = new Date(metric.createdAt)
+    // Find earliest metric
+    earliestDataDate = adjustEarliestDate(earliestDataDate, createdAt)
+
+    if (isSubmission(metric)) {
       // Live submissions
       handleLiveSubmissions(metric, formSubmissionsMapLive)
 
       // Draft submissions
       handleDraftSubmissions(metric, formSubmissionsMapDraft)
+
+      // Only count live submissions for timeslot figures
+      if (metric.formStatus === FormStatus.Live) {
+        handleAllTimeslots(
+          metric,
+          totals,
+          CalculationTypes.Accumulation,
+          createdAt,
+          timeslots
+        )
+      }
+    } else {
+      // Handle non-submission metrics for functional areas
+      handleAllTimeslots(
+        metric,
+        totals,
+        CalculationTypes.Accumulation,
+        createdAt,
+        timeslots
+      )
     }
-
-    // Find earliest metric
-    const createdAt = new Date(metric.createdAt)
-    earliestDataDate = adjustEarliestDate(earliestDataDate, createdAt)
-
-    handleAllTimeslots(
-      metric,
-      totals,
-      CalculationTypes.Accumulation,
-      createdAt,
-      timeslots
-    )
   }
 
   totals.liveSubmissions = Object.fromEntries(formSubmissionsMapLive)

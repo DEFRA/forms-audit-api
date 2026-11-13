@@ -505,11 +505,11 @@ describe('metrics-helper', () => {
         liveSubmissions: { 'form-1': 6, 'form-2': 5 },
         draftSubmissions: { 'form-1': 3 },
         last7Days: {
-          [CopyAnswersMetricName.CopyAnswersSubmission]: { count: 14 },
+          [CopyAnswersMetricName.CopyAnswersSubmission]: { count: 11 },
           [CopyAnswersMetricName.CopyAnswersForm]: { count: 1 }
         },
         allTime: {
-          [CopyAnswersMetricName.CopyAnswersSubmission]: { count: 14 },
+          [CopyAnswersMetricName.CopyAnswersSubmission]: { count: 11 },
           [CopyAnswersMetricName.CopyAnswersForm]: { count: 1 }
         }
       })
