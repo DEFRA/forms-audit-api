@@ -1192,7 +1192,7 @@ describe('runMetricsCollectionJob', () => {
       expect(calls[2][0].href).toBe(
         'http://localhost:3002/report/timeline?date=2026-05-12T15:56:04.364Z&language=cy'
       )
-      expect(getAuditRecordsOfType).toHaveBeenCalledTimes(11)
+      expect(getAuditRecordsOfType).toHaveBeenCalledTimes(12)
       expect(getAuditRecordsOfType).toHaveBeenNthCalledWith(
         1,
         'FORM_CREATED',

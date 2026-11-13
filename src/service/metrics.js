@@ -36,7 +36,10 @@ import {
   getJsonFromManager,
   getJsonFromSubmissions
 } from '~/src/service/metrics-call-wrapper.js'
-import { allowedCopyAnswersMetricNames } from '~/src/service/metrics-copy-answers.js'
+import {
+  allowedCopyAnswersMetricNames,
+  collectCopyAnswersMetricsFromAudit
+} from '~/src/service/metrics-copy-answers.js'
 import {
   constructPeriodTimeslots,
   createFormMap,
@@ -161,7 +164,7 @@ export async function collectMetrics(
 
     // Functional areas
     await collectSigninMetricsFromAudit(reportDate, session)
-    // Copy answers metrics are collected during submission processing
+    await collectCopyAnswersMetricsFromAudit(reportDate, session)
 
     reportDate = add(reportDate, { days: 1 })
   }
@@ -473,7 +476,7 @@ export async function recalcFormMetrics(
       continue
     }
 
-    const metricCalcType = getMetricCalcType(metric)
+    const metricCalcType = getMetricCalcType(metric.metricName)
 
     if (metric.metricName === FormMetricName.Submissions) {
       // Live submissions

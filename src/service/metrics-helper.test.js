@@ -82,16 +82,9 @@ describe('metrics-helper', () => {
 
   describe('getMetricCalcType', () => {
     it('should return the configured calculation type', () => {
-      expect(
-        getMetricCalcType({
-          type: FormMetricType.TimelineMetric,
-          metricName: FormMetricName.Submissions,
-          formId: 'form-id',
-          formStatus: FormStatus.Live,
-          metricValue: 1,
-          createdAt: new Date('2026-05-01T00:00:00.000Z')
-        })
-      ).toBe(CalculationTypes.AccumulationWithDrilldown)
+      expect(getMetricCalcType(FormMetricName.Submissions)).toBe(
+        CalculationTypes.AccumulationWithDrilldown
+      )
     })
   })
 

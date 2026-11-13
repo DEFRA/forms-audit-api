@@ -552,6 +552,49 @@ export async function getNumberOfFormsInDraft(
 }
 
 /**
+ * Gets the functional area metric for the previous day relative to the specified reporting date and returns the value
+ * @param {Date} reportingDate
+ * @param {string} metricName
+ * @param {ClientSession} session
+ * @returns {Promise<number>}
+ */
+export async function getFunctionalAreaMetricFromPreviousDay(
+  reportingDate,
+  metricName,
+  session
+) {
+  const coll = getMetricCollection()
+
+  const withoutTime = reportingDate.toISOString().substring(0, 10)
+  const startOfDay = `${withoutTime}T00:00:00.000Z`
+  const endOfDay = `${withoutTime}T23:59:59.999Z`
+
+  try {
+    const metric =
+      /** @type {WithId<FunctionalAreaTimelineMetric> | undefined} */ (
+        await coll.findOne(
+          {
+            type: FormMetricType.TimelineMetric,
+            metricName,
+            createdAt: {
+              $gte: new Date(startOfDay),
+              $lte: new Date(endOfDay)
+            }
+          },
+          { session }
+        )
+      )
+    return metric?.metricValue ?? 0
+  } catch (err) {
+    logger.error(
+      err,
+      `Failed to read timeline getFunctionalAreaMetricFromPreviousDay for date ${reportingDate.toISOString()} and metricName ${metricName} - ${getErrorMessage(err)}`
+    )
+    throw err
+  }
+}
+
+/**
  * @import { ClientSession, Collection, Filter, FindCursor, WithId, WithoutId } from 'mongodb'
  * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FormDrilldownMetric, FunctionalAreaTotalsMetric, FunctionalAreaType, FunctionalAreaTimelineMetric } from '@defra/forms-model'
  * @import { FilterCriteria } from '~/src/service/metrics.js'
