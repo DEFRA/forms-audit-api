@@ -9,8 +9,6 @@ import {
 } from '~/src/repositories/metrics-repository-helper.js'
 import { metricDrilldownPeriods } from '~/src/service/metrics-helper.js'
 
-const FORM_METRIC_CONTROL = 'form-metric-control'
-
 /**
  * Gets overview metric records for a form.
  * @param {string} formId
@@ -212,14 +210,15 @@ export function getAllOverviewMetrics(filter, session) {
 
 /**
  * Get all timeline metrics
- * @param { Filter<WithId<FormTimelineMetric>> | undefined } filter
+ * @param { Filter<WithId<FormTimelineMetric | FunctionalAreaTimelineMetric>> | undefined } filter
  * @param {ClientSession} session
  * @returns {FindCursor<WithId<FormTimelineMetric>>}
  */
 export function getAllTimelineMetrics(filter, session) {
-  const coll = /** @type {Collection<FormTimelineMetric>} */ (
-    getMetricCollection()
-  )
+  const coll =
+    /** @type {Collection<FormTimelineMetric | FunctionalAreaTimelineMetric>} */ (
+      getMetricCollection()
+    )
 
   try {
     const cursor = /** @type {FindCursor<WithId<FormTimelineMetric>>} */ (
@@ -333,6 +332,33 @@ export async function getDrilldownRecords(
 }
 
 /**
+ * Gets functional area metric totals record.
+ * @param {FunctionalAreaType} area
+ * @param {ClientSession} session
+ */
+export function getFunctionalAreaMetricTotals(area, session) {
+  const coll = getMetricCollection()
+
+  try {
+    return /** @type {Promise<WithId<FunctionalAreaTotalsMetric>>} */ (
+      coll.findOne(
+        {
+          type: FormMetricType.FunctionalAreaTotalsMetric,
+          area
+        },
+        { session }
+      )
+    )
+  } catch (err) {
+    logger.error(
+      err,
+      `Failed to get functional area totals metric for ${area} - ${getErrorMessage(err)}`
+    )
+    throw err
+  }
+}
+
+/**
  * Saves snapshot metric records for a form.
  * @param {Date} reportDate
  * @param {FormTotalsMetric[]} totalsList
@@ -361,6 +387,44 @@ export async function updateMetricTotals(reportDate, totalsList, session) {
     }
   } catch (err) {
     logger.error(err, `Failed to save totals metric - ${getErrorMessage(err)}`)
+    throw err
+  }
+}
+
+/**
+ * Saves snapshot metric records for functional areas.
+ * @param {Date} reportDate
+ * @param {FunctionalAreaTotalsMetric[]} totalsList
+ * @param {ClientSession} session
+ */
+export async function updateFunctionalAreaMetricTotals(
+  reportDate,
+  totalsList,
+  session
+) {
+  const coll = getMetricCollection()
+
+  try {
+    await coll.deleteMany(
+      { type: FormMetricType.FunctionalAreaTotalsMetric },
+      { session }
+    )
+
+    for (const totals of totalsList) {
+      totals.updatedAt = reportDate
+      await coll.insertOne(
+        {
+          ...totals,
+          type: FormMetricType.FunctionalAreaTotalsMetric
+        },
+        { session }
+      )
+    }
+  } catch (err) {
+    logger.error(
+      err,
+      `Failed to save functional area totals metric - ${getErrorMessage(err)}`
+    )
     throw err
   }
 }
@@ -488,141 +552,43 @@ export async function getNumberOfFormsInDraft(
 }
 
 /**
- * Gets metric lock record and sets the lock if not already locked.
+ * Gets the functional area metric for the previous day relative to the specified reporting date and returns the value
+ * @param {Date} reportingDate
+ * @param {string} metricName
  * @param {ClientSession} session
- * @returns {Promise<{ lockSuccess: boolean, lastSuccessfulRun: Date | null }>}
+ * @returns {Promise<number>}
  */
-export async function grabLock(session) {
+export async function getFunctionalAreaMetricFromPreviousDay(
+  reportingDate,
+  metricName,
+  session
+) {
   const coll = getMetricCollection()
-  const now = new Date()
+
+  const withoutTime = reportingDate.toISOString().substring(0, 10)
+  const startOfDay = `${withoutTime}T00:00:00.000Z`
+  const endOfDay = `${withoutTime}T23:59:59.999Z`
 
   try {
-    // Atomically try to grab the lock on existing record
-    // Returns the document BEFORE update (or null if no match)
-    const controlRecord = /** @type { WithId<FormMetricControl> | null } */ (
-      await coll.findOneAndUpdate(
-        { type: FORM_METRIC_CONTROL, locked: false },
-        {
-          $set: {
-            locked: true,
-            jobStart: now,
-            jobEnd: null,
-            updatedAt: now
-          }
-        },
-        { returnDocument: 'before', session }
+    const metric =
+      /** @type {WithId<FunctionalAreaTimelineMetric> | undefined} */ (
+        await coll.findOne(
+          {
+            type: FormMetricType.TimelineMetric,
+            metricName,
+            createdAt: {
+              $gte: new Date(startOfDay),
+              $lte: new Date(endOfDay)
+            }
+          },
+          { session }
+        )
       )
-    )
-
-    // No record found - could be first deploy or record is locked
-    if (!controlRecord) {
-      // Check if record exists at all
-      const existing = /** @type { WithId<FormMetricControl> | null } */ (
-        await coll.findOne({ type: FORM_METRIC_CONTROL }, { session })
-      )
-
-      // First deploy - record doesn't exist, create it with lock
-      if (!existing) {
-        const firstLock = {
-          type: FORM_METRIC_CONTROL,
-          locked: true,
-          jobStart: now,
-          jobEnd: null,
-          lastSuccessfulRunDate: null,
-          lastRunResult: '',
-          updatedAt: now
-        }
-        await coll.insertOne(firstLock, { session })
-        return {
-          lockSuccess: true,
-          lastSuccessfulRun: null
-        }
-      }
-
-      // Record exists but is already locked by another container
-      return {
-        lockSuccess: false,
-        lastSuccessfulRun: existing.lastSuccessfulRunDate
-      }
-    }
-
-    // Successfully grabbed the lock (record existed and was unlocked)
-    return {
-      lockSuccess: true,
-      lastSuccessfulRun: controlRecord.lastSuccessfulRunDate
-    }
+    return metric?.metricValue ?? 0
   } catch (err) {
     logger.error(
       err,
-      `Failed to read/update control record - ${getErrorMessage(err)}`
-    )
-    throw err
-  }
-}
-
-/**
- * Removes the metric control lock and updates the control record.
- * @param {{ success: boolean, message: string, endDate: Date | undefined }} result
- * @param {ClientSession} session
- */
-export async function releaseLock({ success, message, endDate }, session) {
-  const coll = getMetricCollection()
-
-  const now = new Date()
-
-  const lastRunDate = success ? { lastSuccessfulRunDate: endDate } : {}
-
-  const updateObj = {
-    $set: {
-      locked: false,
-      jobEnd: now,
-      updatedAt: now,
-      lastRunResult: success ? `Success: ${message}` : `Failure: ${message}`,
-      ...lastRunDate
-    }
-  }
-
-  try {
-    await coll.updateOne(
-      {
-        type: FORM_METRIC_CONTROL
-      },
-      updateObj,
-      {
-        session
-      }
-    )
-  } catch (err) {
-    logger.error(err, `Failed to remove lock - ${getErrorMessage(err)}`)
-    throw err
-  }
-}
-
-/**
- * Clears all metrics data (leaves the control record)
- * @param {ClientSession} session
- */
-export async function clearMetricsData(session) {
-  const coll = getMetricCollection()
-
-  try {
-    await coll.deleteMany(
-      {
-        type: { $ne: FORM_METRIC_CONTROL }
-      },
-      { session }
-    )
-    await coll.updateOne(
-      {
-        type: FORM_METRIC_CONTROL
-      },
-      { $set: { lastSuccessfulRunDate: null } },
-      { session }
-    )
-  } catch (err) {
-    logger.error(
-      err,
-      `Failed to clear all metrics data - ${getErrorMessage(err)}`
+      `Failed to read timeline getFunctionalAreaMetricFromPreviousDay for date ${reportingDate.toISOString()} and metricName ${metricName} - ${getErrorMessage(err)}`
     )
     throw err
   }
@@ -630,6 +596,6 @@ export async function clearMetricsData(session) {
 
 /**
  * @import { ClientSession, Collection, Filter, FindCursor, WithId, WithoutId } from 'mongodb'
- * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FormDrilldownMetric } from '@defra/forms-model'
- * @import { FilterCriteria, FormMetricControl } from '~/src/service/metrics.js'
+ * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FormDrilldownMetric, FunctionalAreaTotalsMetric, FunctionalAreaType, FunctionalAreaTimelineMetric } from '@defra/forms-model'
+ * @import { FilterCriteria } from '~/src/service/metrics.js'
  */

@@ -1,7 +1,8 @@
-import { FormMetricName, Scopes } from '@defra/forms-model'
+import { FormMetricName, FunctionalAreaType, Scopes } from '@defra/forms-model'
 import Joi from 'joi'
 
 import { WELSH } from '~/src/constants.js'
+import { generateFunctionalAreaReport } from '~/src/service/metrics-helper.js'
 import { runMetricsCollectionJob } from '~/src/service/metrics-job.js'
 import { generateSubmissionsReport } from '~/src/service/metrics-submissions.js'
 import {
@@ -127,6 +128,29 @@ export default [
       validate: {
         params: drilldownSchema,
         query: querySchema
+      }
+    }
+  }),
+
+  /**
+   * @satisfies {ServerRoute<{ Params: { area: FunctionalAreaType } }>}
+   */
+  ({
+    method: 'GET',
+    path: '/report-functional-area/{area}',
+    async handler(request, h) {
+      const metrics = await generateFunctionalAreaReport(request.params.area)
+
+      return h.response(metrics).code(HTTP_OK)
+    },
+    options: {
+      auth: false,
+      validate: {
+        params: Joi.object({
+          area: Joi.string()
+            .valid(...Object.values(FunctionalAreaType))
+            .required()
+        })
       }
     }
   }),
