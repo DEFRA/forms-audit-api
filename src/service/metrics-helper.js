@@ -357,7 +357,9 @@ export async function recalcFunctionalAreaMetrics(
   let earliestDataDate
 
   const metricCursor = getAllTimelineMetrics(
-    { metricName: { $in: allowedMetricNames } },
+    {
+      metricName: { $in: allowedMetricNames }
+    },
     session
   )
 

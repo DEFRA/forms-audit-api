@@ -412,7 +412,9 @@ describe('metrics-helper', () => {
       )
 
       expect(getAllTimelineMetrics).toHaveBeenCalledWith(
-        { metricName: { $in: Object.values(SigninMetricName) } },
+        {
+          metricName: { $in: Object.values(SigninMetricName) }
+        },
         session
       )
       expect(totals).toMatchObject({
@@ -436,27 +438,50 @@ describe('metrics-helper', () => {
       expect(calcAverages).toHaveBeenCalledWith(totals)
     })
 
-    it('aggregates Copy Answers events that do not carry a form status', async () => {
-      const metrics = /** @type {FunctionalAreaTimelineMetric[]} */ ([
-        {
-          type: FormMetricType.TimelineMetric,
-          metricName: CopyAnswersMetricName.CopyAnswersSubmission,
-          metricValue: 4,
-          createdAt: new Date('2026-05-09T10:00:00.000Z')
-        },
-        {
-          type: FormMetricType.TimelineMetric,
-          metricName: CopyAnswersMetricName.CopyAnswersSubmission,
-          metricValue: 2,
-          createdAt: new Date('2026-05-08T10:00:00.000Z')
-        },
-        {
-          type: FormMetricType.TimelineMetric,
-          metricName: CopyAnswersMetricName.CopyAnswersForm,
-          metricValue: 1,
-          createdAt: new Date('2026-05-09T10:00:00.000Z')
-        }
-      ])
+    it('aggregates Copy Answers submissions by form and status for the overview', async () => {
+      const metrics =
+        /** @type {(FunctionalAreaTimelineMetric & Pick<FormTimelineMetric, 'formId' | 'formStatus'>)[]} */ ([
+          {
+            type: FormMetricType.TimelineMetric,
+            metricName: CopyAnswersMetricName.CopyAnswersSubmission,
+            formId: 'form-1',
+            formStatus: FormStatus.Live,
+            metricValue: 4,
+            createdAt: new Date('2026-05-09T10:00:00.000Z')
+          },
+          {
+            type: FormMetricType.TimelineMetric,
+            metricName: CopyAnswersMetricName.CopyAnswersSubmission,
+            formId: 'form-1',
+            formStatus: FormStatus.Live,
+            metricValue: 2,
+            createdAt: new Date('2026-05-08T10:00:00.000Z')
+          },
+          {
+            type: FormMetricType.TimelineMetric,
+            metricName: CopyAnswersMetricName.CopyAnswersSubmission,
+            formId: 'form-1',
+            formStatus: FormStatus.Draft,
+            metricValue: 3,
+            createdAt: new Date('2026-05-08T10:00:00.000Z')
+          },
+          {
+            type: FormMetricType.TimelineMetric,
+            metricName: CopyAnswersMetricName.CopyAnswersSubmission,
+            formId: 'form-2',
+            formStatus: FormStatus.Live,
+            metricValue: 5,
+            createdAt: new Date('2026-05-08T10:00:00.000Z')
+          },
+          {
+            type: FormMetricType.TimelineMetric,
+            metricName: CopyAnswersMetricName.CopyAnswersForm,
+            formId: 'form-1',
+            formStatus: FormStatus.Live,
+            metricValue: 1,
+            createdAt: new Date('2026-05-09T10:00:00.000Z')
+          }
+        ])
       jest
         .mocked(getAllTimelineMetrics)
         // @ts-expect-error - async iterator mock for a Mongo cursor
@@ -469,19 +494,65 @@ describe('metrics-helper', () => {
         session
       )
 
+      expect(getAllTimelineMetrics).toHaveBeenCalledWith(
+        {
+          metricName: { $in: Object.values(CopyAnswersMetricName) }
+        },
+        session
+      )
       expect(totals).toMatchObject({
         area: FunctionalAreaType.CopyAnswers,
-        liveSubmissions: {},
-        draftSubmissions: {},
+        liveSubmissions: { 'form-1': 6, 'form-2': 5 },
+        draftSubmissions: { 'form-1': 3 },
         last7Days: {
-          [CopyAnswersMetricName.CopyAnswersSubmission]: { count: 6 },
+          [CopyAnswersMetricName.CopyAnswersSubmission]: { count: 14 },
           [CopyAnswersMetricName.CopyAnswersForm]: { count: 1 }
         },
         allTime: {
-          [CopyAnswersMetricName.CopyAnswersSubmission]: { count: 6 },
+          [CopyAnswersMetricName.CopyAnswersSubmission]: { count: 14 },
           [CopyAnswersMetricName.CopyAnswersForm]: { count: 1 }
         }
       })
+
+      /** @type {Pick<FormOverviewMetric, 'type' | 'featureMetrics' | 'submissionsCount' | 'updatedAt'>} */
+      const baseOverview = {
+        type: FormMetricType.OverviewMetric,
+        featureMetrics: { features: new Map() },
+        submissionsCount: 0,
+        updatedAt: new Date('2026-05-10T12:00:00.000Z')
+      }
+      /** @type {FormOverviewMetric[]} */
+      const overview = [
+        {
+          ...baseOverview,
+          formId: 'form-1',
+          formStatus: FormStatus.Live,
+          summaryMetrics: { name: 'Form 1' }
+        },
+        {
+          ...baseOverview,
+          formId: 'form-1',
+          formStatus: FormStatus.Draft,
+          summaryMetrics: { name: 'Form 1' }
+        },
+        {
+          ...baseOverview,
+          formId: 'form-2',
+          formStatus: FormStatus.Live,
+          summaryMetrics: { name: 'Form 2' }
+        },
+        {
+          ...baseOverview,
+          formId: 'form-3',
+          formStatus: FormStatus.Live,
+          summaryMetrics: { name: 'Form 3' }
+        }
+      ]
+      expect(
+        applySubmissionCountsForFunctionalArea({ overview, totals }).map(
+          ({ submissionsCount }) => submissionsCount
+        )
+      ).toEqual([6, 3, 5, 0])
     })
 
     it('uses the fallback earliest date when there are no functional-area metrics', async () => {
