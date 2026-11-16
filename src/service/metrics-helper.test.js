@@ -14,13 +14,17 @@ import { saveFunctionalAreaTimelineMetrics } from '~/src/repositories/metrics-fu
 import {
   getAllOverviewMetrics,
   getAllTimelineMetrics,
+  getFunctionalAreaMetricFromPreviousDay,
   getFunctionalAreaMetricTotals
 } from '~/src/repositories/metrics-repository.js'
 import {
   CalculationTypes,
   applySubmissionCountsForFunctionalArea,
+  calcAverages,
   collectFunctionalAreaMetricsFromAuditByType,
   constructPeriodTimeslots,
+  createFormMap,
+  formatDateOnly,
   generateFunctionalAreaReport,
   getMetricCalcType,
   handleAllTimeslots,
@@ -33,14 +37,10 @@ import {
   recalcFunctionalAreaMetrics,
   setTimeOnDate
 } from '~/src/service/metrics-helper.js'
-import { calcAverages } from '~/src/service/metrics.js'
 
 jest.mock('~/src/repositories/audit-record-repository.js')
 jest.mock('~/src/repositories/metrics-func-area-repository.js')
 jest.mock('~/src/repositories/metrics-repository.js')
-jest.mock('~/src/service/metrics.js', () => ({
-  calcAverages: jest.fn((totals) => totals)
-}))
 jest.mock('~/src/mongo.js', () => ({
   client: {
     startSession: jest.fn()
@@ -60,6 +60,16 @@ function createAsyncIterator(rows) {
   }
 }
 
+/**
+ * @param {object[]} rows
+ * @returns {FindCursor<WithId<AuditRecordInput>>}
+ */
+function createAuditCursor(rows) {
+  return /** @type {FindCursor<WithId<AuditRecordInput>>} */ (
+    /** @type {unknown} */ (createAsyncIterator(rows))
+  )
+}
+
 describe('metrics-helper', () => {
   const session = /** @type {any} */ ({
     endSession: jest.fn().mockResolvedValue(undefined)
@@ -68,8 +78,31 @@ describe('metrics-helper', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     jest.mocked(client.startSession).mockReturnValue(session)
-    jest.mocked(calcAverages).mockImplementation((totals) => totals)
     session.endSession.mockResolvedValue(undefined)
+  })
+
+  describe('calcAverages', () => {
+    it('replaces average totals with averages and preserves count metrics', () => {
+      const totals = {
+        last7Days: {
+          [FormMetricName.TimeToPublish]: { avgTotal: 20, avgCount: 4 },
+          [FormMetricName.NewFormsCreated]: { count: 5 }
+        },
+        allTime: {
+          [FormMetricName.TimeToPublish]: { avgTotal: 9, avgCount: 3 }
+        }
+      }
+
+      expect(calcAverages(totals)).toEqual({
+        last7Days: {
+          [FormMetricName.TimeToPublish]: { count: 5 },
+          [FormMetricName.NewFormsCreated]: { count: 5 }
+        },
+        allTime: {
+          [FormMetricName.TimeToPublish]: { count: 3 }
+        }
+      })
+    })
   })
 
   describe('setTimeOnDate', () => {
@@ -80,11 +113,32 @@ describe('metrics-helper', () => {
     })
   })
 
+  describe('formatDateOnly', () => {
+    it('formats a date without its time component', () => {
+      expect(formatDateOnly(new Date('2026-02-05T08:59:34.000Z'))).toBe(
+        '2026-02-05'
+      )
+    })
+  })
+
   describe('getMetricCalcType', () => {
     it('should return the configured calculation type', () => {
       expect(getMetricCalcType(FormMetricName.Submissions)).toBe(
         CalculationTypes.AccumulationWithDrilldown
       )
+    })
+
+    it('defaults unconfigured metrics to accumulation', () => {
+      expect(getMetricCalcType(SigninMetricName.Registration)).toBe(
+        CalculationTypes.Accumulation
+      )
+    })
+  })
+
+  describe('createFormMap', () => {
+    it('creates a map from form submission totals and handles missing totals', () => {
+      expect(createFormMap({ 'form-1': 3 })).toEqual(new Map([['form-1', 3]]))
+      expect(createFormMap(undefined)).toEqual(new Map())
     })
   })
 
@@ -282,6 +336,95 @@ describe('metrics-helper', () => {
         }
       })
     })
+
+    it('initializes an average and ignores a missing period', () => {
+      const metric = /** @type {FormTimelineMetric} */ ({
+        metricName: FormMetricName.TimeToPublish,
+        formStatus: FormStatus.Live,
+        metricValue: 3
+      })
+      const period =
+        /** @type {Record<string, { count?: number, avgTotal?: number, avgCount?: number }>} */ ({})
+      const missingAverageValues =
+        /** @type {Record<string, { count?: number, avgTotal?: number, avgCount?: number }>} */ ({
+          [FormMetricName.TimeToPublish]: {
+            avgTotal: undefined,
+            avgCount: undefined
+          }
+        })
+
+      handleMetricValue(metric, period, CalculationTypes.Average)
+      handleMetricValue(metric, missingAverageValues, CalculationTypes.Average)
+      handleMetricValue(metric, undefined, CalculationTypes.Average)
+
+      expect(period).toEqual({
+        [FormMetricName.TimeToPublish]: { avgTotal: 3, avgCount: 1 }
+      })
+      expect(missingAverageValues).toEqual({
+        [FormMetricName.TimeToPublish]: { avgTotal: 3, avgCount: 1 }
+      })
+    })
+
+    it('ignores non-live form submissions when accumulating', () => {
+      const metric = /** @type {FormTimelineMetric} */ ({
+        metricName: FormMetricName.Submissions,
+        formStatus: FormStatus.Draft,
+        metricValue: 3
+      })
+      const period = /** @type {Record<string, { count?: number }>} */ ({})
+
+      handleMetricValue(metric, period, CalculationTypes.Accumulation)
+
+      expect(period).toEqual({})
+    })
+
+    it('keeps only minimal detail when saving accumulation drilldowns', () => {
+      const metric = /** @type {FormTimelineMetric} */ ({
+        metricName: FormMetricName.NewFormsCreated,
+        formId: 'form-1',
+        formStatus: FormStatus.Draft,
+        metricValue: 2,
+        createdAt: new Date('2026-05-01T10:00:00.000Z'),
+        language: 'cy'
+      })
+      const period = /** @type {Record<string, { count?: number }>} */ ({})
+
+      handleMetricValue(
+        metric,
+        period,
+        CalculationTypes.AccumulationWithDrilldown,
+        true
+      )
+
+      expect(period).toEqual({
+        [FormMetricName.NewFormsCreated]: {
+          count: 2,
+          details: [
+            {
+              formId: 'form-1',
+              metricValue: 2,
+              createdAt: new Date('2026-05-01T10:00:00.000Z')
+            }
+          ]
+        }
+      })
+    })
+
+    it('does nothing when the period is unavailable and rejects unsupported calculations', () => {
+      const metric = /** @type {FormTimelineMetric} */ ({
+        metricName: FormMetricName.FormsInDraft,
+        formStatus: FormStatus.Draft,
+        metricValue: 3
+      })
+      const period = /** @type {Record<string, { count?: number }>} */ ({})
+
+      expect(() => {
+        handleMetricValue(metric, undefined, CalculationTypes.Snapshot)
+      }).not.toThrow()
+      expect(() => {
+        handleMetricValue(metric, period, 'Unsupported')
+      }).toThrow('Unsupported calculation type: Unsupported')
+    })
   })
 
   describe('submission helpers', () => {
@@ -340,8 +483,12 @@ describe('metrics-helper', () => {
       const createdAt = new Date('2026-05-01T10:00:00.000Z')
       jest
         .mocked(getAuditRecordsOfType)
-        // @ts-expect-error - async iterator mock for a Mongo cursor
-        .mockReturnValue(createAsyncIterator([{ createdAt }, { createdAt }]))
+        .mockReturnValue(
+          createAuditCursor([
+            { createdAt },
+            { createdAt, data: { formId: 'form-1' } }
+          ])
+        )
 
       await collectFunctionalAreaMetricsFromAuditByType(
         AuditEventMessageType.IDENTITY_REGISTRATION,
@@ -371,7 +518,69 @@ describe('metrics-helper', () => {
         {
           metricName: SigninMetricName.Registration,
           metricValue: 1,
-          createdAt
+          createdAt,
+          formId: 'form-1'
+        },
+        session
+      )
+    })
+
+    it('adds only new enabled forms to snapshot totals', async () => {
+      const reportingDate = new Date('2026-05-01T10:00:00.000Z')
+      jest
+        .mocked(getFunctionalAreaMetricFromPreviousDay)
+        .mockResolvedValueOnce(4)
+      jest.mocked(getAuditRecordsOfType).mockReturnValue(
+        createAuditCursor([
+          {
+            type: AuditEventMessageType.FORM_OPTION_UPDATED,
+            data: {
+              formId: 'form-1',
+              changes: { new: { allowCopy: true } }
+            }
+          },
+          {
+            type: AuditEventMessageType.FORM_OPTION_UPDATED,
+            data: {
+              formId: 'form-1',
+              changes: { new: { allowCopy: true } }
+            }
+          },
+          {
+            type: AuditEventMessageType.FORM_OPTION_UPDATED,
+            data: {
+              formId: 'form-2',
+              changes: { new: { allowCopy: false } }
+            }
+          },
+          {
+            type: AuditEventMessageType.IDENTITY_REGISTRATION,
+            data: { formId: 'form-3' }
+          },
+          {
+            type: AuditEventMessageType.IDENTITY_REGISTRATION,
+            data: { userId: 'user-1' }
+          }
+        ])
+      )
+
+      await collectFunctionalAreaMetricsFromAuditByType(
+        AuditEventMessageType.FORM_OPTION_UPDATED,
+        CopyAnswersMetricName.CopyAnswersForm,
+        reportingDate,
+        session
+      )
+
+      expect(getFunctionalAreaMetricFromPreviousDay).toHaveBeenCalledWith(
+        new Date('2026-04-30T10:00:00.000Z'),
+        CopyAnswersMetricName.CopyAnswersForm,
+        session
+      )
+      expect(saveFunctionalAreaTimelineMetrics).toHaveBeenCalledWith(
+        {
+          metricName: CopyAnswersMetricName.CopyAnswersForm,
+          metricValue: 6,
+          createdAt: reportingDate
         },
         session
       )
@@ -428,7 +637,6 @@ describe('metrics-helper', () => {
           [SigninMetricName.Registration]: { count: 3 }
         }
       })
-      expect(calcAverages).toHaveBeenCalledWith(totals)
     })
 
     it('aggregates Copy Answers submissions by form and status for the overview', async () => {
@@ -711,6 +919,7 @@ describe('metrics-helper', () => {
 })
 
 /**
- * @import { WithId } from 'mongodb'
+ * @import { FindCursor, WithId } from 'mongodb'
+ * @import { AuditRecordInput } from '@defra/forms-model'
  * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FunctionalAreaTimelineMetric, FunctionalAreaTotalsMetric } from '@defra/forms-model'
  */

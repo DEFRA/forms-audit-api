@@ -18,7 +18,6 @@ import {
   getFunctionalAreaMetricFromPreviousDay,
   getFunctionalAreaMetricTotals
 } from '~/src/repositories/metrics-repository.js'
-import { calcAverages } from '~/src/service/metrics.js'
 
 export const CalculationTypes = {
   Accumulation: 'Accumulation',
@@ -561,6 +560,54 @@ export function handleAllTimeslots(
 
   // All time
   handleMetricValue(metric, totals.allTime, metricCalcType, true)
+}
+
+/**
+ * @param {string} metricPropertyName
+ * @param {any} totals
+ * @param {string} periodName
+ * @param {string} metricName
+ * @param {any} totalsCopy
+ */
+function calcAverage(
+  metricPropertyName,
+  totals,
+  periodName,
+  metricName,
+  totalsCopy
+) {
+  if (metricPropertyName === 'avgTotal') {
+    const total = totals[periodName][metricName].avgTotal
+    const count = totals[periodName][metricName].avgCount
+    totalsCopy[periodName][metricName].count = total / count
+    delete totalsCopy[periodName][metricName].avgTotal
+    delete totalsCopy[periodName][metricName].avgCount
+  }
+}
+
+/**
+ * @param {any} totals
+ */
+export function calcAverages(totals) {
+  const totalsCopy = {
+    ...totals
+  }
+  for (const periodName of Object.keys(totals)) {
+    for (const metricName of Object.keys(totals[periodName])) {
+      for (const metricPropertyName of Object.keys(
+        totals[periodName][metricName]
+      )) {
+        calcAverage(
+          metricPropertyName,
+          totals,
+          periodName,
+          metricName,
+          totalsCopy
+        )
+      }
+    }
+  }
+  return totalsCopy
 }
 
 /**

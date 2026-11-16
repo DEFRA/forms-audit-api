@@ -41,6 +41,7 @@ import {
   collectCopyAnswersMetricsFromAudit
 } from '~/src/service/metrics-copy-answers.js'
 import {
+  calcAverages,
   constructPeriodTimeslots,
   createFormMap,
   formatDateOnly,
@@ -143,12 +144,7 @@ export async function collectMetrics(
       `[metrics] getting timeline metrics for ${reportDate.toISOString()}`
     )
     // Collect timeline metrics for all languages and Welsh-only (from submissions and audit records)
-    await collectRelevantTimelineMetrics(
-      submissionUrl,
-      reportDate,
-      languageFormIds,
-      session
-    )
+    await collectRelevantTimelineMetrics(reportDate, languageFormIds, session)
 
     reportDate = add(reportDate, { days: 1 })
   }
@@ -196,13 +192,11 @@ export async function collectMetrics(
 
 /**
  * Collects relevant timeline metrics for the given report date and language-specific forms.
- * @param {string} submissionUrl
  * @param {Date} reportDate
  * @param {{ draftIds: Set<string>, liveIds: Set<string> }} languageFormIds
  * @param {ClientSession} session
  */
 async function collectRelevantTimelineMetrics(
-  submissionUrl,
   reportDate,
   languageFormIds,
   session
@@ -543,54 +537,6 @@ export async function recalcFormMetrics(
   const finalTotals = calcAverages(totals)
 
   return finalTotals
-}
-
-/**
- * @param {string} metricPropertyName
- * @param {any} totals
- * @param {string} periodName
- * @param {string} metricName
- * @param {any} totalsCopy
- */
-function calcAverage(
-  metricPropertyName,
-  totals,
-  periodName,
-  metricName,
-  totalsCopy
-) {
-  if (metricPropertyName === 'avgTotal') {
-    const total = totals[periodName][metricName].avgTotal
-    const count = totals[periodName][metricName].avgCount
-    totalsCopy[periodName][metricName].count = total / count
-    delete totalsCopy[periodName][metricName].avgTotal
-    delete totalsCopy[periodName][metricName].avgCount
-  }
-}
-
-/**
- * @param {any} totals
- */
-export function calcAverages(totals) {
-  const totalsCopy = {
-    ...totals
-  }
-  for (const periodName of Object.keys(totals)) {
-    for (const metricName of Object.keys(totals[periodName])) {
-      for (const metricPropertyName of Object.keys(
-        totals[periodName][metricName]
-      )) {
-        calcAverage(
-          metricPropertyName,
-          totals,
-          periodName,
-          metricName,
-          totalsCopy
-        )
-      }
-    }
-  }
-  return totalsCopy
 }
 
 /**
