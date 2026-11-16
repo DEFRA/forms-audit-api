@@ -1,6 +1,22 @@
-import { AuditEventMessageType, SigninMetricName } from '@defra/forms-model'
+import {
+  AuditEventMessageType,
+  FunctionalAreaType,
+  SigninMetricName
+} from '@defra/forms-model'
 
-import { collectFunctionalAreaMetricsFromAuditByType } from '~/src/service/metrics-helper.js'
+import { client } from '~/src/mongo.js'
+import { adjustEarliestDate } from '~/src/repositories/metrics-repository-helper.js'
+import {
+  getAllTimelineMetrics,
+  getFunctionalAreaMetricTotals
+} from '~/src/repositories/metrics-repository.js'
+import {
+  CalculationTypes,
+  calcAverages,
+  collectFunctionalAreaMetricsFromAuditByType,
+  constructPeriodTimeslots,
+  handleAllTimeslots
+} from '~/src/service/metrics-helper.js'
 
 export const allowedSigninMetricNames = Object.values(SigninMetricName)
 
@@ -55,5 +71,74 @@ export async function collectSigninMetricsFromAudit(reportingDate, session) {
 }
 
 /**
+ * Generates a report of sign-in (and other forms-identity) events
+ * @param {Date} reportingDate
+ * @param {ClientSession} session
+ * @returns {Promise<FunctionalAreaTotalsMetric>}
+ */
+export async function recalcSigninMetrics(reportingDate, session) {
+  const timeslots = constructPeriodTimeslots(reportingDate)
+
+  const totals = /** @type {FunctionalAreaTotalsMetric} */ ({
+    last7Days: {},
+    prev7Days: {},
+    last30Days: {},
+    prev30Days: {},
+    lastYear: {},
+    prevYear: {},
+    allTime: {},
+    area: FunctionalAreaType.Signin
+  })
+
+  /** @type { Date | undefined } */
+  let earliestDataDate
+
+  const metricCursor = getAllTimelineMetrics(
+    { metricName: { $in: allowedSigninMetricNames } },
+    session
+  )
+
+  for await (const metric of metricCursor) {
+    // Find earliest metric
+    const createdAt = new Date(metric.createdAt)
+    earliestDataDate = adjustEarliestDate(earliestDataDate, createdAt)
+
+    handleAllTimeslots(
+      metric,
+      totals,
+      CalculationTypes.Accumulation,
+      createdAt,
+      timeslots
+    )
+  }
+
+  // Approximate implementation date as fallback if no submissions found
+  totals.earliestDate = earliestDataDate ?? new Date('2025-12-01')
+  const finalTotals = calcAverages(totals)
+
+  return finalTotals
+}
+
+/**
+ * Generates a report based on the stored metrics for sign-in activities
+ * @param {FunctionalAreaType} area - The functional area sub-type for which to generate the report
+ */
+export async function generateFunctionalAreaReport(area) {
+  const session = client.startSession()
+
+  try {
+    // Get summary tiles
+    const totals = await getFunctionalAreaMetricTotals(area, session)
+
+    return {
+      totals
+    }
+  } finally {
+    await session.endSession()
+  }
+}
+
+/**
  * @import { ClientSession } from 'mongodb'
+ * @import { FunctionalAreaTotalsMetric } from '@defra/forms-model'
  */

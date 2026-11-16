@@ -1,4 +1,5 @@
 import { getErrorMessage } from '@defra/forms-model'
+import { subHours } from 'date-fns'
 
 import { logger } from '~/src/helpers/logging/logger.js'
 import { getMetricCollection } from '~/src/repositories/metrics-repository-helper.js'
@@ -17,9 +18,16 @@ export async function grabLock(session) {
   try {
     // Atomically try to grab the lock on existing record
     // Returns the document BEFORE update (or null if no match)
+    // Also handles stale locks (job started more than 2 hours ago but not finished)
     const controlRecord = /** @type { WithId<FormMetricControl> | null } */ (
       await coll.findOneAndUpdate(
-        { type: FORM_METRIC_CONTROL, locked: false },
+        {
+          type: FORM_METRIC_CONTROL,
+          $or: [
+            { locked: false },
+            { jobEnd: null, jobStart: { $lt: subHours(now, 2) } }
+          ]
+        },
         {
           $set: {
             locked: true,
