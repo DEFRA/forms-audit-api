@@ -61,7 +61,7 @@ describe('metrics-helper', () => {
         endOfSlot
       )
 
-      expect(period).toEqual({ FormsInDraft: { count: 6 } })
+      expect(period).toEqual({ FormsInDraft: { count: 3 } })
     })
 
     it('should ignore metrics outside the slot', () => {

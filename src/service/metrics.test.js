@@ -653,7 +653,7 @@ describe('runMetricsCollectionJob', () => {
       )
 
       expect(totals.last7Days?.NewFormsCreated.details).toHaveLength(3)
-      expect(totals.last7Days?.Submissions.details).toHaveLength(4)
+      expect(totals.last7Days?.Submissions.details).toHaveLength(3)
       // Remove 'details' attributes for comparison
       delete totals.last7Days?.NewFormsCreated.details
       delete totals.last7Days?.Submissions.details
@@ -662,7 +662,7 @@ describe('runMetricsCollectionJob', () => {
           count: 6
         },
         Submissions: {
-          count: 14
+          count: 13
         }
       })
       expect(totals.prev7Days).toEqual({
@@ -671,7 +671,7 @@ describe('runMetricsCollectionJob', () => {
         }
       })
       expect(totals.last30Days?.NewFormsCreated.details).toHaveLength(5)
-      expect(totals.last30Days?.Submissions.details).toHaveLength(5)
+      expect(totals.last30Days?.Submissions.details).toHaveLength(4)
       // Remove 'details' attributes for comparison
       delete totals.last30Days?.NewFormsCreated.details
       delete totals.last30Days?.Submissions.details
@@ -680,7 +680,7 @@ describe('runMetricsCollectionJob', () => {
           count: 15
         },
         Submissions: {
-          count: 19
+          count: 18
         }
       })
       expect(totals.prev30Days).toEqual({
@@ -696,7 +696,7 @@ describe('runMetricsCollectionJob', () => {
           count: 19
         },
         Submissions: {
-          count: 20
+          count: 19
         }
       })
       expect(totals.prevYear).toEqual({

@@ -91,14 +91,20 @@ async function collectSigninMetricsFromAuditByType(
     undefined,
     session
   )
+  // Dilemma as to whether to keep as individual records or aggregate by day
+  // Aggregate by day gives a performance and storage benefit, but we can't drill down into actual sign-ins
+  let dayTotal = 0
+  let lastCreatedAt = null
   for await (const created of cursor) {
-    const metric = /** @type {SigninTimelineMetric} */ ({
-      metricName,
-      metricValue: 1,
-      createdAt: created.createdAt
-    })
-    await saveSigninTimelineMetrics(metric, session)
+    dayTotal++
+    lastCreatedAt = created.createdAt
   }
+  const metric = /** @type {SigninTimelineMetric} */ ({
+    metricName,
+    metricValue: dayTotal,
+    createdAt: lastCreatedAt
+  })
+  await saveSigninTimelineMetrics(metric, session)
 }
 
 /**

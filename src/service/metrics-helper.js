@@ -1,12 +1,5 @@
 import { FormMetricName, FormStatus } from '@defra/forms-model'
-import {
-  addMilliseconds,
-  endOfDay,
-  format,
-  startOfDay,
-  subDays,
-  subYears
-} from 'date-fns'
+import { format, startOfDay, subDays, subYears } from 'date-fns'
 
 import { FOURTEEN_DAYS, SEVEN_DAYS, THIRTY_DAYS } from '~/src/constants.js'
 
@@ -156,8 +149,7 @@ export function handleTimeslot(
   endOfSlot,
   saveDrilldown
 ) {
-  const endOfDaySlot = addMilliseconds(endOfDay(endOfSlot), 1)
-  if (dateFallsInsideTimeslot(createdAt, startOfSlot, endOfDaySlot)) {
+  if (dateFallsInsideTimeslot(createdAt, startOfSlot, endOfSlot)) {
     handleMetricValue(metric, period, metricCalcType, saveDrilldown)
   }
 }

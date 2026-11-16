@@ -357,6 +357,52 @@ describe('metrics-repository', () => {
       })
     })
 
+    it('should recover a locked job with no end time that started over two hours ago', async () => {
+      const now = new Date('2026-05-10T12:00:00.000Z')
+      const staleJobStart = new Date('2026-05-10T08:00:00.000Z')
+      const lastSuccessfulRunDate = new Date('2026-05-09T12:00:00.000Z')
+      jest.useFakeTimers().setSystemTime(now)
+      mockCollection.findOneAndUpdate.mockResolvedValueOnce({
+        locked: true,
+        jobStart: staleJobStart,
+        jobEnd: null,
+        lastSuccessfulRunDate
+      })
+
+      try {
+        const result = await grabLock(mockSession)
+
+        expect(mockCollection.findOneAndUpdate).toHaveBeenCalledWith(
+          {
+            type: 'form-metric-control',
+            $or: [
+              { locked: false },
+              {
+                jobEnd: null,
+                jobStart: { $lt: new Date('2026-05-10T10:00:00.000Z') }
+              }
+            ]
+          },
+          {
+            $set: {
+              locked: true,
+              jobStart: now,
+              jobEnd: null,
+              updatedAt: now
+            }
+          },
+          { returnDocument: 'before', session: mockSession }
+        )
+        expect(mockCollection.findOne).not.toHaveBeenCalled()
+        expect(result).toEqual({
+          lockSuccess: true,
+          lastSuccessfulRun: lastSuccessfulRunDate
+        })
+      } finally {
+        jest.useRealTimers()
+      }
+    })
+
     it('should throw if error', async () => {
       mockCollection.findOne.mockImplementationOnce(() => {
         throw new Error('db error')
