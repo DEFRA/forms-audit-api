@@ -142,29 +142,13 @@ export async function collectMetrics(
     logger.info(
       `[metrics] getting timeline metrics for ${reportDate.toISOString()}`
     )
-    // All languages
-    await collectTimelineMetrics(submissionUrl, reportDate, undefined, session)
-    // Welsh-only
-    await collectTimelineMetrics(submissionUrl, reportDate, WELSH, session)
-
-    // All languages
-    await collectTimelineMetricsFromAudit(
+    // Collect timeline metrics for all languages and Welsh-only (from submissions and audit records)
+    await collectRelevantTimelineMetrics(
+      submissionUrl,
       reportDate,
-      undefined,
-      undefined,
-      session
-    )
-    // Welsh-only
-    await collectTimelineMetricsFromAudit(
-      reportDate,
-      WELSH,
       languageFormIds,
       session
     )
-
-    // Functional areas
-    await collectSigninMetricsFromAudit(reportDate, session)
-    await collectCopyAnswersMetricsFromAudit(reportDate, session)
 
     reportDate = add(reportDate, { days: 1 })
   }
@@ -208,6 +192,44 @@ export async function collectMetrics(
     processMoreBatches: formatDateOnly(reportDate) <= formatDateOnly(yesterday),
     endDate: reportEndDate
   }
+}
+
+/**
+ * Collects relevant timeline metrics for the given report date and language-specific forms.
+ * @param {string} submissionUrl
+ * @param {Date} reportDate
+ * @param {{ draftIds: Set<string>, liveIds: Set<string> }} languageFormIds
+ * @param {ClientSession} session
+ */
+async function collectRelevantTimelineMetrics(
+  submissionUrl,
+  reportDate,
+  languageFormIds,
+  session
+) {
+  // All languages
+  await collectTimelineMetrics(submissionUrl, reportDate, undefined, session)
+  // Welsh-only
+  await collectTimelineMetrics(submissionUrl, reportDate, WELSH, session)
+
+  // All languages
+  await collectTimelineMetricsFromAudit(
+    reportDate,
+    undefined,
+    undefined,
+    session
+  )
+  // Welsh-only
+  await collectTimelineMetricsFromAudit(
+    reportDate,
+    WELSH,
+    languageFormIds,
+    session
+  )
+
+  // Functional areas
+  await collectSigninMetricsFromAudit(reportDate, session)
+  await collectCopyAnswersMetricsFromAudit(reportDate, session)
 }
 
 /**

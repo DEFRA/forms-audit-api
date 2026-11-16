@@ -154,6 +154,8 @@ export function handleMetricValue(
     case CalculationTypes.Average:
       updateMetricAverage(metric, period)
       break
+    default:
+      throw new Error(`Unsupported calculation type: ${calculationType}`)
   }
 }
 
@@ -373,12 +375,12 @@ export async function collectFunctionalAreaMetricsFromAuditByType(
     }
   }
   total += formsFlagged.size
-  const metric = /** @type {FunctionalAreaTimelineMetric} */ ({
+  const snapshotMetric = /** @type {FunctionalAreaTimelineMetric} */ ({
     metricName,
     metricValue: total,
     createdAt: reportingDate
   })
-  await saveFunctionalAreaTimelineMetrics(metric, session)
+  await saveFunctionalAreaTimelineMetrics(snapshotMetric, session)
 }
 
 /**
