@@ -25,6 +25,7 @@ import {
   saveFormTimelineMetrics
 } from '~/src/repositories/metrics-repository.js'
 import {
+  constructPeriodTimeslots,
   setMetricTotal,
   updateMetricAverage,
   updateMetricTotal
@@ -497,6 +498,50 @@ describe('runMetricsCollectionJob', () => {
   })
 
   describe('recalcMetricTotals', () => {
+    it('uses adjacent, non-overlapping 7-day and 30-day windows', async () => {
+      const reportingDate = new Date(2026, 0, 1, 12)
+      const timeslots = constructPeriodTimeslots(reportingDate)
+      const boundaryMetrics = /** @type {Array<[Date, number]>} */ ([
+        [timeslots.fourteenDaysAgo, 1],
+        [new Date(timeslots.sevenDaysAgo.getTime() - 1), 2],
+        [timeslots.sevenDaysAgo, 3],
+        [new Date(timeslots.reportMorning.getTime() - 1), 4],
+        [timeslots.reportMorning, 8],
+        [timeslots.sixtyDaysAgo, 16],
+        [new Date(timeslots.thirtyDaysAgo.getTime() - 1), 32],
+        [timeslots.thirtyDaysAgo, 64]
+      ])
+      const timelineMetrics = boundaryMetrics.map(([createdAt, metricValue]) =>
+        createTimelineMetric(
+          FormMetricName.NewFormsCreated,
+          FormStatus.Draft,
+          createdAt.toISOString(),
+          metricValue
+        )
+      )
+      const mockAsyncIterator = {
+        [Symbol.asyncIterator]: function* () {
+          yield* timelineMetrics
+        }
+      }
+
+      jest
+        .mocked(getAllTimelineMetrics)
+        // @ts-expect-error - async iterator mock for a Mongo cursor
+        .mockReturnValueOnce(mockAsyncIterator)
+
+      const totals = await recalcFormMetrics(
+        reportingDate,
+        undefined,
+        mockSession
+      )
+
+      expect(totals.prev7Days?.NewFormsCreated.count).toBe(3)
+      expect(totals.last7Days?.NewFormsCreated.count).toBe(7)
+      expect(totals.prev30Days?.NewFormsCreated.count).toBe(48)
+      expect(totals.last30Days?.NewFormsCreated.count).toBe(74)
+    })
+
     it('should apportion timeline metrics into appropriate time windows', async () => {
       const timelineMetrics = /** @type {FormTimelineMetric[]} */ ([
         {
