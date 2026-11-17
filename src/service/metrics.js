@@ -8,6 +8,7 @@ import { add, differenceInDays, min, sub, subDays } from 'date-fns'
 
 import { config } from '~/src/config/index.js'
 import { WELSH } from '~/src/constants.js'
+import { getErrorMessage } from '~/src/helpers/error-message.js'
 import { logger } from '~/src/helpers/logging/logger.js'
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
@@ -44,6 +45,7 @@ import {
   calcAverages,
   constructPeriodTimeslots,
   createFormMap,
+  emptyFormMetrics,
   formatDateOnly,
   getMetricCalcType,
   handleAllTimeslots,
@@ -559,6 +561,12 @@ export async function generateReport(filter) {
       overview: overviewFull,
       totals
     }
+  } catch (err) {
+    logger.error(
+      err,
+      `Failed to generate report - metrics records are probably missing - ${getErrorMessage(err)}`
+    )
+    return emptyFormMetrics()
   } finally {
     await session.endSession()
   }
@@ -641,7 +649,7 @@ export function applyExtraColumns(metrics) {
           : undefined
     },
     formId: metric.formId,
-    formName: metric.summaryMetrics.name,
+    formName: /** @type {string} */ (metric.summaryMetrics.name),
     formStatus: metric.formStatus,
     submissionsCount:
       (metric.formStatus === FormStatus.Live

@@ -1,14 +1,31 @@
-import { AuditEventMessageType, SigninMetricName } from '@defra/forms-model'
+import {
+  AuditEventMessageType,
+  FormMetricType,
+  FunctionalAreaType,
+  SigninMetricName
+} from '@defra/forms-model'
 
+import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
 import { saveFunctionalAreaTimelineMetrics } from '~/src/repositories/metrics-func-area-repository.js'
 import {
-  allowedSigninMetricNames,
-  collectSigninMetricsFromAudit
+  getAllTimelineMetrics,
+  getFunctionalAreaMetricTotals
+} from '~/src/repositories/metrics-repository.js'
+import {
+  collectSigninMetricsFromAudit,
+  generateFunctionalAreaReport,
+  recalcSigninMetrics
 } from '~/src/service/metrics-signin.js'
 
 jest.mock('~/src/repositories/audit-record-repository.js')
+jest.mock('~/src/repositories/metrics-repository.js')
 jest.mock('~/src/repositories/metrics-func-area-repository.js')
+jest.mock('~/src/mongo.js', () => ({
+  client: {
+    startSession: jest.fn()
+  }
+}))
 
 /**
  * @param {object[]} rows
@@ -24,74 +41,196 @@ function createAsyncIterator(rows) {
 }
 
 describe('metrics-signin', () => {
+  const session = /** @type {any} */ ({
+    endSession: jest.fn().mockResolvedValue(undefined)
+  })
+
   beforeEach(() => {
-    jest.clearAllMocks()
+    jest.mocked(client.startSession).mockReturnValue(session)
   })
 
-  it('exports all supported sign-in metric names for recalculation', () => {
-    expect(allowedSigninMetricNames).toEqual(Object.values(SigninMetricName))
-  })
+  describe('collectSigninMetricsFromAudit', () => {
+    it('saves timeline metrics for each supported identity audit type', async () => {
+      const createdAt = new Date('2026-05-01T10:00:00.000Z')
+      jest
+        .mocked(getAuditRecordsOfType)
+        // @ts-expect-error - async iterator mock for a Mongo cursor
+        .mockReturnValue(createAsyncIterator([{ createdAt }]))
 
-  it('collects and stores one timeline metric for each supported identity audit type', async () => {
-    const reportingDate = new Date('2026-05-01T10:00:00.000Z')
-    const createdAt = new Date('2026-04-30T10:00:00.000Z')
-    jest
-      .mocked(getAuditRecordsOfType)
-      // @ts-expect-error - async iterator mock for a Mongo cursor
-      .mockReturnValue(createAsyncIterator([{ createdAt }]))
+      await collectSigninMetricsFromAudit(createdAt, session)
 
-    await collectSigninMetricsFromAudit(reportingDate, /** @type {any} */ ({}))
-
-    const expectedTypesAndNames = [
-      [
-        AuditEventMessageType.IDENTITY_REGISTRATION,
-        SigninMetricName.Registration
-      ],
-      [
-        AuditEventMessageType.IDENTITY_SIGN_IN_SUCCESSFUL,
-        SigninMetricName.SuccessfulAuthentication
-      ],
-      [
-        AuditEventMessageType.IDENTITY_TOO_MANY_OTPS_REQUESTED,
-        SigninMetricName.TooManyCodeRequests
-      ],
-      [
-        AuditEventMessageType.IDENTITY_INCORRECT_CODE_ENTERED,
-        SigninMetricName.IncorrectCodeEntered
-      ],
-      [
-        AuditEventMessageType.IDENTITY_ACCOUNT_DELETION,
-        SigninMetricName.AccountDeletion
-      ],
-      [
-        AuditEventMessageType.IDENTITY_EMAIL_ADDRESS_UPDATED,
-        SigninMetricName.EmailAddressUpdate
-      ],
-      [
-        AuditEventMessageType.IDENTITY_PHONE_NUMBER_UPDATED,
-        SigninMetricName.PhoneNumberUpdate
+      const expectedTypesAndNames = [
+        [
+          AuditEventMessageType.IDENTITY_REGISTRATION,
+          SigninMetricName.Registration
+        ],
+        [
+          AuditEventMessageType.IDENTITY_SIGN_IN_SUCCESSFUL,
+          SigninMetricName.SuccessfulAuthentication
+        ],
+        [
+          AuditEventMessageType.IDENTITY_TOO_MANY_OTPS_REQUESTED,
+          SigninMetricName.TooManyCodeRequests
+        ],
+        [
+          AuditEventMessageType.IDENTITY_INCORRECT_CODE_ENTERED,
+          SigninMetricName.IncorrectCodeEntered
+        ],
+        [
+          AuditEventMessageType.IDENTITY_ACCOUNT_DELETION,
+          SigninMetricName.AccountDeletion
+        ],
+        [
+          AuditEventMessageType.IDENTITY_EMAIL_ADDRESS_UPDATED,
+          SigninMetricName.EmailAddressUpdate
+        ],
+        [
+          AuditEventMessageType.IDENTITY_PHONE_NUMBER_UPDATED,
+          SigninMetricName.PhoneNumberUpdate
+        ]
       ]
-    ]
 
-    expect(getAuditRecordsOfType).toHaveBeenCalledTimes(
-      expectedTypesAndNames.length
-    )
-    for (const [
-      index,
-      [eventType, metricName]
-    ] of expectedTypesAndNames.entries()) {
-      expect(getAuditRecordsOfType).toHaveBeenNthCalledWith(
-        index + 1,
-        eventType,
-        reportingDate,
-        undefined,
-        expect.anything()
+      expect(getAuditRecordsOfType).toHaveBeenCalledTimes(
+        expectedTypesAndNames.length
       )
-      expect(saveFunctionalAreaTimelineMetrics).toHaveBeenNthCalledWith(
-        index + 1,
-        { metricName, metricValue: 1, createdAt },
-        expect.anything()
+      for (const [
+        index,
+        [eventType, metricName]
+      ] of expectedTypesAndNames.entries()) {
+        expect(getAuditRecordsOfType).toHaveBeenNthCalledWith(
+          index + 1,
+          eventType,
+          createdAt,
+          undefined,
+          session
+        )
+        expect(saveFunctionalAreaTimelineMetrics).toHaveBeenNthCalledWith(
+          index + 1,
+          { metricName, metricValue: 1, createdAt },
+          session
+        )
+      }
+    })
+  })
+
+  describe('recalcSigninMetrics', () => {
+    it('aggregates sign-in counts into reporting periods and finds the earliest metric', async () => {
+      const metrics = [
+        {
+          metricName: SigninMetricName.SuccessfulAuthentication,
+          metricValue: 2,
+          createdAt: new Date('2026-05-08T10:00:00.000Z')
+        },
+        {
+          metricName: SigninMetricName.Registration,
+          metricValue: 3,
+          createdAt: new Date('2026-05-01T10:00:00.000Z')
+        },
+        {
+          metricName: SigninMetricName.Registration,
+          metricValue: 4,
+          createdAt: new Date('2026-04-01T10:00:00.000Z')
+        },
+        {
+          metricName: SigninMetricName.TooManyCodeRequests,
+          metricValue: 5,
+          createdAt: new Date('2025-04-01T10:00:00.000Z')
+        }
+      ]
+      jest
+        .mocked(getAllTimelineMetrics)
+        // @ts-expect-error - async iterator mock for a Mongo cursor
+        .mockReturnValue(createAsyncIterator(metrics))
+
+      const totals = await recalcSigninMetrics(
+        new Date('2026-05-10T12:00:00.000Z'),
+        session
       )
-    }
+
+      expect(getAllTimelineMetrics).toHaveBeenCalledWith(
+        { metricName: { $in: Object.values(SigninMetricName) } },
+        session
+      )
+      expect(totals).toMatchObject({
+        area: FunctionalAreaType.Signin,
+        earliestDate: new Date('2025-04-01T10:00:00.000Z'),
+        last7Days: {
+          [SigninMetricName.SuccessfulAuthentication]: { count: 2 }
+        },
+        prev7Days: {
+          [SigninMetricName.Registration]: { count: 3 }
+        },
+        last30Days: {
+          [SigninMetricName.SuccessfulAuthentication]: { count: 2 },
+          [SigninMetricName.Registration]: { count: 3 }
+        },
+        prev30Days: {
+          [SigninMetricName.Registration]: { count: 4 }
+        },
+        lastYear: {
+          [SigninMetricName.SuccessfulAuthentication]: { count: 2 },
+          [SigninMetricName.Registration]: { count: 7 }
+        },
+        prevYear: {
+          [SigninMetricName.TooManyCodeRequests]: { count: 5 }
+        },
+        allTime: {
+          [SigninMetricName.SuccessfulAuthentication]: { count: 2 },
+          [SigninMetricName.Registration]: { count: 7 },
+          [SigninMetricName.TooManyCodeRequests]: { count: 5 }
+        }
+      })
+    })
+
+    it('uses the fallback earliest date when no sign-in metrics exist', async () => {
+      jest
+        .mocked(getAllTimelineMetrics)
+        // @ts-expect-error - async iterator mock for a Mongo cursor
+        .mockReturnValue(createAsyncIterator([]))
+
+      const totals = await recalcSigninMetrics(
+        new Date('2026-05-10T12:00:00.000Z'),
+        session
+      )
+
+      expect(totals.earliestDate).toEqual(new Date('2025-12-01'))
+      expect(totals.area).toBe(FunctionalAreaType.Signin)
+    })
+  })
+
+  describe('generateFunctionalAreaReport', () => {
+    it('returns stored totals and ends its database session', async () => {
+      const totals = {
+        type: FormMetricType.FunctionalAreaTotalsMetric,
+        area: FunctionalAreaType.Signin
+      }
+      // @ts-expect-error - partial data mock
+      jest.mocked(getFunctionalAreaMetricTotals).mockResolvedValue(totals)
+
+      const report = await generateFunctionalAreaReport(
+        FunctionalAreaType.Signin
+      )
+
+      expect(client.startSession).toHaveBeenCalled()
+      expect(getFunctionalAreaMetricTotals).toHaveBeenCalledWith(
+        FunctionalAreaType.Signin,
+        session
+      )
+      expect(report).toEqual({ totals })
+      expect(session.endSession).toHaveBeenCalled()
+    })
+
+    it('ends its database session when reading totals fails', async () => {
+      const error = new Error('Failed to read totals')
+      jest.mocked(getFunctionalAreaMetricTotals).mockRejectedValueOnce(error)
+
+      const report = await generateFunctionalAreaReport(
+        FunctionalAreaType.Signin
+      )
+
+      expect(report.totals.type).toBe('functional-area-totals-metric')
+      expect(report.totals.last7Days).toBeUndefined()
+      expect(session.endSession).toHaveBeenCalled()
+    })
   })
 })
