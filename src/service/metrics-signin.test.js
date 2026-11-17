@@ -230,10 +230,11 @@ describe('metrics-signin', () => {
       const error = new Error('Failed to read totals')
       jest.mocked(getFunctionalAreaMetricTotals).mockRejectedValueOnce(error)
 
-      await expect(
-        generateFunctionalAreaReport(FunctionalAreaType.Signin)
-      ).rejects.toThrow(error)
+      const report = await generateFunctionalAreaReport(
+        FunctionalAreaType.Signin
+      )
 
+      expect(report.totals).toEqual({})
       expect(session.endSession).toHaveBeenCalled()
     })
   })

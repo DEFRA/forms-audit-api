@@ -4,6 +4,8 @@ import {
   SigninMetricName
 } from '@defra/forms-model'
 
+import { getErrorMessage } from '~/src/helpers/error-message.js'
+import { logger } from '~/src/helpers/logging/logger.js'
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
 import { saveSigninTimelineMetrics } from '~/src/repositories/metrics-func-area-repository.js'
@@ -192,6 +194,14 @@ export async function generateFunctionalAreaReport(area) {
 
     return {
       totals
+    }
+  } catch (err) {
+    logger.error(
+      err,
+      `Failed to generate functional area report - metrics records are probably missing - ${getErrorMessage(err)}`
+    )
+    return {
+      totals: {}
     }
   } finally {
     await session.endSession()
