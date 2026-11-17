@@ -3,13 +3,17 @@ import { FormMetricName, FormMetricType, FormStatus } from '@defra/forms-model'
 import { buildMockCollection } from '~/src/api/forms/__stubs__/mongo.js'
 import { db } from '~/src/mongo.js'
 import {
+  clearMetricsData,
+  grabLock,
+  releaseLock
+} from '~/src/repositories/metrics-job-repository.js'
+import {
   getFirstDraft,
   getLanguageFilter,
   getLanguageNoPropertyFilter,
   isFirstPublish
 } from '~/src/repositories/metrics-repository-helper.js'
 import {
-  clearMetricsData,
   deleteFormOverviewMetrics,
   getAllOverviewMetrics,
   getAllTimelineMetrics,
@@ -18,8 +22,6 @@ import {
   getFormTimelineMetrics,
   getMetricTotals,
   getNumberOfFormsInDraft,
-  grabLock,
-  releaseLock,
   saveDrilldown,
   saveDrilldownRecords,
   saveFormOverviewMetrics,
@@ -353,6 +355,52 @@ describe('metrics-repository', () => {
         lockSuccess: true,
         lastSuccessfulRun: new Date('2026-05-10T00:00:00.000Z')
       })
+    })
+
+    it('should recover a locked job with no end time that started over two hours ago', async () => {
+      const now = new Date('2026-05-10T12:00:00.000Z')
+      const staleJobStart = new Date('2026-05-10T08:00:00.000Z')
+      const lastSuccessfulRunDate = new Date('2026-05-09T12:00:00.000Z')
+      jest.useFakeTimers().setSystemTime(now)
+      mockCollection.findOneAndUpdate.mockResolvedValueOnce({
+        locked: true,
+        jobStart: staleJobStart,
+        jobEnd: null,
+        lastSuccessfulRunDate
+      })
+
+      try {
+        const result = await grabLock(mockSession)
+
+        expect(mockCollection.findOneAndUpdate).toHaveBeenCalledWith(
+          {
+            type: 'form-metric-control',
+            $or: [
+              { locked: false },
+              {
+                jobEnd: null,
+                jobStart: { $lt: new Date('2026-05-10T10:00:00.000Z') }
+              }
+            ]
+          },
+          {
+            $set: {
+              locked: true,
+              jobStart: now,
+              jobEnd: null,
+              updatedAt: now
+            }
+          },
+          { returnDocument: 'before', session: mockSession }
+        )
+        expect(mockCollection.findOne).not.toHaveBeenCalled()
+        expect(result).toEqual({
+          lockSuccess: true,
+          lastSuccessfulRun: lastSuccessfulRunDate
+        })
+      } finally {
+        jest.useRealTimers()
+      }
     })
 
     it('should throw if error', async () => {

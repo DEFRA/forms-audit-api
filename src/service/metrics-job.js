@@ -1,7 +1,10 @@
 import { getErrorMessage } from '~/src/helpers/error-message.js'
 import { logger } from '~/src/helpers/logging/logger.js'
 import { client } from '~/src/mongo.js'
-import { grabLock, releaseLock } from '~/src/repositories/metrics-repository.js'
+import {
+  grabLock,
+  releaseLock
+} from '~/src/repositories/metrics-job-repository.js'
 import { collectMetrics } from '~/src/service/metrics.js'
 
 const MAX_DAYS_PER_BATCH = 30

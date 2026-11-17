@@ -6,23 +6,26 @@ import { getJson } from '~/src/lib/fetch.js'
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
 import {
+  clearMetricsData,
+  grabLock,
+  releaseLock
+} from '~/src/repositories/metrics-job-repository.js'
+import {
   getFirstDraft,
   isFirstPublish
 } from '~/src/repositories/metrics-repository-helper.js'
 import {
-  clearMetricsData,
   getAllOverviewMetrics,
   getAllTimelineMetrics,
   getDrilldownRecords,
   getFormTimelineMetricsCursor,
   getMetricTotals,
   getNumberOfFormsInDraft,
-  grabLock,
-  releaseLock,
   saveFormOverviewMetrics,
   saveFormTimelineMetrics
 } from '~/src/repositories/metrics-repository.js'
 import {
+  constructPeriodTimeslots,
   setMetricTotal,
   updateMetricAverage,
   updateMetricTotal
@@ -39,11 +42,14 @@ import {
   generateReport,
   generateReportForForm,
   getOverviewMetricsForForms,
-  recalcMetrics
+  recalcFormMetrics
 } from '~/src/service/metrics.js'
 
 jest.mock('~/src/lib/fetch.js')
 jest.mock('~/src/repositories/metrics-repository.js')
+jest.mock('~/src/repositories/metrics-job-repository.js')
+jest.mock('~/src/repositories/metrics-repository.js')
+jest.mock('~/src/repositories/metrics-func-area-repository.js')
 jest.mock('~/src/repositories/metrics-repository-helper.js')
 jest.mock('~/src/repositories/audit-record-repository.js')
 
@@ -492,6 +498,50 @@ describe('runMetricsCollectionJob', () => {
   })
 
   describe('recalcMetricTotals', () => {
+    it('uses adjacent, non-overlapping 7-day and 30-day windows', async () => {
+      const reportingDate = new Date(2026, 0, 1, 12)
+      const timeslots = constructPeriodTimeslots(reportingDate)
+      const boundaryMetrics = /** @type {Array<[Date, number]>} */ ([
+        [timeslots.fourteenDaysAgo, 1],
+        [new Date(timeslots.sevenDaysAgo.getTime() - 1), 2],
+        [timeslots.sevenDaysAgo, 3],
+        [new Date(timeslots.reportMorning.getTime() - 1), 4],
+        [timeslots.reportMorning, 8],
+        [timeslots.sixtyDaysAgo, 16],
+        [new Date(timeslots.thirtyDaysAgo.getTime() - 1), 32],
+        [timeslots.thirtyDaysAgo, 64]
+      ])
+      const timelineMetrics = boundaryMetrics.map(([createdAt, metricValue]) =>
+        createTimelineMetric(
+          FormMetricName.NewFormsCreated,
+          FormStatus.Draft,
+          createdAt.toISOString(),
+          metricValue
+        )
+      )
+      const mockAsyncIterator = {
+        [Symbol.asyncIterator]: function* () {
+          yield* timelineMetrics
+        }
+      }
+
+      jest
+        .mocked(getAllTimelineMetrics)
+        // @ts-expect-error - async iterator mock for a Mongo cursor
+        .mockReturnValueOnce(mockAsyncIterator)
+
+      const totals = await recalcFormMetrics(
+        reportingDate,
+        undefined,
+        mockSession
+      )
+
+      expect(totals.prev7Days?.NewFormsCreated.count).toBe(3)
+      expect(totals.last7Days?.NewFormsCreated.count).toBe(7)
+      expect(totals.prev30Days?.NewFormsCreated.count).toBe(48)
+      expect(totals.last30Days?.NewFormsCreated.count).toBe(74)
+    })
+
     it('should apportion timeline metrics into appropriate time windows', async () => {
       const timelineMetrics = /** @type {FormTimelineMetric[]} */ ([
         {
@@ -641,14 +691,14 @@ describe('runMetricsCollectionJob', () => {
         // @ts-expect-error - resolves to an async iterator like FindCursor<FormSubmissionDocument>
         .mockReturnValueOnce(mockAsyncIterator)
 
-      const totals = await recalcMetrics(
+      const totals = await recalcFormMetrics(
         new Date('2026-01-01'),
         undefined,
         mockSession
       )
 
       expect(totals.last7Days?.NewFormsCreated.details).toHaveLength(3)
-      expect(totals.last7Days?.Submissions.details).toHaveLength(4)
+      expect(totals.last7Days?.Submissions.details).toHaveLength(3)
       // Remove 'details' attributes for comparison
       delete totals.last7Days?.NewFormsCreated.details
       delete totals.last7Days?.Submissions.details
@@ -657,7 +707,7 @@ describe('runMetricsCollectionJob', () => {
           count: 6
         },
         Submissions: {
-          count: 14
+          count: 13
         }
       })
       expect(totals.prev7Days).toEqual({
@@ -666,7 +716,7 @@ describe('runMetricsCollectionJob', () => {
         }
       })
       expect(totals.last30Days?.NewFormsCreated.details).toHaveLength(5)
-      expect(totals.last30Days?.Submissions.details).toHaveLength(5)
+      expect(totals.last30Days?.Submissions.details).toHaveLength(4)
       // Remove 'details' attributes for comparison
       delete totals.last30Days?.NewFormsCreated.details
       delete totals.last30Days?.Submissions.details
@@ -675,7 +725,7 @@ describe('runMetricsCollectionJob', () => {
           count: 15
         },
         Submissions: {
-          count: 19
+          count: 18
         }
       })
       expect(totals.prev30Days).toEqual({
@@ -691,7 +741,7 @@ describe('runMetricsCollectionJob', () => {
           count: 19
         },
         Submissions: {
-          count: 20
+          count: 19
         }
       })
       expect(totals.prevYear).toEqual({
@@ -1150,6 +1200,10 @@ describe('runMetricsCollectionJob', () => {
           }
         }
       }
+      jest
+        .mocked(getAuditRecordsOfType)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValue(mockAsyncIteratorBlankSet)
 
       jest
         .mocked(getAllTimelineMetrics)
@@ -1157,6 +1211,8 @@ describe('runMetricsCollectionJob', () => {
         .mockReturnValueOnce(mockAsyncIteratorBlankSet)
         // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
         .mockReturnValueOnce(mockAsyncIteratorBlankSet)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValue(mockAsyncIteratorBlankSet)
 
       const res = await collectMetrics(
         currentRunDate,
@@ -1181,7 +1237,7 @@ describe('runMetricsCollectionJob', () => {
       expect(calls[2][0].href).toBe(
         'http://localhost:3002/report/timeline?date=2026-05-12T15:56:04.364Z&language=cy'
       )
-      expect(getAuditRecordsOfType).toHaveBeenCalledTimes(4)
+      expect(getAuditRecordsOfType).toHaveBeenCalledTimes(11)
       expect(getAuditRecordsOfType).toHaveBeenNthCalledWith(
         1,
         'FORM_CREATED',
@@ -1196,6 +1252,13 @@ describe('runMetricsCollectionJob', () => {
         undefined,
         expect.anything(),
         { createdAt: 1 } // Overrides sort option
+      )
+      expect(getAuditRecordsOfType).toHaveBeenNthCalledWith(
+        5,
+        'IDENTITY_REGISTRATION',
+        new Date('2026-05-12T15:56:04.364Z'),
+        undefined,
+        expect.anything()
       )
       expect(getAuditRecordsOfType).toHaveBeenNthCalledWith(
         3,
@@ -1275,6 +1338,10 @@ describe('runMetricsCollectionJob', () => {
           }
         }
       }
+      jest
+        .mocked(getAuditRecordsOfType)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValue(mockAsyncIteratorBlankSet)
 
       jest
         .mocked(getAllTimelineMetrics)
@@ -1286,6 +1353,8 @@ describe('runMetricsCollectionJob', () => {
         .mockReturnValueOnce(mockAsyncIteratorBlankSet)
         // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
         .mockReturnValueOnce(mockAsyncIteratorBlankSet)
+        // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
+        .mockReturnValue(mockAsyncIteratorBlankSet)
 
       const res = await collectMetrics(
         currentRunDate,

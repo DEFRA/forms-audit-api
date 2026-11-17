@@ -1,5 +1,6 @@
 import { createServer } from '~/src/api/server.js'
 import { runMetricsCollectionJob } from '~/src/service/metrics-job.js'
+import { generateFunctionalAreaReport } from '~/src/service/metrics-signin.js'
 import { generateSubmissionsReport } from '~/src/service/metrics-submissions.js'
 import {
   generateDrilldownReport,
@@ -10,6 +11,7 @@ import { authSuperAdmin as auth } from '~/test/fixtures/auth.js'
 
 jest.mock('~/src/service/metrics.js')
 jest.mock('~/src/service/metrics-job.js')
+jest.mock('~/src/service/metrics-signin.js')
 jest.mock('~/src/service/metrics-submissions.js')
 jest.mock('~/src/mongo.js')
 jest.mock('~/src/plugins/audit-cache.js')
@@ -96,6 +98,36 @@ describe('Report routes', () => {
       expect(response.statusCode).toEqual(okStatusCode)
       expect(response.headers['content-type']).toContain(jsonContentType)
       expect(response.result).toEqual({ '2026-02': { 'form-id-1': 10 } })
+    })
+
+    test('/report-functional-area/{area} returns the area report', async () => {
+      const report = {
+        totals: { allTime: { SuccessfulAuthentication: { count: 4 } } }
+      }
+      jest
+        .mocked(generateFunctionalAreaReport)
+        // @ts-expect-error - partial data mock
+        .mockResolvedValue(report)
+
+      const response = await server.inject({
+        method: 'GET',
+        url: '/report-functional-area/Signin'
+      })
+
+      expect(response.statusCode).toEqual(okStatusCode)
+      expect(response.headers['content-type']).toContain(jsonContentType)
+      expect(response.result).toEqual(report)
+      expect(generateFunctionalAreaReport).toHaveBeenCalledWith('Signin')
+    })
+
+    test('/report-functional-area rejects an unknown area', async () => {
+      const response = await server.inject({
+        method: 'GET',
+        url: '/report-functional-area/unknown'
+      })
+
+      expect(response.statusCode).toBe(400)
+      expect(generateFunctionalAreaReport).not.toHaveBeenCalled()
     })
   })
 

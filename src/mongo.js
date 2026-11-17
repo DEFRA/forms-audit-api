@@ -44,6 +44,7 @@ export async function prepareDb(logger) {
 
   await coll.createIndex({ messageId: 1 }, { unique: true })
   await coll.createIndex({ entityId: 1, createdAt: -1 })
+  await coll.createIndex({ type: 1, createdAt: -1 })
 
   const coll2 = db.collection(METRICS_COLLECTION_NAME)
 

@@ -1,5 +1,7 @@
-import { FormMetricName, FormStatus } from '@defra/forms-model'
-import { format } from 'date-fns'
+import { FormMetricName, FormMetricType, FormStatus } from '@defra/forms-model'
+import { format, startOfDay, subDays, subYears } from 'date-fns'
+
+import { FOURTEEN_DAYS, SEVEN_DAYS, THIRTY_DAYS } from '~/src/constants.js'
 
 export const CalculationTypes = {
   Accumulation: 'Accumulation',
@@ -9,7 +11,7 @@ export const CalculationTypes = {
 }
 
 export const metricConfig =
-  /** { Record<FormMetricName, { calculationType: string }>} */ {
+  /** @type { Record<FormMetricName, { calculationType: string }> } */ ({
     [FormMetricName.NewFormsCreated]: {
       calculationType: CalculationTypes.AccumulationWithDrilldown
     },
@@ -28,7 +30,7 @@ export const metricConfig =
     [FormMetricName.TimeToPublish]: {
       calculationType: CalculationTypes.Average
     }
-  }
+  })
 
 export const metricDrilldownPeriods = ['last7Days', 'last30Days', 'allTime']
 
@@ -131,6 +133,29 @@ export function handleMetricValue(
 
 /**
  * @param {FormTimelineMetric} metric
+ * @param {Record<string, { count?: number }> | undefined} period
+ * @param {string} metricCalcType
+ * @param {Date} createdAt
+ * @param {Date} startOfSlot
+ * @param {Date} endOfSlot
+ * @param {boolean} [saveDrilldown]
+ */
+export function handleTimeslot(
+  metric,
+  period,
+  metricCalcType,
+  createdAt,
+  startOfSlot,
+  endOfSlot,
+  saveDrilldown
+) {
+  if (dateFallsInsideTimeslot(createdAt, startOfSlot, endOfSlot)) {
+    handleMetricValue(metric, period, metricCalcType, saveDrilldown)
+  }
+}
+
+/**
+ * @param {FormTimelineMetric} metric
  * @param { Record<string, { count?: number, details?: FormTimelineMetric[] }> | undefined } period
  * @param {boolean} [drillDown]
  */
@@ -206,5 +231,52 @@ export function updateMetricAverage(metric, period) {
 }
 
 /**
- * @import { FormTimelineMetric } from '@defra/forms-model'
+ * Constructs an object containing various period timeslots based on the reporting date.
+ * @param {Date} reportingDate
+ */
+export function constructPeriodTimeslots(reportingDate) {
+  return {
+    reportMorning: startOfDay(reportingDate),
+    sevenDaysAgo: subDays(startOfDay(reportingDate), SEVEN_DAYS),
+    fourteenDaysAgo: subDays(startOfDay(reportingDate), FOURTEEN_DAYS),
+    thirtyDaysAgo: subDays(startOfDay(reportingDate), THIRTY_DAYS),
+    sixtyDaysAgo: subDays(startOfDay(reportingDate), 60),
+    oneYearAgo: subYears(startOfDay(reportingDate), 1),
+    twoYearsAgo: subYears(startOfDay(reportingDate), 2)
+  }
+}
+
+/**
+ * @returns {{ totals: FormTotalsMetric, overview: FormOverviewMetric[] }}
+ */
+export function emptyFormMetrics() {
+  const now = new Date()
+  return {
+    overview: [],
+    totals: {
+      type: FormMetricType.TotalsMetric,
+      updatedAt: now,
+      earliestDate: now
+    }
+  }
+}
+
+/**
+ * @param {FunctionalAreaType} area The functional area for which to create empty metrics
+ * @returns {{ totals: FunctionalAreaTotalsMetric }}
+ */
+export function emptyFunctionalAreaMetrics(area) {
+  const now = new Date()
+  return {
+    totals: {
+      type: FormMetricType.FunctionalAreaTotalsMetric,
+      area,
+      updatedAt: now,
+      earliestDate: now
+    }
+  }
+}
+
+/**
+ * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FunctionalAreaTotalsMetric, FunctionalAreaType } from '@defra/forms-model'
  */
