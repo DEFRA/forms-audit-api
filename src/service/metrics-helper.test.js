@@ -676,7 +676,8 @@ describe('metrics-helper', () => {
 
       expect(getAllTimelineMetrics).toHaveBeenCalledWith(
         {
-          metricName: { $in: Object.values(SigninMetricName) }
+          metricName: { $in: Object.values(SigninMetricName) },
+          language: { $exists: false }
         },
         session
       )
@@ -758,7 +759,8 @@ describe('metrics-helper', () => {
 
       expect(getAllTimelineMetrics).toHaveBeenCalledWith(
         {
-          metricName: { $in: Object.values(CopyAnswersMetricName) }
+          metricName: { $in: Object.values(CopyAnswersMetricName) },
+          language: { $exists: false }
         },
         session
       )

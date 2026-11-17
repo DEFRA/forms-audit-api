@@ -315,7 +315,7 @@ function getMetricSnapshotValue(record) {
 }
 
 /**
- * Collect signin metrics from audit events by type
+ * Collect functional area metrics from audit events by type
  * @param {AuditEventMessageType} queryType
  * @param {FunctionalAreaMetricName} metricName
  * @param {Date} reportingDate
@@ -357,24 +357,27 @@ export async function collectFunctionalAreaMetricsFromAuditByType(
     metricName,
     session
   )
+  // Work through the audit records from earliest in the day to latest
   const cursorSnapshot = getAuditRecordsOfType(
     queryType,
     reportingDate,
     undefined,
-    session
+    session,
+    { createdAt: 1 }
   )
+  // TODO - rework this to handle a form being enabled several days ago but disabled today
   let total = prevDayMetricValue
-  const formsFlagged = new Set()
+  const formsCount = /** @type {Map<string, number>} */ (new Map())
   for await (const snapshot of cursorSnapshot) {
     if (snapshot.data && 'formId' in snapshot.data) {
       const formId = snapshot.data.formId
       const metricValue = getMetricSnapshotValue(snapshot)
-      if (!formsFlagged.has(formId) && metricValue > 0) {
-        formsFlagged.add(formId)
+      if (metricValue > 0) {
+        formsCount.set(formId, (formsCount.get(formId) ?? 0) + metricValue)
       }
     }
   }
-  total += formsFlagged.size
+  total += formsCount.size
   const snapshotMetric = /** @type {FunctionalAreaTimelineMetric} */ ({
     metricName,
     metricValue: total,
