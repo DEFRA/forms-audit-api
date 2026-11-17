@@ -418,7 +418,8 @@ export async function recalcFunctionalAreaMetrics(
 
   const metricCursor = getAllTimelineMetrics(
     {
-      metricName: { $in: allowedMetricNames }
+      metricName: { $in: allowedMetricNames },
+      language: { $exists: false }
     },
     session
   )
