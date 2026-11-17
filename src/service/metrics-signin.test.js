@@ -228,8 +228,8 @@ describe('metrics-signin', () => {
         FunctionalAreaType.Signin
       )
 
-      expect(report.totals.type).toBe('functional-area-totals-metric')
-      expect(report.totals.last7Days).toBeUndefined()
+      expect(report.totals?.type).toBe('functional-area-totals-metric')
+      expect(report.totals?.last7Days).toBeUndefined()
       expect(session.endSession).toHaveBeenCalled()
     })
   })
