@@ -5,7 +5,7 @@ import { getMetricCollection } from '~/src/repositories/metrics-repository-helpe
 
 /**
  * Saves snapshot metric records for a form.
- * @param {SigninTimelineMetric} metricData
+ * @param {FunctionalAreaTimelineMetric} metricData
  * @param {ClientSession} session
  */
 export async function saveSigninTimelineMetrics(metricData, session) {
@@ -30,5 +30,5 @@ export async function saveSigninTimelineMetrics(metricData, session) {
 
 /**
  * @import { ClientSession } from 'mongodb'
- * @import { SigninTimelineMetric } from '@defra/forms-model'
+ * @import { FunctionalAreaTimelineMetric } from '@defra/forms-model'
  */

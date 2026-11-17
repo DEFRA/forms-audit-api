@@ -39,6 +39,7 @@ import {
 import {
   constructPeriodTimeslots,
   createFormMap,
+  emptyFormMetrics,
   formatDateOnly,
   getMetricCalcType,
   handleMetricValue,
@@ -626,10 +627,7 @@ export async function generateReport(filter) {
       err,
       `Failed to generate report - metrics records are probably missing - ${getErrorMessage(err)}`
     )
-    return {
-      overview: [],
-      totals: {}
-    }
+    return emptyFormMetrics()
   } finally {
     await session.endSession()
   }
@@ -712,7 +710,7 @@ export function applyExtraColumns(metrics) {
           : undefined
     },
     formId: metric.formId,
-    formName: metric.summaryMetrics.name,
+    formName: /** @type {string} */ (metric.summaryMetrics.name),
     formStatus: metric.formStatus,
     submissionsCount:
       (metric.formStatus === FormStatus.Live

@@ -210,13 +210,13 @@ export function getAllOverviewMetrics(filter, session) {
 
 /**
  * Get all timeline metrics
- * @param { Filter<WithId<FormTimelineMetric | SigninTimelineMetric>> | undefined } filter
+ * @param { Filter<WithId<FormTimelineMetric | FunctionalAreaTimelineMetric>> | undefined } filter
  * @param {ClientSession} session
  * @returns {FindCursor<WithId<FormTimelineMetric>>}
  */
 export function getAllTimelineMetrics(filter, session) {
   const coll =
-    /** @type {Collection<FormTimelineMetric | SigninTimelineMetric>} */ (
+    /** @type {Collection<FormTimelineMetric | FunctionalAreaTimelineMetric>} */ (
       getMetricCollection()
     )
 
@@ -555,6 +555,6 @@ export async function getNumberOfFormsInDraft(
 
 /**
  * @import { ClientSession, Collection, Filter, FindCursor, WithId, WithoutId } from 'mongodb'
- * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FormDrilldownMetric, FunctionalAreaTotalsMetric, FunctionalAreaType, SigninTimelineMetric } from '@defra/forms-model'
+ * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FormDrilldownMetric, FunctionalAreaTotalsMetric, FunctionalAreaType, FunctionalAreaTimelineMetric } from '@defra/forms-model'
  * @import { FilterCriteria } from '~/src/service/metrics.js'
  */

@@ -17,6 +17,7 @@ import {
 import {
   CalculationTypes,
   constructPeriodTimeslots,
+  emptyFunctionalAreaMetrics,
   handleMetricValue,
   handleTimeslot
 } from '~/src/service/metrics-helper.js'
@@ -101,7 +102,7 @@ async function collectSigninMetricsFromAuditByType(
     dayTotal++
     lastCreatedAt = created.createdAt
   }
-  const metric = /** @type {SigninTimelineMetric} */ ({
+  const metric = /** @type {FunctionalAreaTimelineMetric} */ ({
     metricName,
     metricValue: dayTotal,
     createdAt: lastCreatedAt
@@ -200,9 +201,7 @@ export async function generateFunctionalAreaReport(area) {
       err,
       `Failed to generate functional area report - metrics records are probably missing - ${getErrorMessage(err)}`
     )
-    return {
-      totals: {}
-    }
+    return emptyFunctionalAreaMetrics(FunctionalAreaType.Signin)
   } finally {
     await session.endSession()
   }
@@ -210,5 +209,5 @@ export async function generateFunctionalAreaReport(area) {
 
 /**
  * @import { ClientSession } from 'mongodb'
- * @import { FunctionalAreaTotalsMetric, SigninTimelineMetric } from '@defra/forms-model'
+ * @import { FunctionalAreaTotalsMetric, FunctionalAreaTimelineMetric } from '@defra/forms-model'
  */

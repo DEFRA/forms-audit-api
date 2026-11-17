@@ -1,4 +1,4 @@
-import { FormMetricName, FormStatus } from '@defra/forms-model'
+import { FormMetricName, FormMetricType, FormStatus } from '@defra/forms-model'
 import { format, startOfDay, subDays, subYears } from 'date-fns'
 
 import { FOURTEEN_DAYS, SEVEN_DAYS, THIRTY_DAYS } from '~/src/constants.js'
@@ -247,5 +247,36 @@ export function constructPeriodTimeslots(reportingDate) {
 }
 
 /**
- * @import { FormTimelineMetric } from '@defra/forms-model'
+ * @returns {{ totals: FormTotalsMetric, overview: FormOverviewMetric[] }}
+ */
+export function emptyFormMetrics() {
+  const now = new Date()
+  return {
+    overview: [],
+    totals: {
+      type: FormMetricType.TotalsMetric,
+      updatedAt: now,
+      earliestDate: now
+    }
+  }
+}
+
+/**
+ * @param {FunctionalAreaType} area The functional area for which to create empty metrics
+ * @returns {{ totals: FunctionalAreaTotalsMetric }}
+ */
+export function emptyFunctionalAreaMetrics(area) {
+  const now = new Date()
+  return {
+    totals: {
+      type: FormMetricType.FunctionalAreaTotalsMetric,
+      area,
+      updatedAt: now,
+      earliestDate: now
+    }
+  }
+}
+
+/**
+ * @import { FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FunctionalAreaTotalsMetric, FunctionalAreaType } from '@defra/forms-model'
  */
