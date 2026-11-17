@@ -482,9 +482,15 @@ export async function recalcFormMetrics(
   /** @type { Date | undefined } */
   let earliestDataDate
 
+  const allowedMetricNames = new Set(Object.values(FormMetricName))
+
   const metricCursor = getFormMetricsCursor(formId, language, session)
 
   for await (const metric of metricCursor) {
+    if (!allowedMetricNames.has(metric.metricName)) {
+      continue
+    }
+
     // FormsInDraft needs special attention since the cursor will return values from 'all' and other languages (e.g. Welsh),
     // therefore the totals must only use the relevant value for the language (or no language)
     if (

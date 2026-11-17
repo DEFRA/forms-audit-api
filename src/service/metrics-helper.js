@@ -421,7 +421,7 @@ export async function recalcFunctionalAreaMetrics(
       metricName: { $in: allowedMetricNames }
     },
     session
-  )
+  ).sort({ createdAt: 1 })
 
   for await (const metric of metricCursor) {
     const createdAt = new Date(metric.createdAt)
@@ -478,7 +478,9 @@ export async function generateFunctionalAreaReport(area) {
 
   try {
     // Get summary tiles
-    const totals = await getFunctionalAreaMetricTotals(area, session)
+    const totals =
+      (await getFunctionalAreaMetricTotals(area, session)) ??
+      emptyFunctionalAreaMetrics(area).totals
 
     const overview = await getAllOverviewMetrics({}, session).toArray()
 

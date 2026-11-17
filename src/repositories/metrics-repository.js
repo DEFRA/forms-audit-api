@@ -340,7 +340,7 @@ export function getFunctionalAreaMetricTotals(area, session) {
   const coll = getMetricCollection()
 
   try {
-    return /** @type {Promise<WithId<FunctionalAreaTotalsMetric>>} */ (
+    return /** @type {Promise<WithId<FunctionalAreaTotalsMetric> | null>} */ (
       coll.findOne(
         {
           type: FormMetricType.FunctionalAreaTotalsMetric,

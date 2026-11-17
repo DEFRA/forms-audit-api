@@ -61,17 +61,50 @@ jest.mock('~/src/mongo.js', () => ({
 }))
 
 /**
- * @param {AuditRecordInput[]} metricRows
+ * @template {{ createdAt: Date }} T
+ * @param {T[]} metricRows
  */
 function createAsyncIterator(metricRows) {
+  const rows = [...metricRows]
   return {
+    /** @param {{ createdAt: 1 | -1 }} order */
+    sort(order) {
+      rows.sort(
+        (left, right) =>
+          (left.createdAt.getTime() - right.createdAt.getTime()) *
+          order.createdAt
+      )
+      return this
+    },
     [Symbol.asyncIterator]: function* () {
-      for (const metric of metricRows) {
+      for (const metric of rows) {
         yield metric
       }
     }
   }
 }
+
+describe('mock metric cursor', () => {
+  it('sorts by creation time in either direction without changing the input', async () => {
+    const later = { createdAt: new Date('2026-05-10T12:00:00Z') }
+    const earlier = { createdAt: new Date('2026-05-01T12:00:00Z') }
+    const rows = [later, earlier]
+    const cursor = createAsyncIterator(rows)
+    const ascending = []
+    const descending = []
+
+    for await (const row of cursor.sort({ createdAt: 1 })) {
+      ascending.push(row)
+    }
+    for await (const row of cursor.sort({ createdAt: -1 })) {
+      descending.push(row)
+    }
+
+    expect(ascending).toEqual([earlier, later])
+    expect(descending).toEqual([later, earlier])
+    expect(rows).toEqual([later, earlier])
+  })
+})
 
 /**
  * @param {{ all: AuditRecordInput[], welsh: AuditRecordInput[] }} formRows
@@ -285,13 +318,7 @@ describe('runMetricsCollectionJob', () => {
       .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
 
     const timelineMetrics = /** @type {FormTimelineMetric[]} */ ([])
-    const mockAsyncIterator = {
-      [Symbol.asyncIterator]: function* () {
-        for (const metric of timelineMetrics) {
-          yield metric
-        }
-      }
-    }
+    const mockAsyncIterator = createAsyncIterator(timelineMetrics)
 
     // @ts-expect-error - resolves to an async iterator like FindCursor<FormSubmissionDocument>
     jest.mocked(getAllTimelineMetrics).mockReturnValueOnce(mockAsyncIterator)
@@ -631,13 +658,7 @@ describe('runMetricsCollectionJob', () => {
           'form-id-1'
         )
       ])
-      const mockAsyncIterator = {
-        [Symbol.asyncIterator]: function* () {
-          for (const metric of timelineMetrics) {
-            yield metric
-          }
-        }
-      }
+      const mockAsyncIterator = createAsyncIterator(timelineMetrics)
 
       jest
         .mocked(getAllTimelineMetrics)
@@ -1147,14 +1168,7 @@ describe('runMetricsCollectionJob', () => {
         // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
         .mockReturnValueOnce(FIRST_PUBLISHED_ITERATORS.welsh)
 
-      const blankSet = /** @type {AuditRecordInput[]} */ ([])
-      const mockAsyncIteratorBlankSet = {
-        [Symbol.asyncIterator]: function* () {
-          for (const metric of blankSet) {
-            yield metric
-          }
-        }
-      }
+      const mockAsyncIteratorBlankSet = createAsyncIterator([])
       jest
         .mocked(getAuditRecordsOfType)
         // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
@@ -1285,14 +1299,7 @@ describe('runMetricsCollectionJob', () => {
         // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
         .mockReturnValueOnce(FIRST_PUBLISHED_ITERATORS.all)
 
-      const blankSet = /** @type {AuditRecordInput[]} */ ([])
-      const mockAsyncIteratorBlankSet = {
-        [Symbol.asyncIterator]: function* () {
-          for (const metric of blankSet) {
-            yield metric
-          }
-        }
-      }
+      const mockAsyncIteratorBlankSet = createAsyncIterator([])
       jest
         .mocked(getAuditRecordsOfType)
         // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>
@@ -1375,14 +1382,7 @@ describe('runMetricsCollectionJob', () => {
         .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
         .mockResolvedValueOnce({ response: {}, body: { timeline: [] } })
 
-      const blankSet = /** @type {AuditRecordInput[]} */ ([])
-      const mockAsyncIteratorBlankSet = {
-        [Symbol.asyncIterator]: function* () {
-          for (const metric of blankSet) {
-            yield metric
-          }
-        }
-      }
+      const mockAsyncIteratorBlankSet = createAsyncIterator([])
       jest
         .mocked(getAuditRecordsOfType)
         // @ts-expect-error - resolves to an async iterator like FindCursor<AuditRecordInput>

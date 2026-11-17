@@ -51,13 +51,36 @@ jest.mock('~/src/mongo.js', () => ({
  * @param {object[]} rows
  */
 function createAsyncIterator(rows) {
-  return {
+  const sortedRows = [...rows]
+  const cursor = {
+    sort: jest.fn(),
     [Symbol.asyncIterator]: async function* () {
-      for (const row of rows) {
+      for (const row of sortedRows) {
         yield await Promise.resolve(row)
       }
     }
   }
+  cursor.sort.mockImplementation(
+    /** @param {{ createdAt: 1 | -1 }} order */
+    (order) => {
+      sortedRows.sort((left, right) => {
+        if (
+          !('createdAt' in left) ||
+          !(left.createdAt instanceof Date) ||
+          !('createdAt' in right) ||
+          !(right.createdAt instanceof Date)
+        ) {
+          throw new Error('Sorted cursor rows must have a createdAt date')
+        }
+        return (
+          (left.createdAt.getTime() - right.createdAt.getTime()) *
+          order.createdAt
+        )
+      })
+      return cursor
+    }
+  )
+  return cursor
 }
 
 /**
@@ -588,6 +611,44 @@ describe('metrics-helper', () => {
   })
 
   describe('recalcFunctionalAreaMetrics', () => {
+    it('uses the latest snapshot in each period even when metrics arrive out of order', async () => {
+      const metricName = CopyAnswersMetricName.CopyAnswersForm
+      const cursor = createAsyncIterator([
+        {
+          metricName,
+          metricValue: 9,
+          createdAt: new Date('2026-05-08T10:00:00Z')
+        },
+        {
+          metricName,
+          metricValue: 3,
+          createdAt: new Date('2026-05-01T10:00:00Z')
+        },
+        {
+          metricName,
+          metricValue: 5,
+          createdAt: new Date('2026-05-05T10:00:00Z')
+        }
+      ])
+      jest
+        .mocked(getAllTimelineMetrics)
+        // @ts-expect-error - async iterator mock for a Mongo cursor
+        .mockReturnValue(cursor)
+
+      const totals = await recalcFunctionalAreaMetrics(
+        new Date('2026-05-10T12:00:00.000Z'),
+        FunctionalAreaType.CopyAnswers,
+        Object.values(CopyAnswersMetricName),
+        session
+      )
+
+      expect(cursor.sort).toHaveBeenCalledWith({ createdAt: 1 })
+      expect(totals.last7Days?.[metricName]).toEqual({ count: 9 })
+      expect(totals.prev7Days?.[metricName]).toEqual({ count: 3 })
+      expect(totals.last30Days?.[metricName]).toEqual({ count: 9 })
+      expect(totals.allTime?.[metricName]).toEqual({ count: 9 })
+    })
+
     it('aggregates sign-in events, including metrics without a form status', async () => {
       const metrics = [
         {
