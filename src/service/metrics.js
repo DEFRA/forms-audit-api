@@ -487,15 +487,13 @@ export async function recalcFormMetrics(
   const metricCursor = getFormMetricsCursor(formId, language, session)
 
   for await (const metric of metricCursor) {
-    if (!allowedMetricNames.has(metric.metricName)) {
-      continue
-    }
-
     // FormsInDraft needs special attention since the cursor will return values from 'all' and other languages (e.g. Welsh),
     // therefore the totals must only use the relevant value for the language (or no language)
+    // Also skip metrics that aren't form metrics
     if (
-      metric.metricName === FormMetricName.FormsInDraft &&
-      language !== metric.language
+      (metric.metricName === FormMetricName.FormsInDraft &&
+        language !== metric.language) ||
+      !allowedMetricNames.has(metric.metricName)
     ) {
       continue
     }

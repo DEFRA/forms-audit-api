@@ -366,6 +366,8 @@ export async function collectFunctionalAreaMetricsFromAuditByType(
     { createdAt: 1 }
   )
   // TODO - rework this to handle a form being enabled several days ago but disabled today
+  // Rework so the daily metric record contains all the formId's where it is enabled
+  // That way you can easily change the next day's total up or down depending on the last record of the day per form
   let total = prevDayMetricValue
   const formsCount = /** @type {Map<string, number>} */ (new Map())
   for await (const snapshot of cursorSnapshot) {
