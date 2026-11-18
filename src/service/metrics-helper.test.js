@@ -524,7 +524,8 @@ describe('metrics-helper', () => {
         AuditEventMessageType.IDENTITY_REGISTRATION,
         createdAt,
         undefined,
-        session
+        session,
+        { createdAt: 1 }
       )
       expect(saveFunctionalAreaTimelineMetrics).toHaveBeenCalledTimes(2)
       expect(saveFunctionalAreaTimelineMetrics).toHaveBeenNthCalledWith(
@@ -552,7 +553,13 @@ describe('metrics-helper', () => {
       const reportingDate = new Date('2026-05-01T10:00:00.000Z')
       jest
         .mocked(getFunctionalAreaMetricFromPreviousDay)
-        .mockResolvedValueOnce(4)
+        // @ts-expect-error - partial mock of data
+        .mockResolvedValueOnce({
+          metricValue: 4,
+          metricContext: {
+            formIds: ['form-2', 'form-10', 'form-11', 'form-12']
+          }
+        })
       jest.mocked(getAuditRecordsOfType).mockReturnValue(
         createAuditCursor([
           {
@@ -581,6 +588,13 @@ describe('metrics-helper', () => {
             data: { formId: 'form-3' }
           },
           {
+            type: AuditEventMessageType.FORM_OPTION_UPDATED,
+            data: {
+              formId: 'form-12',
+              changes: { new: { allowCopy: false } }
+            }
+          },
+          {
             type: AuditEventMessageType.IDENTITY_REGISTRATION,
             data: { userId: 'user-1' }
           }
@@ -601,8 +615,10 @@ describe('metrics-helper', () => {
       )
       expect(saveFunctionalAreaTimelineMetrics).toHaveBeenCalledWith(
         {
+          type: FormMetricType.TimelineMetric,
           metricName: CopyAnswersMetricName.CopyAnswersForm,
-          metricValue: 6,
+          metricValue: 3,
+          metricContext: { formIds: ['form-10', 'form-11', 'form-1'] },
           createdAt: reportingDate
         },
         session

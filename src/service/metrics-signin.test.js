@@ -102,7 +102,8 @@ describe('metrics-signin', () => {
           eventType,
           createdAt,
           undefined,
-          session
+          session,
+          { createdAt: 1 }
         )
         expect(saveFunctionalAreaTimelineMetrics).toHaveBeenNthCalledWith(
           index + 1,

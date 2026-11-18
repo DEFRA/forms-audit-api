@@ -556,7 +556,7 @@ export async function getNumberOfFormsInDraft(
  * @param {Date} reportingDate
  * @param {string} metricName
  * @param {ClientSession} session
- * @returns {Promise<number>}
+ * @returns {Promise<WithId<FunctionalAreaTimelineMetric> | undefined>}
  */
 export async function getFunctionalAreaMetricFromPreviousDay(
   reportingDate,
@@ -584,7 +584,7 @@ export async function getFunctionalAreaMetricFromPreviousDay(
           { session }
         )
       )
-    return metric?.metricValue ?? 0
+    return metric
   } catch (err) {
     logger.error(
       err,

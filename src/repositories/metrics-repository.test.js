@@ -862,7 +862,7 @@ describe('metrics-repository', () => {
           'SuccessfulAuthentication',
           mockSession
         )
-      ).resolves.toBe(5)
+      ).resolves.toEqual({ metricValue: 5 })
 
       expect(mockCollection.findOne).toHaveBeenCalledWith(
         {
@@ -877,7 +877,7 @@ describe('metrics-repository', () => {
       )
     })
 
-    it('should return zero when no metric is found', async () => {
+    it('should return null when no metric is found', async () => {
       mockCollection.findOne.mockResolvedValueOnce(null)
 
       await expect(
@@ -886,7 +886,7 @@ describe('metrics-repository', () => {
           'SuccessfulAuthentication',
           mockSession
         )
-      ).resolves.toBe(0)
+      ).resolves.toBeNull()
     })
 
     it('should throw if error', async () => {

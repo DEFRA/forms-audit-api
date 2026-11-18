@@ -28,7 +28,7 @@ export const CalculationTypes = {
 }
 
 export const metricConfig =
-  /** @type { Partial<Record<FormMetricName | FunctionalAreaMetricName, { calculationType: string }>> } */ ({
+  /** @type { Partial<Record<FormMetricName | FunctionalAreaMetricName, { calculationType: string, valueFunc?: (snapshot: any) => number }>> } */ ({
     [FormMetricName.NewFormsCreated]: {
       calculationType: CalculationTypes.AccumulationWithDrilldown
     },
@@ -48,7 +48,13 @@ export const metricConfig =
       calculationType: CalculationTypes.Average
     },
     [CopyAnswersMetricName.CopyAnswersForm]: {
-      calculationType: CalculationTypes.Snapshot
+      calculationType: CalculationTypes.Snapshot,
+      valueFunc: (snapshot) =>
+        snapshot.type === AuditEventMessageType.FORM_OPTION_UPDATED
+          ? snapshot.data.changes.new.allowCopy
+            ? 1
+            : 0
+          : -1
     }
   })
 
@@ -116,6 +122,14 @@ function isSubmission(metric) {
 export function getMetricCalcType(metricName) {
   const config = metricConfig[metricName]
   return config?.calculationType ?? CalculationTypes.Accumulation
+}
+
+/**
+ * @param {FormMetricName | FunctionalAreaMetricName} metricName
+ */
+export function getMetricValueFunc(metricName) {
+  const config = metricConfig[metricName]
+  return config?.valueFunc ?? (() => 1)
 }
 
 /**
@@ -303,18 +317,6 @@ export function constructPeriodTimeslots(reportingDate) {
 }
 
 /**
- * Determines the metric value for a given audit record
- * @param {WithId<AuditRecordInput>} record
- * @returns {number}
- */
-function getMetricSnapshotValue(record) {
-  if (record.type === AuditEventMessageType.FORM_OPTION_UPDATED) {
-    return record.data.changes.new.allowCopy ? 1 : 0
-  }
-  return 1
-}
-
-/**
  * Collect functional area metrics from audit events by type
  * @param {AuditEventMessageType} queryType
  * @param {FunctionalAreaMetricName} metricName
@@ -328,61 +330,90 @@ export async function collectFunctionalAreaMetricsFromAuditByType(
   session
 ) {
   const calcType = getMetricCalcType(metricName)
-  if (calcType !== CalculationTypes.Snapshot) {
-    // Non-snapshot metrics can be cycled through with no special processing
-    const cursor = getAuditRecordsOfType(
-      queryType,
-      reportingDate,
-      undefined,
-      session
-    )
-    for await (const created of cursor) {
-      const metric = /** @type {FunctionalAreaTimelineMetric} */ ({
-        metricName,
-        metricValue: 1,
-        createdAt: created.createdAt,
-        ...(created.data && 'formId' in created.data
-          ? { formId: created.data.formId }
-          : {})
-      })
-      await saveFunctionalAreaTimelineMetrics(metric, session)
-    }
-    return
-  }
 
-  // Read functional area metric so far from previous day
-  // Only relavant for snapshot calculation types
-  const prevDayMetricValue = await getFunctionalAreaMetricFromPreviousDay(
-    subDays(reportingDate, 1),
-    metricName,
-    session
-  )
   // Work through the audit records from earliest in the day to latest
-  const cursorSnapshot = getAuditRecordsOfType(
+  const cursor = getAuditRecordsOfType(
     queryType,
     reportingDate,
     undefined,
     session,
     { createdAt: 1 }
   )
-  // TODO - rework this to handle a form being enabled several days ago but disabled today
-  // Rework so the daily metric record contains all the formId's where it is enabled
-  // That way you can easily change the next day's total up or down depending on the last record of the day per form
-  let total = prevDayMetricValue
-  const formsCount = /** @type {Map<string, number>} */ (new Map())
-  for await (const snapshot of cursorSnapshot) {
+
+  if (calcType === CalculationTypes.Snapshot) {
+    // Snapshot calculations
+    await processSnapshotMetric(cursor, metricName, reportingDate, session)
+  } else {
+    // Non-snapshot metrics can be cycled through with no special processing
+    await processNonSnapshotMetric(cursor, metricName, session)
+  }
+}
+
+/**
+ * Simple processing for non-snapshot metrics
+ * @param {FindCursor<WithId<AuditRecordInput>>} cursor
+ * @param {FunctionalAreaMetricName} metricName
+ * @param {ClientSession} session
+ */
+async function processNonSnapshotMetric(cursor, metricName, session) {
+  // Non-snapshot metrics can be cycled through with no special processing
+  for await (const created of cursor) {
+    const metric = /** @type {FunctionalAreaTimelineMetric} */ ({
+      metricName,
+      metricValue: 1,
+      createdAt: created.createdAt,
+      ...(created.data && 'formId' in created.data
+        ? { formId: created.data.formId }
+        : {})
+    })
+    await saveFunctionalAreaTimelineMetrics(metric, session)
+  }
+}
+
+/**
+ * @param {FindCursor<WithId<AuditRecordInput>>} cursor
+ * @param {FunctionalAreaMetricName} metricName
+ * @param {Date} reportingDate
+ * @param {ClientSession} session
+ */
+async function processSnapshotMetric(
+  cursor,
+  metricName,
+  reportingDate,
+  session
+) {
+  // Read functional area metric so far from previous day
+  // The daily metric record contains all the formId's where the property is enabled (in metric.metricContext)
+  const prevDayMetric = await getFunctionalAreaMetricFromPreviousDay(
+    subDays(reportingDate, 1),
+    metricName,
+    session
+  )
+
+  const metricValueFunc = getMetricValueFunc(metricName)
+  const prevFormIds = /** @type {string[]} */ (
+    prevDayMetric?.metricContext?.formIds ?? []
+  )
+  const currentFormSet = /** @type {Set<string>} */ (new Set(prevFormIds))
+  for await (const snapshot of cursor) {
     if (snapshot.data && 'formId' in snapshot.data) {
       const formId = snapshot.data.formId
-      const metricValue = getMetricSnapshotValue(snapshot)
-      if (metricValue > 0) {
-        formsCount.set(formId, (formsCount.get(formId) ?? 0) + metricValue)
+      const metricValue = metricValueFunc(snapshot)
+      if (metricValue === 0) {
+        currentFormSet.delete(formId)
+      } else if (metricValue === 1) {
+        currentFormSet.add(formId)
       }
     }
   }
-  total += formsCount.size
+  const total = currentFormSet.size
   const snapshotMetric = /** @type {FunctionalAreaTimelineMetric} */ ({
+    type: FormMetricType.TimelineMetric,
     metricName,
     metricValue: total,
+    metricContext: {
+      formIds: Array.from(currentFormSet)
+    },
     createdAt: reportingDate
   })
   await saveFunctionalAreaTimelineMetrics(snapshotMetric, session)
@@ -651,6 +682,6 @@ export function emptyFunctionalAreaMetrics(area) {
 }
 
 /**
- * @import { ClientSession, WithId } from 'mongodb'
+ * @import { ClientSession, FindCursor, WithId } from 'mongodb'
  * @import { AuditRecordInput, FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FunctionalAreaMetricName, FunctionalAreaTimelineMetric, FunctionalAreaTotalsMetric } from '@defra/forms-model'
  */

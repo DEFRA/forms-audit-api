@@ -1220,14 +1220,15 @@ describe('runMetricsCollectionJob', () => {
         new Date('2026-05-12T15:56:04.364Z'),
         undefined,
         expect.anything(),
-        { createdAt: 1 } // Overrides sort option
+        { createdAt: 1 }
       )
       expect(getAuditRecordsOfType).toHaveBeenNthCalledWith(
         5,
         'IDENTITY_REGISTRATION',
         new Date('2026-05-12T15:56:04.364Z'),
         undefined,
-        expect.anything()
+        expect.anything(),
+        { createdAt: 1 }
       )
       expect(getAuditRecordsOfType).toHaveBeenNthCalledWith(
         3,
