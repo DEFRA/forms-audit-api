@@ -1,4 +1,9 @@
-import { FormMetricName, FormMetricType, FormStatus } from '@defra/forms-model'
+import {
+  FormMetricName,
+  FormMetricType,
+  FormStatus,
+  FunctionalAreaType
+} from '@defra/forms-model'
 
 import { buildMockCollection } from '~/src/api/forms/__stubs__/mongo.js'
 import { db } from '~/src/mongo.js'
@@ -20,12 +25,15 @@ import {
   getDrilldownRecords,
   getFormOverviewMetrics,
   getFormTimelineMetrics,
+  getFunctionalAreaMetricFromPreviousDay,
+  getFunctionalAreaMetricTotals,
   getMetricTotals,
   getNumberOfFormsInDraft,
   saveDrilldown,
   saveDrilldownRecords,
   saveFormOverviewMetrics,
   saveFormTimelineMetrics,
+  updateFunctionalAreaMetricTotals,
   updateMetricTotals
 } from '~/src/repositories/metrics-repository.js'
 
@@ -304,6 +312,96 @@ describe('metrics-repository', () => {
       await expect(() =>
         // @ts-expect-error - partial data mocked
         updateMetricTotals(new Date(), [totals], mockSession)
+      ).rejects.toThrow('db error')
+    })
+  })
+
+  describe('getFunctionalAreaMetricTotals', () => {
+    it('should get totals for a functional area', async () => {
+      const totals = { area: FunctionalAreaType.Signin }
+      mockCollection.findOne.mockResolvedValueOnce(totals)
+
+      await expect(
+        getFunctionalAreaMetricTotals(FunctionalAreaType.Signin, mockSession)
+      ).resolves.toBe(totals)
+
+      expect(mockCollection.findOne).toHaveBeenCalledWith(
+        {
+          type: FormMetricType.FunctionalAreaTotalsMetric,
+          area: FunctionalAreaType.Signin
+        },
+        { session: mockSession }
+      )
+    })
+
+    it('should throw if error', () => {
+      mockCollection.findOne.mockImplementationOnce(() => {
+        throw new Error('db error')
+      })
+
+      expect(() =>
+        getFunctionalAreaMetricTotals(FunctionalAreaType.Signin, mockSession)
+      ).toThrow('db error')
+    })
+  })
+
+  describe('updateFunctionalAreaMetricTotals', () => {
+    it('should replace existing totals with the new snapshot records', async () => {
+      const reportDate = new Date('2026-06-01T00:00:00.000Z')
+      const totals = [
+        {
+          area: FunctionalAreaType.Signin,
+          successfulAuthentication: 4
+        },
+        {
+          area: FunctionalAreaType.CopyAnswers,
+          successfulAuthentication: 2
+        }
+      ]
+
+      await updateFunctionalAreaMetricTotals(
+        reportDate,
+        // @ts-expect-error - partial data mocked
+        totals,
+        mockSession
+      )
+
+      expect(mockCollection.deleteMany).toHaveBeenCalledWith(
+        { type: FormMetricType.FunctionalAreaTotalsMetric },
+        { session: mockSession }
+      )
+      expect(mockCollection.insertOne).toHaveBeenNthCalledWith(
+        1,
+        {
+          area: FunctionalAreaType.Signin,
+          successfulAuthentication: 4,
+          type: FormMetricType.FunctionalAreaTotalsMetric,
+          updatedAt: reportDate
+        },
+        { session: mockSession }
+      )
+      expect(mockCollection.insertOne).toHaveBeenNthCalledWith(
+        2,
+        {
+          area: FunctionalAreaType.CopyAnswers,
+          successfulAuthentication: 2,
+          type: FormMetricType.FunctionalAreaTotalsMetric,
+          updatedAt: reportDate
+        },
+        { session: mockSession }
+      )
+    })
+
+    it('should throw if saving totals fails', async () => {
+      mockCollection.insertOne.mockRejectedValueOnce(new Error('db error'))
+
+      await expect(
+        updateFunctionalAreaMetricTotals(
+          new Date(),
+          // @ts-expect-error - partial data mocked
+          [{ area: FunctionalAreaType.Signin }],
+          mockSession
+        )
       ).rejects.toThrow('db error')
     })
   })
@@ -752,6 +850,58 @@ describe('metrics-repository', () => {
     })
   })
 
+  describe('getFunctionalAreaMetricFromPreviousDay', () => {
+    const reportingDate = new Date('2026-04-01T12:00:00.000Z')
+
+    it('should return the metric value for the reporting date', async () => {
+      mockCollection.findOne.mockResolvedValueOnce({ metricValue: 5 })
+
+      await expect(
+        getFunctionalAreaMetricFromPreviousDay(
+          reportingDate,
+          'SuccessfulAuthentication',
+          mockSession
+        )
+      ).resolves.toEqual({ metricValue: 5 })
+
+      expect(mockCollection.findOne).toHaveBeenCalledWith(
+        {
+          type: FormMetricType.TimelineMetric,
+          metricName: 'SuccessfulAuthentication',
+          createdAt: {
+            $gte: new Date('2026-04-01T00:00:00.000Z'),
+            $lte: new Date('2026-04-01T23:59:59.999Z')
+          }
+        },
+        { session: mockSession }
+      )
+    })
+
+    it('should return null when no metric is found', async () => {
+      mockCollection.findOne.mockResolvedValueOnce(null)
+
+      await expect(
+        getFunctionalAreaMetricFromPreviousDay(
+          reportingDate,
+          'SuccessfulAuthentication',
+          mockSession
+        )
+      ).resolves.toBeNull()
+    })
+
+    it('should throw if error', async () => {
+      mockCollection.findOne.mockRejectedValueOnce(new Error('db error'))
+
+      await expect(
+        getFunctionalAreaMetricFromPreviousDay(
+          reportingDate,
+          'SuccessfulAuthentication',
+          mockSession
+        )
+      ).rejects.toThrow('db error')
+    })
+  })
+
   describe('clearMetricsData', () => {
     it('should delete records', async () => {
       await clearMetricsData(mockSession)
@@ -908,6 +1058,17 @@ describe('metrics-repository', () => {
 
   describe('saveDrilldownRecords', () => {
     const details = [{ detail: '1' }, { detail: '2' }, { detail: '3' }]
+
+    it('does not insert an empty batch', async () => {
+      await saveDrilldownRecords(
+        'last7Days',
+        FormMetricName.NewFormsCreated,
+        [],
+        mockSession
+      )
+
+      expect(mockCollection.insertMany).not.toHaveBeenCalled()
+    })
 
     it('should save batch of records', async () => {
       await saveDrilldownRecords(

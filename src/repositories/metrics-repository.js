@@ -340,7 +340,7 @@ export function getFunctionalAreaMetricTotals(area, session) {
   const coll = getMetricCollection()
 
   try {
-    return /** @type {Promise<WithId<FunctionalAreaTotalsMetric>>} */ (
+    return /** @type {Promise<WithId<FunctionalAreaTotalsMetric> | null>} */ (
       coll.findOne(
         {
           type: FormMetricType.FunctionalAreaTotalsMetric,
@@ -410,18 +410,16 @@ export async function updateFunctionalAreaMetricTotals(
       { session }
     )
 
-    await Promise.all(
-      totalsList.map((totals) => {
-        totals.updatedAt = reportDate
-        return coll.insertOne(
-          {
-            ...totals,
-            type: FormMetricType.FunctionalAreaTotalsMetric
-          },
-          { session }
-        )
-      })
-    )
+    for (const totals of totalsList) {
+      totals.updatedAt = reportDate
+      await coll.insertOne(
+        {
+          ...totals,
+          type: FormMetricType.FunctionalAreaTotalsMetric
+        },
+        { session }
+      )
+    }
   } catch (err) {
     logger.error(
       err,
@@ -548,6 +546,49 @@ export async function getNumberOfFormsInDraft(
     logger.error(
       err,
       `Failed to read timeline getNumberOfFormsInDraft for date ${reportingDate.toISOString()} - ${getErrorMessage(err)}`
+    )
+    throw err
+  }
+}
+
+/**
+ * Gets the functional area metric for the previous day relative to the specified reporting date and returns the value
+ * @param {Date} reportingDate
+ * @param {string} metricName
+ * @param {ClientSession} session
+ * @returns {Promise<WithId<FunctionalAreaTimelineMetric> | undefined>}
+ */
+export async function getFunctionalAreaMetricFromPreviousDay(
+  reportingDate,
+  metricName,
+  session
+) {
+  const coll = getMetricCollection()
+
+  const withoutTime = reportingDate.toISOString().substring(0, 10)
+  const startOfDay = `${withoutTime}T00:00:00.000Z`
+  const endOfDay = `${withoutTime}T23:59:59.999Z`
+
+  try {
+    const metric =
+      /** @type {WithId<FunctionalAreaTimelineMetric> | undefined} */ (
+        await coll.findOne(
+          {
+            type: FormMetricType.TimelineMetric,
+            metricName,
+            createdAt: {
+              $gte: new Date(startOfDay),
+              $lte: new Date(endOfDay)
+            }
+          },
+          { session }
+        )
+      )
+    return metric
+  } catch (err) {
+    logger.error(
+      err,
+      `Failed to read timeline getFunctionalAreaMetricFromPreviousDay for date ${reportingDate.toISOString()} and metricName ${metricName} - ${getErrorMessage(err)}`
     )
     throw err
   }

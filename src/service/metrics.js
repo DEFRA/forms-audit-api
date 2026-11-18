@@ -1,7 +1,8 @@
 import {
   AuditEventMessageType,
   FormMetricName,
-  FormStatus
+  FormStatus,
+  FunctionalAreaType
 } from '@defra/forms-model'
 import { add, differenceInDays, min, sub, subDays } from 'date-fns'
 
@@ -37,20 +38,25 @@ import {
   getJsonFromSubmissions
 } from '~/src/service/metrics-call-wrapper.js'
 import {
+  allowedCopyAnswersMetricNames,
+  collectCopyAnswersMetricsFromAudit
+} from '~/src/service/metrics-copy-answers.js'
+import {
+  calcAverages,
   constructPeriodTimeslots,
   createFormMap,
   emptyFormMetrics,
   formatDateOnly,
   getMetricCalcType,
-  handleMetricValue,
-  handleTimeslot,
-  isDraftSubmission,
-  isLiveSubmission,
+  handleAllTimeslots,
+  handleDraftSubmissions,
+  handleLiveSubmissions,
+  recalcFunctionalAreaMetrics,
   setTimeOnDate
 } from '~/src/service/metrics-helper.js'
 import {
-  collectSigninMetricsFromAudit,
-  recalcSigninMetrics
+  allowedSigninMetricNames,
+  collectSigninMetricsFromAudit
 } from '~/src/service/metrics-signin.js'
 
 /**
@@ -139,28 +145,8 @@ export async function collectMetrics(
     logger.info(
       `[metrics] getting timeline metrics for ${reportDate.toISOString()}`
     )
-    // All languages
-    await collectTimelineMetrics(submissionUrl, reportDate, undefined, session)
-    // Welsh-only
-    await collectTimelineMetrics(submissionUrl, reportDate, WELSH, session)
-
-    // All languages
-    await collectTimelineMetricsFromAudit(
-      reportDate,
-      undefined,
-      undefined,
-      session
-    )
-    // Welsh-only
-    await collectTimelineMetricsFromAudit(
-      reportDate,
-      WELSH,
-      languageFormIds,
-      session
-    )
-
-    // Functional areas - currently only sign-in metrics are collected
-    await collectSigninMetricsFromAudit(reportDate, session)
+    // Collect timeline metrics for all languages and Welsh-only (from submissions and audit records)
+    await collectRelevantTimelineMetrics(reportDate, languageFormIds, session)
 
     reportDate = add(reportDate, { days: 1 })
   }
@@ -175,9 +161,20 @@ export async function collectMetrics(
 
   await updateMetricTotals(reportEndDate, totals, session)
 
-  // Functional areas - currently only sign-in metrics are collected
+  // Functional areas
   const functionalAreaTotals = [
-    await recalcSigninMetrics(reportEndDate, session)
+    await recalcFunctionalAreaMetrics(
+      reportEndDate,
+      FunctionalAreaType.Signin,
+      allowedSigninMetricNames,
+      session
+    ),
+    await recalcFunctionalAreaMetrics(
+      reportEndDate,
+      FunctionalAreaType.CopyAnswers,
+      allowedCopyAnswersMetricNames,
+      session
+    )
   ]
   await updateFunctionalAreaMetricTotals(
     reportEndDate,
@@ -193,6 +190,42 @@ export async function collectMetrics(
     processMoreBatches: formatDateOnly(reportDate) <= formatDateOnly(yesterday),
     endDate: reportEndDate
   }
+}
+
+/**
+ * Collects relevant timeline metrics for the given report date and language-specific forms.
+ * @param {Date} reportDate
+ * @param {{ draftIds: Set<string>, liveIds: Set<string> }} languageFormIds
+ * @param {ClientSession} session
+ */
+async function collectRelevantTimelineMetrics(
+  reportDate,
+  languageFormIds,
+  session
+) {
+  // All languages
+  await collectTimelineMetrics(submissionUrl, reportDate, undefined, session)
+  // Welsh-only
+  await collectTimelineMetrics(submissionUrl, reportDate, WELSH, session)
+
+  // All languages
+  await collectTimelineMetricsFromAudit(
+    reportDate,
+    undefined,
+    undefined,
+    session
+  )
+  // Welsh-only
+  await collectTimelineMetricsFromAudit(
+    reportDate,
+    WELSH,
+    languageFormIds,
+    session
+  )
+
+  // Functional areas
+  await collectSigninMetricsFromAudit(reportDate, session)
+  await collectCopyAnswersMetricsFromAudit(reportDate, session)
 }
 
 /**
@@ -449,19 +482,23 @@ export async function recalcFormMetrics(
   /** @type { Date | undefined } */
   let earliestDataDate
 
+  const allowedMetricNames = new Set(Object.values(FormMetricName))
+
   const metricCursor = getFormMetricsCursor(formId, language, session)
 
   for await (const metric of metricCursor) {
     // FormsInDraft needs special attention since the cursor will return values from 'all' and other languages (e.g. Welsh),
     // therefore the totals must only use the relevant value for the language (or no language)
+    // Also skip metrics that aren't form metrics
     if (
-      metric.metricName === FormMetricName.FormsInDraft &&
-      language !== metric.language
+      (metric.metricName === FormMetricName.FormsInDraft &&
+        language !== metric.language) ||
+      !allowedMetricNames.has(metric.metricName)
     ) {
       continue
     }
 
-    const metricCalcType = getMetricCalcType(metric)
+    const metricCalcType = getMetricCalcType(metric.metricName)
 
     if (metric.metricName === FormMetricName.Submissions) {
       // Live submissions
@@ -491,32 +528,8 @@ export async function recalcFormMetrics(
 
     // Update windowed metrics
     const createdAt = new Date(metric.createdAt)
-    // Last 7 days
-    // prettier-ignore
-    handleTimeslot(metric, totals.last7Days, metricCalcType, createdAt, timeslots.sevenDaysAgo, timeslots.reportMorning, true)
 
-    // Previous 7 days
-    // prettier-ignore
-    handleTimeslot(metric, totals.prev7Days, metricCalcType, createdAt, timeslots.fourteenDaysAgo, timeslots.sevenDaysAgo)
-
-    // Last 30 days
-    // prettier-ignore
-    handleTimeslot(metric, totals.last30Days, metricCalcType, createdAt, timeslots.thirtyDaysAgo, timeslots.reportMorning, true)
-
-    // Previous 30 days
-    // prettier-ignore
-    handleTimeslot(metric, totals.prev30Days, metricCalcType, createdAt, timeslots.sixtyDaysAgo, timeslots.thirtyDaysAgo)
-
-    // Last year
-    // prettier-ignore
-    handleTimeslot(metric, totals.lastYear, metricCalcType, createdAt, timeslots.oneYearAgo, timeslots.reportMorning)
-
-    // Previous year
-    // prettier-ignore
-    handleTimeslot(metric, totals.prevYear, metricCalcType, createdAt, timeslots.twoYearsAgo, timeslots.oneYearAgo)
-
-    // All time
-    handleMetricValue(metric, totals.allTime, metricCalcType, true)
+    handleAllTimeslots(metric, totals, metricCalcType, createdAt, timeslots)
   }
   totals.liveSubmissions = Object.fromEntries(maps.formSubmissionsMapLive)
   totals.draftSubmissions = Object.fromEntries(maps.formSubmissionsMapDraft)
@@ -530,76 +543,6 @@ export async function recalcFormMetrics(
   const finalTotals = calcAverages(totals)
 
   return finalTotals
-}
-
-/**
- * @param {FormTimelineMetric} metric
- * @param {Map<string, number>} map
- */
-function handleLiveSubmissions(metric, map) {
-  if (isLiveSubmission(metric)) {
-    const formTotalSoFar = map.get(metric.formId) ?? 0
-    map.set(metric.formId, formTotalSoFar + metric.metricValue)
-  }
-}
-
-/**
- * @param {FormTimelineMetric} metric
- * @param {Map<string, number>} map
- */
-function handleDraftSubmissions(metric, map) {
-  if (isDraftSubmission(metric)) {
-    const formTotalSoFar = map.get(metric.formId) ?? 0
-    map.set(metric.formId, formTotalSoFar + metric.metricValue)
-  }
-}
-
-/**
- * @param {string} metricPropertyName
- * @param {any} totals
- * @param {string} periodName
- * @param {string} metricName
- * @param {any} totalsCopy
- */
-function calcAverage(
-  metricPropertyName,
-  totals,
-  periodName,
-  metricName,
-  totalsCopy
-) {
-  if (metricPropertyName === 'avgTotal') {
-    const total = totals[periodName][metricName].avgTotal
-    const count = totals[periodName][metricName].avgCount
-    totalsCopy[periodName][metricName].count = total / count
-    delete totalsCopy[periodName][metricName].avgTotal
-    delete totalsCopy[periodName][metricName].avgCount
-  }
-}
-
-/**
- * @param {any} totals
- */
-export function calcAverages(totals) {
-  const totalsCopy = {
-    ...totals
-  }
-  for (const periodName of Object.keys(totals)) {
-    for (const metricName of Object.keys(totals[periodName])) {
-      for (const metricPropertyName of Object.keys(
-        totals[periodName][metricName]
-      )) {
-        calcAverage(
-          metricPropertyName,
-          totals,
-          periodName,
-          metricName,
-          totalsCopy
-        )
-      }
-    }
-  }
-  return totalsCopy
 }
 
 /**
@@ -733,6 +676,6 @@ function getFormMetricsCursor(formId, language, session) {
 
 /**
  * @import { ClientSession } from 'mongodb'
- * @import { FilterOptions, FormOverviewMetric, FormTimelineMetric, FormTotalsMetric } from '@defra/forms-model'
+ * @import { FilterOptions, FormOverviewMetric, FormTimelineMetric, FormTotalsMetric, FunctionalAreaTotalsMetric } from '@defra/forms-model'
  * @import { CollectionJobResult } from '~/src/service/metrics-helper.js'
  */

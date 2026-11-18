@@ -50,6 +50,7 @@ export async function prepareDb(logger) {
 
   await coll2.createIndex({ type: 1, formId: 1, metricName: 1, formStatus: 1 })
   await coll2.createIndex({ type: 1, metricName: 1, periodName: 1 })
+  await coll2.createIndex({ type: 1, metricName: 1, createdAt: 1 })
 
   logger.info(`Mongodb connected to ${databaseName}`)
 

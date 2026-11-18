@@ -1,6 +1,6 @@
 import { createServer } from '~/src/api/server.js'
+import { generateFunctionalAreaReport } from '~/src/service/metrics-helper.js'
 import { runMetricsCollectionJob } from '~/src/service/metrics-job.js'
-import { generateFunctionalAreaReport } from '~/src/service/metrics-signin.js'
 import { generateSubmissionsReport } from '~/src/service/metrics-submissions.js'
 import {
   generateDrilldownReport,
@@ -10,8 +10,8 @@ import {
 import { authSuperAdmin as auth } from '~/test/fixtures/auth.js'
 
 jest.mock('~/src/service/metrics.js')
+jest.mock('~/src/service/metrics-helper.js')
 jest.mock('~/src/service/metrics-job.js')
-jest.mock('~/src/service/metrics-signin.js')
 jest.mock('~/src/service/metrics-submissions.js')
 jest.mock('~/src/mongo.js')
 jest.mock('~/src/plugins/audit-cache.js')

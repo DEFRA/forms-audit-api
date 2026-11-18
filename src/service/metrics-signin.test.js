@@ -7,7 +7,7 @@ import {
 
 import { client } from '~/src/mongo.js'
 import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
-import { saveSigninTimelineMetrics } from '~/src/repositories/metrics-func-area-repository.js'
+import { saveFunctionalAreaTimelineMetrics } from '~/src/repositories/metrics-func-area-repository.js'
 import {
   getAllTimelineMetrics,
   getFunctionalAreaMetricTotals
@@ -17,14 +17,10 @@ import {
   generateFunctionalAreaReport,
   recalcSigninMetrics
 } from '~/src/service/metrics-signin.js'
-import { calcAverages } from '~/src/service/metrics.js'
 
 jest.mock('~/src/repositories/audit-record-repository.js')
 jest.mock('~/src/repositories/metrics-repository.js')
 jest.mock('~/src/repositories/metrics-func-area-repository.js')
-jest.mock('~/src/service/metrics.js', () => ({
-  calcAverages: jest.fn((totals) => totals)
-}))
 jest.mock('~/src/mongo.js', () => ({
   client: {
     startSession: jest.fn()
@@ -51,7 +47,6 @@ describe('metrics-signin', () => {
 
   beforeEach(() => {
     jest.mocked(client.startSession).mockReturnValue(session)
-    jest.mocked(calcAverages).mockImplementation((totals) => totals)
   })
 
   describe('collectSigninMetricsFromAudit', () => {
@@ -107,9 +102,10 @@ describe('metrics-signin', () => {
           eventType,
           createdAt,
           undefined,
-          session
+          session,
+          { createdAt: 1 }
         )
-        expect(saveSigninTimelineMetrics).toHaveBeenNthCalledWith(
+        expect(saveFunctionalAreaTimelineMetrics).toHaveBeenNthCalledWith(
           index + 1,
           { metricName, metricValue: 1, createdAt },
           session
@@ -185,7 +181,6 @@ describe('metrics-signin', () => {
           [SigninMetricName.TooManyCodeRequests]: { count: 5 }
         }
       })
-      expect(calcAverages).toHaveBeenCalledWith(totals)
     })
 
     it('uses the fallback earliest date when no sign-in metrics exist', async () => {
@@ -234,8 +229,8 @@ describe('metrics-signin', () => {
         FunctionalAreaType.Signin
       )
 
-      expect(report.totals.type).toBe('functional-area-totals-metric')
-      expect(report.totals.last7Days).toBeUndefined()
+      expect(report.totals?.type).toBe('functional-area-totals-metric')
+      expect(report.totals?.last7Days).toBeUndefined()
       expect(session.endSession).toHaveBeenCalled()
     })
   })

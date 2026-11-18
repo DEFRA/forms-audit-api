@@ -7,8 +7,6 @@ import {
 import { getErrorMessage } from '~/src/helpers/error-message.js'
 import { logger } from '~/src/helpers/logging/logger.js'
 import { client } from '~/src/mongo.js'
-import { getAuditRecordsOfType } from '~/src/repositories/audit-record-repository.js'
-import { saveSigninTimelineMetrics } from '~/src/repositories/metrics-func-area-repository.js'
 import { adjustEarliestDate } from '~/src/repositories/metrics-repository-helper.js'
 import {
   getAllTimelineMetrics,
@@ -16,14 +14,14 @@ import {
 } from '~/src/repositories/metrics-repository.js'
 import {
   CalculationTypes,
+  calcAverages,
+  collectFunctionalAreaMetricsFromAuditByType,
   constructPeriodTimeslots,
   emptyFunctionalAreaMetrics,
-  handleMetricValue,
-  handleTimeslot
+  handleAllTimeslots
 } from '~/src/service/metrics-helper.js'
-import { calcAverages } from '~/src/service/metrics.js'
 
-const allSigninMetricNames = Object.values(SigninMetricName)
+export const allowedSigninMetricNames = Object.values(SigninMetricName)
 
 /**
  * Collect signin metrics from audit events
@@ -31,83 +29,48 @@ const allSigninMetricNames = Object.values(SigninMetricName)
  * @param {ClientSession} session
  */
 export async function collectSigninMetricsFromAudit(reportingDate, session) {
-  await collectSigninMetricsFromAuditByType(
+  await collectFunctionalAreaMetricsFromAuditByType(
     AuditEventMessageType.IDENTITY_REGISTRATION,
     SigninMetricName.Registration,
     reportingDate,
     session
   )
-  await collectSigninMetricsFromAuditByType(
+  await collectFunctionalAreaMetricsFromAuditByType(
     AuditEventMessageType.IDENTITY_SIGN_IN_SUCCESSFUL,
     SigninMetricName.SuccessfulAuthentication,
     reportingDate,
     session
   )
-  await collectSigninMetricsFromAuditByType(
+  await collectFunctionalAreaMetricsFromAuditByType(
     AuditEventMessageType.IDENTITY_TOO_MANY_OTPS_REQUESTED,
     SigninMetricName.TooManyCodeRequests,
     reportingDate,
     session
   )
-  await collectSigninMetricsFromAuditByType(
+  await collectFunctionalAreaMetricsFromAuditByType(
     AuditEventMessageType.IDENTITY_INCORRECT_CODE_ENTERED,
     SigninMetricName.IncorrectCodeEntered,
     reportingDate,
     session
   )
-  await collectSigninMetricsFromAuditByType(
+  await collectFunctionalAreaMetricsFromAuditByType(
     AuditEventMessageType.IDENTITY_ACCOUNT_DELETION,
     SigninMetricName.AccountDeletion,
     reportingDate,
     session
   )
-  await collectSigninMetricsFromAuditByType(
+  await collectFunctionalAreaMetricsFromAuditByType(
     AuditEventMessageType.IDENTITY_EMAIL_ADDRESS_UPDATED,
     SigninMetricName.EmailAddressUpdate,
     reportingDate,
     session
   )
-  await collectSigninMetricsFromAuditByType(
+  await collectFunctionalAreaMetricsFromAuditByType(
     AuditEventMessageType.IDENTITY_PHONE_NUMBER_UPDATED,
     SigninMetricName.PhoneNumberUpdate,
     reportingDate,
     session
   )
-}
-
-/**
- * Collect signin metrics from audit events by type
- * @param {AuditEventMessageType} queryType
- * @param {string} metricName
- * @param {Date} reportingDate
- * @param {ClientSession} session
- */
-async function collectSigninMetricsFromAuditByType(
-  queryType,
-  metricName,
-  reportingDate,
-  session
-) {
-  const cursor = getAuditRecordsOfType(
-    queryType,
-    reportingDate,
-    undefined,
-    session
-  )
-  // Dilemma as to whether to keep as individual records or aggregate by day
-  // Aggregate by day gives a performance and storage benefit, but we can't drill down into actual sign-ins
-  let dayTotal = 0
-  let lastCreatedAt = null
-  for await (const created of cursor) {
-    dayTotal++
-    lastCreatedAt = created.createdAt
-  }
-  const metric = /** @type {FunctionalAreaTimelineMetric} */ ({
-    metricName,
-    metricValue: dayTotal,
-    createdAt: lastCreatedAt
-  })
-  await saveSigninTimelineMetrics(metric, session)
 }
 
 /**
@@ -134,7 +97,7 @@ export async function recalcSigninMetrics(reportingDate, session) {
   let earliestDataDate
 
   const metricCursor = getAllTimelineMetrics(
-    { metricName: { $in: allSigninMetricNames } },
+    { metricName: { $in: allowedSigninMetricNames } },
     session
   )
 
@@ -143,38 +106,15 @@ export async function recalcSigninMetrics(reportingDate, session) {
     const createdAt = new Date(metric.createdAt)
     earliestDataDate = adjustEarliestDate(earliestDataDate, createdAt)
 
-    // Last 7 days
-    // prettier-ignore
-    handleTimeslot(metric, totals.last7Days, CalculationTypes.Accumulation, createdAt, timeslots.sevenDaysAgo, timeslots.reportMorning, true)
-
-    // Previous 7 days
-    // prettier-ignore
-    handleTimeslot(metric, totals.prev7Days, CalculationTypes.Accumulation, createdAt, timeslots.fourteenDaysAgo, timeslots.sevenDaysAgo)
-
-    // Last 30 days
-    // prettier-ignore
-    handleTimeslot(metric, totals.last30Days, CalculationTypes.Accumulation, createdAt, timeslots.thirtyDaysAgo, timeslots.reportMorning, true)
-
-    // Previous 30 days
-    // prettier-ignore
-    handleTimeslot(metric, totals.prev30Days, CalculationTypes.Accumulation, createdAt, timeslots.sixtyDaysAgo, timeslots.thirtyDaysAgo)
-
-    // Last year
-    // prettier-ignore
-    handleTimeslot(metric, totals.lastYear, CalculationTypes.Accumulation, createdAt, timeslots.oneYearAgo, timeslots.reportMorning)
-
-    // Previous year
-    // prettier-ignore
-    handleTimeslot(metric, totals.prevYear, CalculationTypes.Accumulation, createdAt, timeslots.twoYearsAgo, timeslots.oneYearAgo)
-
-    // All time
-    handleMetricValue(
+    handleAllTimeslots(
       metric,
-      totals.allTime,
+      totals,
       CalculationTypes.Accumulation,
-      true
+      createdAt,
+      timeslots
     )
   }
+
   // Approximate implementation date as fallback if no submissions found
   totals.earliestDate = earliestDataDate ?? new Date('2025-12-01')
   const finalTotals = calcAverages(totals)
@@ -209,5 +149,5 @@ export async function generateFunctionalAreaReport(area) {
 
 /**
  * @import { ClientSession } from 'mongodb'
- * @import { FunctionalAreaTotalsMetric, FunctionalAreaTimelineMetric } from '@defra/forms-model'
+ * @import { FunctionalAreaTotalsMetric } from '@defra/forms-model'
  */
