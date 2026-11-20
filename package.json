@@ -59,7 +59,7 @@
     "mongodb": "^6.18.0",
     "node-cron": "^4.2.1",
     "pino": "10.4.0",
-    "pino-pretty": "^13.0.0",
+    "pino-pretty": "^13.2.0",
     "proxy-agent": "^6.5.0"
   },
   "devDependencies": {
