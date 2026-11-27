@@ -255,6 +255,8 @@ export async function saveFormTimelineMetrics(formId, metricData, session) {
     await coll.insertOne(
       {
         ...metricData,
+        // Ensure 'createdAt' is always stored as a date, regardless of source
+        createdAt: new Date(metricData.createdAt),
         formId,
         type: FormMetricType.TimelineMetric
       },

@@ -915,6 +915,44 @@ describe('metrics-repository', () => {
       )
     })
 
+    it('should reset the control record so the job starts from the beginning', async () => {
+      await clearMetricsData(mockSession)
+      expect(mockCollection.updateOne).toHaveBeenCalledWith(
+        { type: 'form-metric-control' },
+        { $set: { lastSuccessfulRunDate: null } },
+        { session: {} }
+      )
+    })
+
+    it('should retain timeline metrics up to and including the last retained day', async () => {
+      const lastRetainedDate = new Date('2025-08-05T03:00:00.000Z')
+      await clearMetricsData(mockSession, lastRetainedDate)
+      expect(mockCollection.deleteMany).toHaveBeenCalledWith(
+        {
+          $or: [
+            {
+              type: {
+                $nin: ['form-metric-control', 'timeline-metric']
+              }
+            },
+            {
+              type: 'timeline-metric',
+              $or: [
+                { createdAt: { $gte: new Date('2025-08-06T00:00:00.000Z') } },
+                { createdAt: { $gte: '2025-08-06T00:00:00.000Z' } }
+              ]
+            }
+          ]
+        },
+        { session: {} }
+      )
+      expect(mockCollection.updateOne).toHaveBeenCalledWith(
+        { type: 'form-metric-control' },
+        { $set: { lastSuccessfulRunDate: lastRetainedDate } },
+        { session: {} }
+      )
+    })
+
     it('should throw if error', async () => {
       mockCollection.deleteMany.mockImplementationOnce(() => {
         throw new Error('bad db call')
