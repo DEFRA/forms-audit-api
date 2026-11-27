@@ -128,8 +128,6 @@ export async function releaseLock({ success, message, endDate }, session) {
 /**
  * Builds the filter for the metrics records to be deleted when clearing metrics.
  * If 'lastRetainedDate' is supplied, timeline metrics for that day (UTC) and earlier are retained.
- * Timeline metrics derived from forms-submission-api have 'createdAt' stored as an ISO string
- * (as received via JSON), whereas others have a BSON date, so both representations are matched.
  * @param { Date | undefined } lastRetainedDate
  */
 export function buildClearMetricsFilter(lastRetainedDate) {
@@ -151,10 +149,7 @@ export function buildClearMetricsFilter(lastRetainedDate) {
       },
       {
         type: FormMetricType.TimelineMetric,
-        $or: [
-          { createdAt: { $gte: cutoff } },
-          { createdAt: { $gte: cutoff.toISOString() } }
-        ]
+        createdAt: { $gte: cutoff }
       }
     ]
   }

@@ -1,3 +1,4 @@
+import { FormMetricType } from '@defra/forms-model'
 import { MongoClient } from 'mongodb'
 
 import { config } from '~/src/config/index.js'
@@ -52,12 +53,37 @@ export async function prepareDb(logger) {
   await coll2.createIndex({ type: 1, metricName: 1, periodName: 1 })
   await coll2.createIndex({ type: 1, metricName: 1, createdAt: 1 })
 
+  await convertMetricsCreatedAtToDate(coll2, logger)
+
   logger.info(`Mongodb connected to ${databaseName}`)
 
   return db
 }
 
 /**
- * @import { Db } from 'mongodb'
+ * Back-fix: converts any timeline metrics whose 'createdAt' was stored as a string
+ * (as received via JSON from forms-submission-api) into a date.
+ * Idempotent, so safe to run on every startup and from multiple containers.
+ * @param {Collection} coll - the metrics collection
+ * @param {Logger} logger
+ */
+export async function convertMetricsCreatedAtToDate(coll, logger) {
+  const { modifiedCount } = await coll.updateMany(
+    {
+      type: FormMetricType.TimelineMetric,
+      createdAt: { $type: 'string' }
+    },
+    [{ $set: { createdAt: { $toDate: '$createdAt' } } }]
+  )
+
+  if (modifiedCount) {
+    logger.info(
+      `Converted createdAt from string to date on ${modifiedCount} metrics records`
+    )
+  }
+}
+
+/**
+ * @import { Collection, Db } from 'mongodb'
  * @import { Logger } from 'pino'
  */
