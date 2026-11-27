@@ -15,6 +15,8 @@ export async function saveFunctionalAreaTimelineMetrics(metricData, session) {
     await coll.insertOne(
       {
         ...metricData,
+        // Ensure 'createdAt' is always stored as a date, regardless of source
+        createdAt: new Date(metricData.createdAt),
         type: FormMetricType.TimelineMetric
       },
       { session }
