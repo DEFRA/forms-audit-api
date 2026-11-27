@@ -85,13 +85,52 @@ export const EARLIEST_REPORT_DATE_AS_STRING = '2025-07-01'
 const METRICS_FORM_BATCH_SIZE = 20
 
 /**
- * Delete all metrics records from the database (apart from the control record)
+ * Determines the last day for which existing timeline metrics must be retained during a regeneration.
+ * Submission records are removed over time by a TTL, so metrics up to and including the day of the
+ * earliest remaining submission can't be fully regenerated and are kept. That day is retained (rather
+ * than recollected) since some of its submissions may already have expired.
+ * Returns undefined if all metrics can be regenerated from scratch.
+ * @returns {Promise<Date | undefined>}
+ */
+export async function getLastRetainedMetricsDate() {
+  const { body } = await getJsonFromSubmissions(
+    new URL(`${submissionUrl}/report/earliest-submission`)
+  )
+  const { earliestDate } = /** @type {{ earliestDate: string | null }} */ (body)
+
+  if (!earliestDate) {
+    return undefined
+  }
+
+  const earliestDay = new Date(earliestDate).toISOString().substring(0, 10)
+
+  // The collection job never reports on days before this, so there's nothing to retain
+  if (earliestDay <= EARLIEST_REPORT_DATE_AS_STRING) {
+    return undefined
+  }
+
+  // Keep the time-of-day aligned with that used by the collection job
+  return setTimeOnDate(earliestDay, new Date())
+}
+
+/**
+ * Delete metrics records from the database so they can be regenerated (the control record is kept).
+ * Timeline metrics up to and including the day of the earliest remaining submission are retained,
+ * and the control record is adjusted so the next collection job starts from the following day.
  */
 export async function clearMetricsDatabase() {
+  const lastRetainedDate = await getLastRetainedMetricsDate()
+
+  logger.info(
+    lastRetainedDate
+      ? `[metrics] clearing metrics after ${lastRetainedDate.toISOString()}`
+      : '[metrics] clearing all metrics'
+  )
+
   const session = client.startSession()
   try {
     await session.withTransaction(async () => {
-      await clearMetricsData(session)
+      await clearMetricsData(session, lastRetainedDate)
     })
   } finally {
     await session.endSession()

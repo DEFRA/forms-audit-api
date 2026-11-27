@@ -1,10 +1,11 @@
-import { getErrorMessage } from '@defra/forms-model'
+import { FormMetricType, getErrorMessage } from '@defra/forms-model'
 import { subHours } from 'date-fns'
 
 import { logger } from '~/src/helpers/logging/logger.js'
 import { getMetricCollection } from '~/src/repositories/metrics-repository-helper.js'
 
 const FORM_METRIC_CONTROL = 'form-metric-control'
+const MS_IN_A_DAY = 24 * 60 * 60 * 1000
 
 /**
  * Gets metric lock record and sets the lock if not already locked.
@@ -125,24 +126,61 @@ export async function releaseLock({ success, message, endDate }, session) {
 }
 
 /**
- * Clears all metrics data (leaves the control record)
- * @param {ClientSession} session
+ * Builds the filter for the metrics records to be deleted when clearing metrics.
+ * If 'lastRetainedDate' is supplied, timeline metrics for that day (UTC) and earlier are retained.
+ * Timeline metrics derived from forms-submission-api have 'createdAt' stored as an ISO string
+ * (as received via JSON), whereas others have a BSON date, so both representations are matched.
+ * @param { Date | undefined } lastRetainedDate
  */
-export async function clearMetricsData(session) {
+export function buildClearMetricsFilter(lastRetainedDate) {
+  if (!lastRetainedDate) {
+    return { type: { $ne: FORM_METRIC_CONTROL } }
+  }
+
+  const lastRetainedDay = lastRetainedDate.toISOString().substring(0, 10)
+  const cutoff = new Date(
+    new Date(`${lastRetainedDay}T00:00:00.000Z`).getTime() + MS_IN_A_DAY
+  )
+
+  return {
+    $or: [
+      {
+        type: {
+          $nin: [FORM_METRIC_CONTROL, FormMetricType.TimelineMetric]
+        }
+      },
+      {
+        type: FormMetricType.TimelineMetric,
+        $or: [
+          { createdAt: { $gte: cutoff } },
+          { createdAt: { $gte: cutoff.toISOString() } }
+        ]
+      }
+    ]
+  }
+}
+
+/**
+ * Clears metrics data (leaves the control record).
+ * If 'lastRetainedDate' is supplied, timeline metrics up to and including that day are retained
+ * (since the source records may no longer exist to regenerate them from), and the control record
+ * is set so the next job run starts collecting from the following day.
+ * Otherwise, all metrics are cleared and the next job run starts from the beginning.
+ * @param {ClientSession} session
+ * @param {Date} [lastRetainedDate]
+ */
+export async function clearMetricsData(session, lastRetainedDate) {
   const coll = getMetricCollection()
 
   try {
-    await coll.deleteMany(
-      {
-        type: { $ne: FORM_METRIC_CONTROL }
-      },
-      { session }
-    )
+    await coll.deleteMany(buildClearMetricsFilter(lastRetainedDate), {
+      session
+    })
     await coll.updateOne(
       {
         type: FORM_METRIC_CONTROL
       },
-      { $set: { lastSuccessfulRunDate: null } },
+      { $set: { lastSuccessfulRunDate: lastRetainedDate ?? null } },
       { session }
     )
   } catch (err) {

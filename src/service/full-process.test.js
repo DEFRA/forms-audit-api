@@ -41,6 +41,12 @@ function getExpectedSummary(partialSummary) {
 }
 describe('Full process', () => {
   it('should populate full metrics records, then read the report', async () => {
+    // Earliest submission lookup made when clearing the metrics
+    jest
+      .mocked(getJsonFromSubmissions)
+      // @ts-expect-error - partial mock of test data
+      .mockResolvedValueOnce({ body: { earliestDate: null } })
+
     const mockSubmissionsData = buildMockSubmissionData()
     mockSubmissionsData.forEach((data) =>
       // @ts-expect-error - partial mock of test data

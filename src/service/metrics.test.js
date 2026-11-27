@@ -1067,8 +1067,13 @@ describe('runMetricsCollectionJob', () => {
   })
 
   describe('clearMetricsDatabase', () => {
-    it('should clear db', async () => {
+    /**
+     * @param { string | null } earliestDate
+     */
+    function setupMocks(earliestDate) {
       jest.mocked(clearMetricsData).mockResolvedValueOnce()
+      // @ts-expect-error - partial mock of response
+      jest.mocked(getJson).mockResolvedValueOnce({ body: { earliestDate } })
       const mockNewSession = /** @type {any} */ ({
         withTransaction: jest.fn().mockImplementation(async (callback) => {
           return await callback()
@@ -1076,8 +1081,46 @@ describe('runMetricsCollectionJob', () => {
         endSession: jest.fn().mockResolvedValue(undefined)
       })
       jest.mocked(client.startSession).mockReturnValue(mockNewSession)
+      return mockNewSession
+    }
+
+    beforeEach(() => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-11-27T03:00:00.000Z'))
+    })
+
+    afterEach(() => {
+      jest.useRealTimers()
+    })
+
+    it('should retain metrics up to the day of the earliest submission', async () => {
+      const session = setupMocks('2025-08-05T14:22:33.000Z')
       await clearMetricsDatabase()
-      expect(clearMetricsData).toHaveBeenCalled()
+      expect(getJson).toHaveBeenCalledWith(
+        new URL('http://localhost:3002/report/earliest-submission'),
+        {}
+      )
+      expect(clearMetricsData).toHaveBeenCalledWith(
+        session,
+        new Date('2025-08-05T03:00:00.000Z')
+      )
+    })
+
+    it('should clear all metrics if there are no submissions', async () => {
+      const session = setupMocks(null)
+      await clearMetricsDatabase()
+      expect(clearMetricsData).toHaveBeenCalledWith(session, undefined)
+    })
+
+    it('should clear all metrics if earliest submission is before reporting began', async () => {
+      const session = setupMocks('2025-07-01T23:59:59.000Z')
+      await clearMetricsDatabase()
+      expect(clearMetricsData).toHaveBeenCalledWith(session, undefined)
+    })
+
+    it('should not clear anything if the earliest submission cannot be determined', async () => {
+      jest.mocked(getJson).mockRejectedValueOnce(new Error('api down'))
+      await expect(clearMetricsDatabase()).rejects.toThrow('api down')
+      expect(clearMetricsData).not.toHaveBeenCalled()
     })
   })
 
