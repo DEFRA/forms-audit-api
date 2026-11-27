@@ -44,6 +44,7 @@ import {
 import {
   calcAverages,
   constructPeriodTimeslots,
+  convertStringDateOnlyToMillis,
   createFormMap,
   emptyFormMetrics,
   formatDateOnly,
@@ -105,7 +106,11 @@ export async function getLastRetainedMetricsDate() {
   const earliestDay = new Date(earliestDate).toISOString().substring(0, 10)
 
   // The collection job never reports on days before this, so there's nothing to retain
-  if (earliestDay <= EARLIEST_REPORT_DATE_AS_STRING) {
+  const earliestDayStart = convertStringDateOnlyToMillis(earliestDay)
+  const reportingStart = convertStringDateOnlyToMillis(
+    EARLIEST_REPORT_DATE_AS_STRING
+  )
+  if (earliestDayStart <= reportingStart) {
     return undefined
   }
 

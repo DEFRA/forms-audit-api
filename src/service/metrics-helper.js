@@ -84,6 +84,15 @@ export function setTimeOnDate(inDateStr, inTime) {
 }
 
 /**
+ * Converts a date string in the format YYYY-mm-dd to a timestamp for the start of the day in milliseconds.
+ * @param {string} inDateStr - in format YYYY-mm-dd
+ * @returns {number} timestamp for the start of the day in UTC
+ */
+export function convertStringDateOnlyToMillis(inDateStr) {
+  return new Date(`${inDateStr}T00:00:00.000Z`).getTime()
+}
+
+/**
  * @param {Date} date
  * @param {Date} startOfRange
  * @param {Date} endOfRange
