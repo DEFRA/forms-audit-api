@@ -1,6 +1,11 @@
 import { FormMetricName, FormMetricType, FormStatus } from '@defra/forms-model'
 
-import { METRICS_COLLECTION_NAME, client, db } from '~/src/mongo.js'
+import {
+  METRICS_COLLECTION_NAME,
+  client,
+  convertMetricsCreatedAtToDate,
+  db
+} from '~/src/mongo.js'
 import { clearMetricsData } from '~/src/repositories/metrics-job-repository.js'
 import { setupIntegrationDb } from '~/test/helpers/mongo-memory.js'
 
@@ -41,15 +46,13 @@ describe('metrics-job-repository (integration)', () => {
         locked: false,
         lastSuccessfulRunDate: new Date('2026-11-26T03:00:00.000Z')
       },
-      // Submission metrics arrive via JSON so 'createdAt' is a string
-      timelineMetric('before-string', '2025-08-04T03:00:00.000Z'),
-      timelineMetric('same-day-string', '2025-08-05T03:00:00.000Z'),
-      timelineMetric('after-string', '2025-08-06T03:00:00.000Z'),
-      // Audit-derived metrics have a BSON date
+      timelineMetric('before', new Date('2025-08-04T03:00:00.000Z')),
+      timelineMetric('same-day', new Date('2025-08-05T03:00:00.000Z')),
       timelineMetric(
         'same-day-late-date',
         new Date('2025-08-05T23:59:59.999Z')
       ),
+      timelineMetric('after', new Date('2025-08-06T03:00:00.000Z')),
       timelineMetric('after-date', new Date('2025-08-06T00:00:00.000Z')),
       { type: FormMetricType.TotalsMetric, earliestDate: new Date() },
       { type: FormMetricType.OverviewMetric, formId: 'overview' }
@@ -71,9 +74,9 @@ describe('metrics-job-repository (integration)', () => {
       .find({ type: { $ne: 'form-metric-control' } })
       .toArray()
     expect(remaining.map((r) => r.formId).sort()).toEqual([
-      'before-string',
-      'same-day-late-date',
-      'same-day-string'
+      'before',
+      'same-day',
+      'same-day-late-date'
     ])
 
     const control = await coll().findOne({ type: 'form-metric-control' })
@@ -95,6 +98,38 @@ describe('metrics-job-repository (integration)', () => {
     expect(remaining[0]).toMatchObject({
       type: 'form-metric-control',
       lastSuccessfulRunDate: null
+    })
+  })
+
+  describe('convertMetricsCreatedAtToDate', () => {
+    it('should convert string createdAt values to dates', async () => {
+      await coll().insertMany([
+        // Submission metrics previously stored 'createdAt' as received via JSON
+        timelineMetric('string-1', '2025-08-07T03:00:00.000Z'),
+        timelineMetric('string-2', '2025-08-08T03:00:00.000Z')
+      ])
+      const logger = { info: jest.fn() }
+
+      // @ts-expect-error - partial logger
+      await convertMetricsCreatedAtToDate(coll(), logger)
+
+      expect(
+        await coll().countDocuments({ createdAt: { $type: 'string' } })
+      ).toBe(0)
+      const converted = await coll().findOne({ formId: 'string-1' })
+      expect(converted?.createdAt).toEqual(new Date('2025-08-07T03:00:00.000Z'))
+      // Existing dates untouched
+      const existing = await coll().findOne({ formId: 'same-day' })
+      expect(existing?.createdAt).toEqual(new Date('2025-08-05T03:00:00.000Z'))
+      expect(logger.info).toHaveBeenCalledWith(
+        'Converted createdAt from string to date on 2 metrics records'
+      )
+
+      // Idempotent - nothing further to convert
+      logger.info.mockClear()
+      // @ts-expect-error - partial logger
+      await convertMetricsCreatedAtToDate(coll(), logger)
+      expect(logger.info).not.toHaveBeenCalled()
     })
   })
 })

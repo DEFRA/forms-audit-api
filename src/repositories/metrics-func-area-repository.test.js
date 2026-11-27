@@ -40,6 +40,22 @@ describe('metrics-func-area-repository', () => {
     )
   })
 
+  it('converts a string createdAt to a date', async () => {
+    await saveFunctionalAreaTimelineMetrics(
+      // @ts-expect-error - createdAt received as string via JSON
+      { ...metricData, createdAt: '2026-05-01T10:00:00.000Z' },
+      mockSession
+    )
+
+    expect(mockCollection.insertOne).toHaveBeenCalledWith(
+      {
+        ...metricData,
+        type: FormMetricType.TimelineMetric
+      },
+      { session: mockSession }
+    )
+  })
+
   it('rethrows an error when saving fails', async () => {
     const error = new Error('db error')
     mockCollection.insertOne.mockRejectedValueOnce(error)

@@ -255,6 +255,7 @@ export async function saveFormTimelineMetrics(formId, metricData, session) {
     await coll.insertOne(
       {
         ...metricData,
+        // Metrics received via JSON (e.g. from forms-submission-api) carry 'createdAt' as a string
         // Ensure 'createdAt' is always stored as a date, regardless of source
         createdAt: new Date(metricData.createdAt),
         formId,

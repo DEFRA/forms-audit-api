@@ -260,6 +260,22 @@ describe('metrics-repository', () => {
       })
     })
 
+    it('should convert a string createdAt to a date', async () => {
+      mockCollection.insertOne.mockResolvedValueOnce({})
+
+      await saveFormTimelineMetrics(
+        formId,
+        // @ts-expect-error - createdAt received as string via JSON
+        { ...doc, createdAt: '2025-08-05T03:00:00.000Z' },
+        mockSession
+      )
+
+      expect(mockCollection.insertOne).toHaveBeenCalledWith(
+        { ...doc, createdAt: new Date('2025-08-05T03:00:00.000Z') },
+        { session: {} }
+      )
+    })
+
     it('should throw if error', async () => {
       mockCollection.insertOne.mockImplementationOnce(() => {
         throw new Error('db error')
@@ -937,10 +953,7 @@ describe('metrics-repository', () => {
             },
             {
               type: 'timeline-metric',
-              $or: [
-                { createdAt: { $gte: new Date('2025-08-06T00:00:00.000Z') } },
-                { createdAt: { $gte: '2025-08-06T00:00:00.000Z' } }
-              ]
+              createdAt: { $gte: new Date('2025-08-06T00:00:00.000Z') }
             }
           ]
         },
